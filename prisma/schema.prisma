@@ -1,0 +1,180 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum ExamCategory {
+  PO
+  CLERK
+  SO
+  OTHER
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  name      String
+  password  String?
+  role      Role      @default(USER)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  attempts  Attempt[]
+}
+
+model Exam {
+  id          String       @id @default(uuid())
+  slug        String       @unique
+  title       String
+  category    ExamCategory
+  description String
+  isActive    Boolean      @default(true)
+  sections    Section[]
+  mockTests   MockTest[]
+  questions   Question[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Section {
+  id                String             @id @default(uuid())
+  name              String
+  code              String             // e.g. "QUANT", "REASONING", "ENGLISH", "GA"
+  examId            String
+  exam              Exam               @relation(fields: [examId], references: [id], onDelete: Cascade)
+  topics            Topic[]
+  questions         Question[]
+  mockTestQuestions MockTestQuestion[]
+  order             Int                @default(0)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@unique([examId, code])
+}
+
+model Topic {
+  id        String     @id @default(uuid())
+  name      String
+  sectionId String
+  section   Section    @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  questions Question[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model Question {
+  id                String             @id @default(uuid())
+  text              String
+  imageUrl          String?
+  difficulty        Difficulty         @default(MEDIUM)
+  explanation       String
+  marks             Float              @default(1.0)
+  negativeMarks     Float              @default(0.25)
+  examId            String
+  exam              Exam               @relation(fields: [examId], references: [id], onDelete: Cascade)
+  sectionId         String
+  section           Section            @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  topicId           String
+  topic             Topic              @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  options           Option[]
+  mockTestQuestions MockTestQuestion[]
+  answers           Answer[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model Option {
+  id         String   @id @default(uuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  text       String
+  isCorrect  Boolean  @default(false)
+  order      Int      @default(0)
+  answers    Answer[]
+}
+
+model MockTest {
+  id                String             @id @default(uuid())
+  slug              String             @unique
+  title             String
+  description       String
+  examId            String
+  exam              Exam               @relation(fields: [examId], references: [id], onDelete: Cascade)
+  durationMinutes   Int
+  totalMarks        Float
+  totalQuestions    Int
+  cutoffMarks       Float?
+  isFree            Boolean            @default(true)
+  isPublished       Boolean            @default(true)
+  mockTestQuestions MockTestQuestion[]
+  attempts          Attempt[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model MockTestQuestion {
+  id         String   @id @default(uuid())
+  mockTestId String
+  mockTest   MockTest @relation(fields: [mockTestId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  sectionId  String
+  section    Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  order      Int      @default(0)
+
+  @@unique([mockTestId, questionId])
+}
+
+model Attempt {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mockTestId      String
+  mockTest        MockTest @relation(fields: [mockTestId], references: [id], onDelete: Cascade)
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  timeTakenSeconds Int      @default(0)
+  score           Float    @default(0)
+  maxScore        Float    @default(0)
+  accuracy        Float    @default(0)
+  totalAttempted  Int      @default(0)
+  correctCount    Int      @default(0)
+  incorrectCount  Int      @default(0)
+  unansweredCount Int      @default(0)
+  isCompleted     Boolean  @default(false)
+  answers         Answer[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Answer {
+  id               String   @id @default(uuid())
+  attemptId        String
+  attempt          Attempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  questionId       String
+  question         Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedOptionId String?
+  selectedOption   Option?  @relation(fields: [selectedOptionId], references: [id], onDelete: SetNull)
+  isMarkedForReview Boolean @default(false)
+  isAnswered       Boolean  @default(false)
+  isCorrect        Boolean?
+  marksObtained    Float    @default(0)
+  timeSpentSeconds Int      @default(0)
+  updatedAt        DateTime @updatedAt
+
+  @@unique([attemptId, questionId])
+}

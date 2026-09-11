@@ -1,0 +1,99 @@
+import { AttemptResult, DashboardStats, Exam, MockTest } from '@/types';
+import { EXAMS_DATA } from '../data/exams';
+import { MOCK_TESTS_DATA } from '../data/mockTests';
+import { INITIAL_DASHBOARD_STATS, SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
+
+const ATTEMPTS_STORAGE_KEY = 'bankmock_attempts';
+
+export async function getExams(): Promise<Exam[]> {
+  return EXAMS_DATA;
+}
+
+export async function getExamBySlug(slug: string): Promise<Exam | null> {
+  const exam = EXAMS_DATA.find(e => e.slug === slug);
+  return exam || null;
+}
+
+export async function getMockTests(examSlug?: string): Promise<MockTest[]> {
+  if (examSlug) {
+    return MOCK_TESTS_DATA.filter(m => m.examSlug === examSlug);
+  }
+  return MOCK_TESTS_DATA;
+}
+
+export async function getMockTestById(idOrSlug: string): Promise<MockTest | null> {
+  const test = MOCK_TESTS_DATA.find(m => m.id === idOrSlug || m.slug === idOrSlug);
+  return test || null;
+}
+
+export function saveAttemptResult(result: AttemptResult): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const existingStr = localStorage.getItem(ATTEMPTS_STORAGE_KEY);
+    const existing: AttemptResult[] = existingStr ? JSON.parse(existingStr) : [];
+    // Remove if duplicate ID exists
+    const filtered = existing.filter(a => a.id !== result.id);
+    filtered.unshift(result);
+    localStorage.setItem(ATTEMPTS_STORAGE_KEY, JSON.stringify(filtered));
+  } catch (err) {
+    console.error('Failed to save attempt in localStorage:', err);
+  }
+}
+
+export function getAttemptResultById(attemptId: string): AttemptResult | null {
+  if (typeof window !== 'undefined') {
+    try {
+      const existingStr = localStorage.getItem(ATTEMPTS_STORAGE_KEY);
+      if (existingStr) {
+        const attempts: AttemptResult[] = JSON.parse(existingStr);
+        const found = attempts.find(a => a.id === attemptId);
+        if (found) return found;
+      }
+    } catch (err) {
+      console.error('Failed to parse attempts from localStorage:', err);
+    }
+  }
+
+  // Fallback to sample attempts
+  const sample = SAMPLE_ATTEMPTS.find(a => a.id === attemptId);
+  return sample || null;
+}
+
+export function getDashboardStats(): DashboardStats {
+  let userAttempts: AttemptResult[] = [];
+  if (typeof window !== 'undefined') {
+    try {
+      const existingStr = localStorage.getItem(ATTEMPTS_STORAGE_KEY);
+      if (existingStr) {
+        userAttempts = JSON.parse(existingStr);
+      }
+    } catch (err) {
+      console.error('Error loading attempts:', err);
+    }
+  }
+
+  const allAttempts = [...userAttempts, ...SAMPLE_ATTEMPTS];
+
+  if (allAttempts.length === 0) {
+    return INITIAL_DASHBOARD_STATS;
+  }
+
+  const totalTestsAttempted = allAttempts.length;
+  const totalScore = allAttempts.reduce((acc, curr) => acc + curr.score, 0);
+  const averageScore = parseFloat((totalScore / totalTestsAttempted).toFixed(2));
+  const bestScore = Math.max(...allAttempts.map(a => a.score));
+  const totalAccuracy = allAttempts.reduce((acc, curr) => acc + curr.accuracy, 0);
+  const averageAccuracy = parseFloat((totalAccuracy / totalTestsAttempted).toFixed(1));
+  const totalTimeSpentSeconds = allAttempts.reduce((acc, curr) => acc + curr.timeTakenSeconds, 0);
+
+  return {
+    totalTestsAttempted,
+    averageScore,
+    bestScore,
+    averageAccuracy,
+    totalTimeSpentMinutes: Math.round(totalTimeSpentSeconds / 60),
+    recentAttempts: allAttempts.slice(0, 5),
+    sectionPerformance: INITIAL_DASHBOARD_STATS.sectionPerformance,
+    weakTopics: INITIAL_DASHBOARD_STATS.weakTopics,
+  };
+}

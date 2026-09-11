@@ -1,0 +1,173 @@
+import { AttemptResult, DashboardStats } from '@/types';
+
+export const SAMPLE_ATTEMPTS: AttemptResult[] = [
+  {
+    id: 'att-sample-1',
+    mockTestId: 'mock-ibps-po-1',
+    mockTestTitle: 'IBPS PO Prelims Full Mock Test 1',
+    examSlug: 'ibps-po',
+    examTitle: 'IBPS PO (Probationary Officer)',
+    userId: 'user-demo',
+    userName: 'Aspirant',
+    startedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 2 + 3600000).toISOString(),
+    timeTakenSeconds: 3420,
+    totalDurationSeconds: 3600,
+    score: 64.25,
+    maxScore: 100,
+    percentage: 64.25,
+    accuracy: 81.2,
+    totalQuestions: 100,
+    totalAttempted: 82,
+    correctCount: 68,
+    incorrectCount: 14,
+    unansweredCount: 18,
+    cutoffMarks: 58.5,
+    isCutoffCleared: true,
+    sectionResults: [
+      {
+        sectionCode: 'ENGLISH',
+        sectionName: 'English Language',
+        totalQuestions: 30,
+        attempted: 26,
+        correct: 22,
+        incorrect: 4,
+        unanswered: 4,
+        score: 21.0,
+        maxScore: 30,
+        accuracy: 84.6,
+        cutoffMarks: 10.0,
+        isCutoffCleared: true
+      },
+      {
+        sectionCode: 'QUANT',
+        sectionName: 'Quantitative Aptitude',
+        totalQuestions: 35,
+        attempted: 27,
+        correct: 21,
+        incorrect: 6,
+        unanswered: 8,
+        score: 19.5,
+        maxScore: 35,
+        accuracy: 77.8,
+        cutoffMarks: 11.5,
+        isCutoffCleared: true
+      },
+      {
+        sectionCode: 'REASONING',
+        sectionName: 'Reasoning Ability',
+        totalQuestions: 35,
+        attempted: 29,
+        correct: 25,
+        incorrect: 4,
+        unanswered: 6,
+        score: 24.0,
+        maxScore: 35,
+        accuracy: 86.2,
+        cutoffMarks: 11.0,
+        isCutoffCleared: true
+      }
+    ],
+    topicResults: [
+      { topicName: 'Reading Comprehension', sectionCode: 'ENGLISH', attempted: 8, correct: 7, total: 10, accuracy: 87.5 },
+      { topicName: 'Number Series', sectionCode: 'QUANT', attempted: 5, correct: 5, total: 5, accuracy: 100.0 },
+      { topicName: 'Data Interpretation', sectionCode: 'QUANT', attempted: 10, correct: 7, total: 10, accuracy: 70.0 },
+      { topicName: 'Seating Arrangement', sectionCode: 'REASONING', attempted: 10, correct: 8, total: 10, accuracy: 80.0 },
+      { topicName: 'Syllogism', sectionCode: 'REASONING', attempted: 5, correct: 5, total: 5, accuracy: 100.0 },
+    ],
+    questionDetails: []
+  },
+  {
+    id: 'att-sample-2',
+    mockTestId: 'mock-sbi-clerk-1',
+    mockTestTitle: 'SBI Clerk Prelims Full Mock Test 1',
+    examSlug: 'sbi-clerk',
+    examTitle: 'SBI Clerk (Junior Associate)',
+    userId: 'user-demo',
+    userName: 'Aspirant',
+    startedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
+    completedAt: new Date(Date.now() - 86400000 * 5 + 3400000).toISOString(),
+    timeTakenSeconds: 3200,
+    totalDurationSeconds: 3600,
+    score: 76.75,
+    maxScore: 100,
+    percentage: 76.75,
+    accuracy: 88.5,
+    totalQuestions: 100,
+    totalAttempted: 90,
+    correctCount: 80,
+    incorrectCount: 10,
+    unansweredCount: 10,
+    cutoffMarks: 72.5,
+    isCutoffCleared: true,
+    sectionResults: [
+      {
+        sectionCode: 'ENGLISH',
+        sectionName: 'English Language',
+        totalQuestions: 30,
+        attempted: 28,
+        correct: 25,
+        incorrect: 3,
+        unanswered: 2,
+        score: 24.25,
+        maxScore: 30,
+        accuracy: 89.3,
+        cutoffMarks: 12.0,
+        isCutoffCleared: true
+      },
+      {
+        sectionCode: 'QUANT',
+        sectionName: 'Numerical Ability',
+        totalQuestions: 35,
+        attempted: 31,
+        correct: 27,
+        incorrect: 4,
+        unanswered: 4,
+        score: 26.0,
+        maxScore: 35,
+        accuracy: 87.1,
+        cutoffMarks: 14.0,
+        isCutoffCleared: true
+      },
+      {
+        sectionCode: 'REASONING',
+        sectionName: 'Reasoning Ability',
+        totalQuestions: 35,
+        attempted: 31,
+        correct: 28,
+        incorrect: 3,
+        unanswered: 4,
+        score: 27.25,
+        maxScore: 35,
+        accuracy: 90.3,
+        cutoffMarks: 14.0,
+        isCutoffCleared: true
+      }
+    ],
+    topicResults: [
+      { topicName: 'Simplification', sectionCode: 'QUANT', attempted: 10, correct: 10, total: 10, accuracy: 100.0 },
+      { topicName: 'Profit & Loss', sectionCode: 'QUANT', attempted: 5, correct: 3, total: 5, accuracy: 60.0 },
+    ],
+    questionDetails: []
+  }
+];
+
+export const INITIAL_DASHBOARD_STATS: DashboardStats = {
+  totalTestsAttempted: 2,
+  averageScore: 70.5,
+  bestScore: 76.75,
+  averageAccuracy: 84.85,
+  totalTimeSpentMinutes: 110,
+  recentAttempts: SAMPLE_ATTEMPTS,
+  sectionPerformance: [
+    { sectionCode: 'ENGLISH', sectionName: 'English Language', averageAccuracy: 86.9, totalAttempted: 54, totalCorrect: 47 },
+    { sectionCode: 'QUANT', sectionName: 'Quantitative / Numerical', averageAccuracy: 82.5, totalAttempted: 58, totalCorrect: 48 },
+    { sectionCode: 'REASONING', sectionName: 'Reasoning Ability', averageAccuracy: 88.3, totalAttempted: 60, totalCorrect: 53 },
+  ],
+  weakTopics: [
+    { topicName: 'Profit and Loss', sectionName: 'Quantitative Aptitude', accuracy: 60.0, recommendedPracticeCount: 15 },
+    { topicName: 'Caselet Data Interpretation', sectionName: 'Quantitative Aptitude', accuracy: 64.2, recommendedPracticeCount: 20 },
+    { topicName: 'Floor-based Puzzles', sectionName: 'Reasoning Ability', accuracy: 68.5, recommendedPracticeCount: 12 },
+    { topicName: 'Para Jumbles', sectionName: 'English Language', accuracy: 70.0, recommendedPracticeCount: 10 },
+  ]
+};
