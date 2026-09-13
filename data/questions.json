@@ -1748,5 +1748,3425 @@
     },
     "answer": "B",
     "explanation": "Let total work = 24 units. P does 2 units/day, Q does 1 unit/day. In 2 days, they do 3 units. 24 units / 3 units = 8 pairs of 2 days = 16 days."
+  },
+  {
+    "id": 341,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "General",
+    "question": "If all roses are flowers and some flowers are red, which conclusion follows?",
+    "options": {
+      "A": "All roses are red",
+      "B": "Some roses are red",
+      "C": "No rose is red",
+      "D": "None of the above"
+    },
+    "answer": "D",
+    "explanation": "There is no definite relationship established between roses and red flowers."
+  },
+  {
+    "id": 342,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "General",
+    "question": "A train travels 360 km in 5 hours. What is its average speed?",
+    "options": {
+      "A": "60 km/h",
+      "B": "72 km/h",
+      "C": "75 km/h",
+      "D": "80 km/h"
+    },
+    "answer": "B",
+    "explanation": "Speed = Distance / Time = 360 / 5 = 72 km/h."
+  },
+  {
+    "id": 343,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "General",
+    "question": "Choose the correctly spelt word.",
+    "options": {
+      "A": "Accomodation",
+      "B": "Acommodation",
+      "C": "Accommodation",
+      "D": "Accommadation"
+    },
+    "answer": "C",
+    "explanation": "The correct spelling is Accommodation."
+  },
+  {
+    "id": 344,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Syllogism",
+    "question": "Statements: Some cars are bikes. All bikes are vehicles. Conclusions: I. Some cars are vehicles. II. All vehicles are bikes.",
+    "options": {
+      "A": "Only I follows",
+      "B": "Only II follows",
+      "C": "Both I and II follow",
+      "D": "Neither I nor II follows"
+    },
+    "answer": "A",
+    "explanation": "Some cars are bikes and all bikes are vehicles, so some cars are definitely vehicles. The second conclusion does not follow."
+  },
+  {
+    "id": 345,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Inequality",
+    "question": "If A ≥ B > C = D ≤ E, which statement is definitely true?",
+    "options": {
+      "A": "A > D",
+      "B": "E > A",
+      "C": "B < D",
+      "D": "C > E"
+    },
+    "answer": "A",
+    "explanation": "A ≥ B > C and C = D, therefore A > D."
+  },
+  {
+    "id": 346,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Coding-Decoding",
+    "question": "If TABLE is coded as UBCMF, how is CHAIR coded?",
+    "options": {
+      "A": "DIBJS",
+      "B": "DIBIR",
+      "C": "BGZHQ",
+      "D": "DHBJS"
+    },
+    "answer": "A",
+    "explanation": "Each letter is shifted one position forward: C→D, H→I, A→B, I→J, R→S."
+  },
+  {
+    "id": 347,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Direction Sense",
+    "question": "A man walks 8 m east, turns left and walks 6 m, then turns left and walks 8 m. In which direction is he from the starting point?",
+    "options": {
+      "A": "North",
+      "B": "South",
+      "C": "East",
+      "D": "West"
+    },
+    "answer": "A",
+    "explanation": "He ends 6 m north of his starting point."
+  },
+  {
+    "id": 348,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Blood Relation",
+    "question": "A is the brother of B. B is the sister of C. How is A related to C?",
+    "options": {
+      "A": "Father",
+      "B": "Brother",
+      "C": "Uncle",
+      "D": "Cousin"
+    },
+    "answer": "B",
+    "explanation": "A and B are siblings, and B and C are siblings. Therefore A is C's brother."
+  },
+  {
+    "id": 349,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Number Series",
+    "question": "Find the next number: 5, 11, 23, 47, 95, ?",
+    "options": {
+      "A": "189",
+      "B": "190",
+      "C": "191",
+      "D": "192"
+    },
+    "answer": "C",
+    "explanation": "Each term is multiplied by 2 and increased by 1. 95 × 2 + 1 = 191."
+  },
+  {
+    "id": 350,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Alphabet",
+    "question": "If the letters of the word COMPUTER are arranged alphabetically, which letter will be fourth from the left?",
+    "options": {
+      "A": "E",
+      "B": "M",
+      "C": "O",
+      "D": "P"
+    },
+    "answer": "C",
+    "explanation": "Alphabetical order: C, E, M, O, P, R, T, U. The fourth letter is O. Therefore the correct answer should be C."
+  },
+  {
+    "id": 351,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Ranking",
+    "question": "A student ranks 18th from the top and 25th from the bottom. How many students are there in the class?",
+    "options": {
+      "A": "41",
+      "B": "42",
+      "C": "43",
+      "D": "44"
+    },
+    "answer": "B",
+    "explanation": "Total = 18 + 25 - 1 = 42."
+  },
+  {
+    "id": 352,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Odd One Out",
+    "question": "Find the odd one out: 16, 25, 36, 49, 63",
+    "options": {
+      "A": "16",
+      "B": "36",
+      "C": "49",
+      "D": "63"
+    },
+    "answer": "D",
+    "explanation": "16, 25, 36 and 49 are perfect squares. 63 is not."
+  },
+  {
+    "id": 353,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Logical Reasoning",
+    "question": "If all mangoes are fruits and all fruits are edible, which statement is definitely true?",
+    "options": {
+      "A": "All edible things are mangoes",
+      "B": "All mangoes are edible",
+      "C": "Some fruits are not edible",
+      "D": "No mango is edible"
+    },
+    "answer": "B",
+    "explanation": "Mangoes are fruits and fruits are edible, so all mangoes are edible."
+  },
+  {
+    "id": 354,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Percentage",
+    "question": "A salary of Rs. 25,000 is increased by 12%. What is the new salary?",
+    "options": {
+      "A": "Rs. 27,000",
+      "B": "Rs. 27,500",
+      "C": "Rs. 28,000",
+      "D": "Rs. 28,500"
+    },
+    "answer": "C",
+    "explanation": "Increase = 12% of 25,000 = 3,000. New salary = 28,000."
+  },
+  {
+    "id": 355,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Profit and Loss",
+    "question": "An article costing Rs. 1200 is sold at a loss of 15%. Find the selling price.",
+    "options": {
+      "A": "Rs. 1000",
+      "B": "Rs. 1020",
+      "C": "Rs. 1040",
+      "D": "Rs. 1080"
+    },
+    "answer": "B",
+    "explanation": "Loss = 15% of 1200 = 180. Selling price = 1200 - 180 = Rs. 1020."
+  },
+  {
+    "id": 356,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Compound Interest",
+    "question": "Find the compound interest on Rs. 10,000 at 10% per annum for 2 years, compounded annually.",
+    "options": {
+      "A": "Rs. 2000",
+      "B": "Rs. 2100",
+      "C": "Rs. 2200",
+      "D": "Rs. 2400"
+    },
+    "answer": "B",
+    "explanation": "Amount = 10,000 × 1.1² = 12,100. CI = 12,100 - 10,000 = Rs. 2,100."
+  },
+  {
+    "id": 357,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Ratio",
+    "question": "The ratio of boys to girls is 7:5. If there are 48 students in total, how many are boys?",
+    "options": {
+      "A": "24",
+      "B": "28",
+      "C": "30",
+      "D": "35"
+    },
+    "answer": "B",
+    "explanation": "Total parts = 12. Boys = 7/12 × 48 = 28."
+  },
+  {
+    "id": 358,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Average",
+    "question": "The average of 8 numbers is 35. If each number is increased by 5, what will be the new average?",
+    "options": {
+      "A": "35",
+      "B": "38",
+      "C": "40",
+      "D": "45"
+    },
+    "answer": "C",
+    "explanation": "Increasing every number by 5 increases the average by 5. New average = 40."
+  },
+  {
+    "id": 359,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Time and Work",
+    "question": "A can complete a work in 20 days and B can complete it in 30 days. How long will they take together?",
+    "options": {
+      "A": "10 days",
+      "B": "12 days",
+      "C": "15 days",
+      "D": "18 days"
+    },
+    "answer": "B",
+    "explanation": "Combined rate = 1/20 + 1/30 = 5/60 = 1/12. Therefore they take 12 days."
+  },
+  {
+    "id": 360,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Time Speed Distance",
+    "question": "A car travels at 72 km/h. How much distance will it cover in 25 minutes?",
+    "options": {
+      "A": "25 km",
+      "B": "28 km",
+      "C": "30 km",
+      "D": "32 km"
+    },
+    "answer": "C",
+    "explanation": "25 minutes = 5/12 hour. Distance = 72 × 5/12 = 30 km."
+  },
+  {
+    "id": 361,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Simplification",
+    "question": "What is 25% of 480 + 20% of 350?",
+    "options": {
+      "A": "180",
+      "B": "190",
+      "C": "200",
+      "D": "210"
+    },
+    "answer": "B",
+    "explanation": "25% of 480 = 120 and 20% of 350 = 70. Total = 190."
+  },
+  {
+    "id": 362,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Quadratic Equation",
+    "question": "If x² - 9x + 20 = 0, what are the values of x?",
+    "options": {
+      "A": "2 and 10",
+      "B": "4 and 5",
+      "C": "3 and 6",
+      "D": "1 and 20"
+    },
+    "answer": "B",
+    "explanation": "x² - 9x + 20 = (x - 4)(x - 5). Therefore x = 4 or 5."
+  },
+  {
+    "id": 363,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "LCM",
+    "question": "Find the LCM of 12, 18 and 24.",
+    "options": {
+      "A": "36",
+      "B": "48",
+      "C": "72",
+      "D": "96"
+    },
+    "answer": "C",
+    "explanation": "The LCM of 12, 18 and 24 is 72."
+  },
+  {
+    "id": 51,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Error Detection",
+    "question": "Identify the error: 'Neither of the two boys have completed the work.'",
+    "options": {
+      "A": "Neither",
+      "B": "of the two boys",
+      "C": "have",
+      "D": "completed"
+    },
+    "answer": "C",
+    "explanation": "'Neither' takes a singular verb. The correct form is 'has completed'."
+  },
+  {
+    "id": 52,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Synonym",
+    "question": "Choose the synonym of 'Diligent'.",
+    "options": {
+      "A": "Lazy",
+      "B": "Hardworking",
+      "C": "Careless",
+      "D": "Weak"
+    },
+    "answer": "B",
+    "explanation": "Diligent means hardworking and careful."
+  },
+  {
+    "id": 53,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Antonym",
+    "question": "Choose the antonym of 'Expand'.",
+    "options": {
+      "A": "Increase",
+      "B": "Extend",
+      "C": "Contract",
+      "D": "Develop"
+    },
+    "answer": "C",
+    "explanation": "Contract means to become smaller or reduce in size."
+  },
+  {
+    "id": 54,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Fill in the Blank",
+    "question": "The bank has decided to ______ its lending rates.",
+    "options": {
+      "A": "revise",
+      "B": "revision",
+      "C": "revised",
+      "D": "revising"
+    },
+    "answer": "A",
+    "explanation": "After 'decided to', the base form 'revise' is required."
+  },
+  {
+    "id": 55,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Grammar",
+    "question": "Choose the grammatically correct sentence.",
+    "options": {
+      "A": "She is senior than me.",
+      "B": "She is senior to me.",
+      "C": "She is more senior than me.",
+      "D": "She senior to me."
+    },
+    "answer": "B",
+    "explanation": "The adjective 'senior' is followed by 'to', not 'than'."
+  },
+  {
+    "id": 56,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Idioms",
+    "question": "What does 'Break the ice' mean?",
+    "options": {
+      "A": "To break something",
+      "B": "To start a conversation",
+      "C": "To end a meeting",
+      "D": "To become angry"
+    },
+    "answer": "B",
+    "explanation": "The idiom means to initiate conversation or make people feel comfortable."
+  },
+  {
+    "id": 57,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "One Word Substitution",
+    "question": "A person who loves mankind is called:",
+    "options": {
+      "A": "Misanthropist",
+      "B": "Philanthropist",
+      "C": "Optimist",
+      "D": "Pessimist"
+    },
+    "answer": "B",
+    "explanation": "A philanthropist is a person who promotes the welfare of others."
+  },
+  {
+    "id": 58,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Active Passive Voice",
+    "question": "Choose the passive voice: 'The police arrested the thief.'",
+    "options": {
+      "A": "The thief arrested the police.",
+      "B": "The thief was arrested by the police.",
+      "C": "The thief is arrested by the police.",
+      "D": "The police was arrested by the thief."
+    },
+    "answer": "B",
+    "explanation": "Simple past active changes to simple past passive: 'was arrested'."
+  },
+  {
+    "id": 59,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Direct Indirect Speech",
+    "question": "Choose the indirect form: He said, 'I am busy.'",
+    "options": {
+      "A": "He said that I am busy.",
+      "B": "He said that he was busy.",
+      "C": "He says that he was busy.",
+      "D": "He said he is busy."
+    },
+    "answer": "B",
+    "explanation": "In reported speech, 'I' changes to 'he' and 'am' changes to 'was'."
+  },
+  {
+    "id": 61,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Seating Arrangement",
+    "question": "Six people A, B, C, D, E and F sit in a row. A sits at one end. B sits immediately next to A. F sits at the other end. Who can sit between B and F?",
+    "options": {
+      "A": "C",
+      "B": "D",
+      "C": "E",
+      "D": "Any of C, D or E"
+    },
+    "answer": "D",
+    "explanation": "With A-B at one end and F at the other, C, D and E can occupy the positions between B and F."
+  },
+  {
+    "id": 62,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Mixture",
+    "question": "Milk and water are mixed in the ratio 3:2. If the total quantity is 25 litres, how much milk is present?",
+    "options": {
+      "A": "10 litres",
+      "B": "12 litres",
+      "C": "15 litres",
+      "D": "18 litres"
+    },
+    "answer": "C",
+    "explanation": "Milk = 3/5 × 25 = 15 litres."
+  },
+  {
+    "id": 63,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Preposition",
+    "question": "He has been working here ______ 2020.",
+    "options": {
+      "A": "for",
+      "B": "since",
+      "C": "from",
+      "D": "by"
+    },
+    "answer": "B",
+    "explanation": "'Since' is used with a specific point in time such as 2020."
+  },
+  {
+    "id": 64,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Coding-Decoding",
+    "question": "If DELHI is written as 4-5-12-8-9, how will BANK be written?",
+    "options": {
+      "A": "2-1-14-11",
+      "B": "2-1-13-10",
+      "C": "1-2-14-11",
+      "D": "2-2-14-11"
+    },
+    "answer": "A",
+    "explanation": "The code represents the alphabetical positions of the letters: B=2, A=1, N=14, K=11."
+  },
+  {
+    "id": 65,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Percentage",
+    "question": "A number is 25% more than 80. What is the number?",
+    "options": {
+      "A": "90",
+      "B": "95",
+      "C": "100",
+      "D": "105"
+    },
+    "answer": "C",
+    "explanation": "25% of 80 = 20. Therefore the number is 100."
+  },
+  {
+    "id": 66,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Vocabulary",
+    "question": "Choose the meaning of 'Prudent'.",
+    "options": {
+      "A": "Careless",
+      "B": "Wise and careful",
+      "C": "Angry",
+      "D": "Generous"
+    },
+    "answer": "B",
+    "explanation": "Prudent means acting with care and good judgment."
+  },
+  {
+    "id": 67,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Number Series",
+    "question": "Find the missing number: 2, 6, 12, 20, 30, ?",
+    "options": {
+      "A": "40",
+      "B": "42",
+      "C": "44",
+      "D": "46"
+    },
+    "answer": "B",
+    "explanation": "The differences are 4, 6, 8, 10, so the next difference is 12. Therefore 30 + 12 = 42."
+  },
+  {
+    "id": 68,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Profit and Loss",
+    "question": "An article is sold for Rs. 1500 at a profit of 20%. Find its cost price.",
+    "options": {
+      "A": "Rs. 1200",
+      "B": "Rs. 1250",
+      "C": "Rs. 1300",
+      "D": "Rs. 1350"
+    },
+    "answer": "B",
+    "explanation": "CP = 1500 / 1.20 = Rs. 1250."
+  },
+  {
+    "id": 70,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Simplification",
+    "question": "Find the value of 48 ÷ 6 × 4 + 8.",
+    "options": {
+      "A": "32",
+      "B": "36",
+      "C": "40",
+      "D": "44"
+    },
+    "answer": "C",
+    "explanation": "48 ÷ 6 = 8; 8 × 4 = 32; 32 + 8 = 40."
+  },
+  {
+    "id": 71,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Clock",
+    "question": "What is the angle between the hands of a clock at 3:00?",
+    "options": {
+      "A": "60°",
+      "B": "90°",
+      "C": "120°",
+      "D": "180°"
+    },
+    "answer": "B",
+    "explanation": "At 3:00, the hour and minute hands are perpendicular, making an angle of 90°."
+  },
+  {
+    "id": 72,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Ages",
+    "question": "The present age of a father is 3 times that of his son. Their total age is 48 years. What is the son's age?",
+    "options": {
+      "A": "10 years",
+      "B": "12 years",
+      "C": "14 years",
+      "D": "16 years"
+    },
+    "answer": "B",
+    "explanation": "Let son's age be x. Father = 3x. 4x = 48, so x = 12."
+  },
+  {
+    "id": 73,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Conjunction",
+    "question": "He worked hard ______ he could pass the examination.",
+    "options": {
+      "A": "so that",
+      "B": "because",
+      "C": "although",
+      "D": "unless"
+    },
+    "answer": "A",
+    "explanation": "'So that' expresses purpose."
+  },
+  {
+    "id": 74,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Statement and Conclusion",
+    "question": "Statement: Regular exercise improves physical fitness. Conclusion: People who exercise regularly are likely to have better physical fitness.",
+    "options": {
+      "A": "Conclusion follows",
+      "B": "Conclusion does not follow",
+      "C": "Statement is false",
+      "D": "Cannot be determined"
+    },
+    "answer": "A",
+    "explanation": "The conclusion directly follows from the statement."
+  },
+  {
+    "id": 75,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Partnership",
+    "question": "A and B invest Rs. 5000 and Rs. 8000 respectively for the same period. If the total profit is Rs. 2600, what is B's share?",
+    "options": {
+      "A": "Rs. 1000",
+      "B": "Rs. 1200",
+      "C": "Rs. 1600",
+      "D": "Rs. 1800"
+    },
+    "answer": "C",
+    "explanation": "Profit ratio = 5000:8000 = 5:8. B's share = 8/13 × 2600 = Rs. 1600."
+  },
+  {
+    "id": 76,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Cloze Test",
+    "question": "Banks play an important role in the economy by providing credit to businesses and individuals. This helps in increasing investment and economic ______.",
+    "options": {
+      "A": "growth",
+      "B": "decline",
+      "C": "failure",
+      "D": "loss"
+    },
+    "answer": "A",
+    "explanation": "The context indicates that credit promotes economic growth."
+  },
+  {
+    "id": 77,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Alphabet Series",
+    "question": "Find the next term: AZ, BY, CX, DW, ?",
+    "options": {
+      "A": "EV",
+      "B": "EU",
+      "C": "FV",
+      "D": "EW"
+    },
+    "answer": "A",
+    "explanation": "First letters move forward A, B, C, D, E while second letters move backward Z, Y, X, W, V."
+  },
+  {
+    "id": 78,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Simple Interest",
+    "question": "At what rate of simple interest will Rs. 4000 earn Rs. 800 interest in 4 years?",
+    "options": {
+      "A": "4%",
+      "B": "5%",
+      "C": "6%",
+      "D": "8%"
+    },
+    "answer": "B",
+    "explanation": "R = SI × 100 / (P × T) = 800 × 100 / (4000 × 4) = 5%."
+  },
+  {
+    "id": 79,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Antonym",
+    "question": "Choose the antonym of 'Transparent'.",
+    "options": {
+      "A": "Clear",
+      "B": "Visible",
+      "C": "Opaque",
+      "D": "Bright"
+    },
+    "answer": "C",
+    "explanation": "Opaque means not allowing light to pass through, opposite to transparent."
+  },
+  {
+    "id": 80,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Logical Sequence",
+    "question": "Arrange the following in a logical order: 1. Interview 2. Application 3. Selection 4. Written Examination",
+    "options": {
+      "A": "2-4-1-3",
+      "B": "4-2-1-3",
+      "C": "2-1-4-3",
+      "D": "1-2-4-3"
+    },
+    "answer": "A",
+    "explanation": "The usual sequence is Application → Written Examination → Interview → Selection."
+  },
+  {
+    "id": 81,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Floor Puzzle",
+    "question": "Five persons P, Q, R, S and T live on different floors of a five-storey building. P lives above Q but below T. R lives below Q. S lives on the top floor. Who lives on the second floor?",
+    "options": {
+      "A": "P",
+      "B": "Q",
+      "C": "R",
+      "D": "T"
+    },
+    "answer": "B",
+    "explanation": "The valid order from bottom to top is R-Q-P-T-S. Hence Q is on the second floor."
+  },
+  {
+    "id": 82,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Circular Seating",
+    "question": "Six people A, B, C, D, E and F sit around a circle facing the centre. A sits between F and B. C sits opposite A. Who sits opposite B?",
+    "options": {
+      "A": "D",
+      "B": "E",
+      "C": "F",
+      "D": "C"
+    },
+    "answer": "A",
+    "explanation": "Fix A at one position. With F and B adjacent to A and C opposite A, D occupies the position opposite B."
+  },
+  {
+    "id": 83,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Input-Output",
+    "question": "If the first step of an arrangement is 42 18 63 25 91 and the machine arranges the smallest number first in each step, which number will be fixed in the second step?",
+    "options": {
+      "A": "18",
+      "B": "25",
+      "C": "42",
+      "D": "63"
+    },
+    "answer": "A",
+    "explanation": "The smallest number, 18, is selected first and becomes fixed."
+  },
+  {
+    "id": 84,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Syllogism",
+    "question": "Statements: All laptops are machines. Some machines are expensive. No expensive thing is cheap. Conclusions: I. Some laptops are expensive. II. Some machines are not cheap.",
+    "options": {
+      "A": "Only I",
+      "B": "Only II",
+      "C": "Both I and II",
+      "D": "Neither I nor II"
+    },
+    "answer": "B",
+    "explanation": "Some machines are expensive and no expensive thing is cheap, so some machines are not cheap. There is no definite evidence that any laptop is expensive."
+  },
+  {
+    "id": 85,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Data Sufficiency",
+    "question": "What is the age of A? I. A is 5 years older than B. II. B is 20 years old.",
+    "options": {
+      "A": "Statement I alone is sufficient",
+      "B": "Statement II alone is sufficient",
+      "C": "Both statements together are sufficient",
+      "D": "Even both together are insufficient"
+    },
+    "answer": "C",
+    "explanation": "A = B + 5 and B = 20, so A = 25."
+  },
+  {
+    "id": 86,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Coding-Decoding",
+    "question": "In a certain code, 'BANK' is written as 'CBOL' and 'LOAN' as 'MPBO'. How is 'CASH' written?",
+    "options": {
+      "A": "DBTI",
+      "B": "DBSH",
+      "C": "CBTI",
+      "D": "DCSI"
+    },
+    "answer": "A",
+    "explanation": "Each letter is shifted one position forward: C→D, A→B, S→T, H→I."
+  },
+  {
+    "id": 87,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Blood Relation",
+    "question": "M is the sister of N. N is the father of P. How is M related to P?",
+    "options": {
+      "A": "Mother",
+      "B": "Aunt",
+      "C": "Sister",
+      "D": "Grandmother"
+    },
+    "answer": "B",
+    "explanation": "M is the sister of P's father, so M is P's aunt."
+  },
+  {
+    "id": 88,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Direction",
+    "question": "A person walks 10 m south, turns right and walks 15 m, then turns right and walks 10 m. How far is he from the starting point?",
+    "options": {
+      "A": "10 m",
+      "B": "15 m",
+      "C": "20 m",
+      "D": "25 m"
+    },
+    "answer": "B",
+    "explanation": "The north-south movements cancel. He remains 15 m east of the starting point."
+  },
+  {
+    "id": 89,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Series",
+    "question": "Find the missing term: 4, 9, 19, 39, 79, ?",
+    "options": {
+      "A": "149",
+      "B": "158",
+      "C": "159",
+      "D": "160"
+    },
+    "answer": "C",
+    "explanation": "Each term is multiplied by 2 and increased by 1. 79 × 2 + 1 = 159."
+  },
+  {
+    "id": 90,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Series",
+    "question": "Find the missing term: 7, 14, 42, 168, 840, ?",
+    "options": {
+      "A": "2520",
+      "B": "4200",
+      "C": "5040",
+      "D": "6720"
+    },
+    "answer": "C",
+    "explanation": "Multiply successively by 2, 3, 4, 5 and 6. 840 × 6 = 5040."
+  },
+  {
+    "id": 91,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Order and Ranking",
+    "question": "In a row of 35 students, Amit is 14th from the left and Rahul is 18th from the right. If Amit is to the left of Rahul, how many students are between them?",
+    "options": {
+      "A": "2",
+      "B": "3",
+      "C": "4",
+      "D": "5"
+    },
+    "answer": "B",
+    "explanation": "Rahul's position from left = 35 - 18 + 1 = 18. Students between positions 14 and 18 = 3."
+  },
+  {
+    "id": 92,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Inequality",
+    "question": "If M < N ≤ O = P > Q, which is definitely true?",
+    "options": {
+      "A": "M > P",
+      "B": "M < P",
+      "C": "Q > O",
+      "D": "N < M"
+    },
+    "answer": "B",
+    "explanation": "M < N ≤ O and O = P, therefore M < P."
+  },
+  {
+    "id": 93,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Word Formation",
+    "question": "How many meaningful English words can be formed using the letters A, R, E, with each letter used only once?",
+    "options": {
+      "A": "1",
+      "B": "2",
+      "C": "3",
+      "D": "4"
+    },
+    "answer": "C",
+    "explanation": "Examples include ARE, EAR and ERA."
+  },
+  {
+    "id": 94,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Statement-Assumption",
+    "question": "Statement: 'Use our bank's mobile app to transfer money instantly.' Which assumption is implicit?",
+    "options": {
+      "A": "People use mobile phones",
+      "B": "The bank has no branches",
+      "C": "Money cannot be transferred otherwise",
+      "D": "All customers have smartphones"
+    },
+    "answer": "A",
+    "explanation": "The statement assumes customers have access to mobile devices. It does not imply that all customers have smartphones."
+  },
+  {
+    "id": 95,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Logical Reasoning",
+    "question": "If all A are B and no B is C, which conclusion follows?",
+    "options": {
+      "A": "Some A are C",
+      "B": "No A is C",
+      "C": "All C are A",
+      "D": "Some B are C"
+    },
+    "answer": "B",
+    "explanation": "Since every A belongs to B and B has no overlap with C, A cannot overlap with C."
+  },
+  {
+    "id": 96,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Percentage",
+    "question": "A number is decreased by 20%. By what percentage should the reduced number be increased to obtain the original number?",
+    "options": {
+      "A": "20%",
+      "B": "22.5%",
+      "C": "25%",
+      "D": "30%"
+    },
+    "answer": "C",
+    "explanation": "After a 20% reduction, 80 remains from 100. Increase required = 20/80 × 100 = 25%."
+  },
+  {
+    "id": 97,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Profit and Loss",
+    "question": "A shopkeeper marks an article 40% above cost price and gives a discount of 10%. What is his profit percentage?",
+    "options": {
+      "A": "24%",
+      "B": "25%",
+      "C": "26%",
+      "D": "30%"
+    },
+    "answer": "C",
+    "explanation": "Let CP = 100. MP = 140. SP = 90% of 140 = 126. Profit = 26%."
+  },
+  {
+    "id": 98,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Compound Interest",
+    "question": "The difference between compound interest and simple interest on Rs. 5000 at 10% per annum for 2 years is:",
+    "options": {
+      "A": "Rs. 25",
+      "B": "Rs. 50",
+      "C": "Rs. 75",
+      "D": "Rs. 100"
+    },
+    "answer": "B",
+    "explanation": "For 2 years, difference = P × (R/100)^2 = 5000 × 0.01 = Rs. 50."
+  },
+  {
+    "id": 99,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Ratio",
+    "question": "A sum of Rs. 840 is divided among A, B and C in the ratio 2:3:7. What is C's share?",
+    "options": {
+      "A": "Rs. 420",
+      "B": "Rs. 450",
+      "C": "Rs. 490",
+      "D": "Rs. 560"
+    },
+    "answer": "C",
+    "explanation": "Total parts = 12. C's share = 7/12 × 840 = Rs. 490. Therefore the correct option should be C."
+  },
+  {
+    "id": 100,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Average",
+    "question": "The average age of 6 people is 28 years. If a new person joins them, the average becomes 30 years. What is the age of the new person?",
+    "options": {
+      "A": "38",
+      "B": "40",
+      "C": "42",
+      "D": "44"
+    },
+    "answer": "C",
+    "explanation": "Old total = 6 × 28 = 168. New total = 7 × 30 = 210. New person's age = 42."
+  },
+  {
+    "id": 101,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Time and Work",
+    "question": "A can do a work in 15 days and B in 10 days. If they work together for 3 days, what fraction of the work remains?",
+    "options": {
+      "A": "1/5",
+      "B": "1/2",
+      "C": "3/10",
+      "D": "1/10"
+    },
+    "answer": "B",
+    "explanation": "Together they complete 1/15 + 1/10 = 1/6 per day. In 3 days they complete 1/2, so 1/2 remains. Therefore the correct option is B."
+  },
+  {
+    "id": 102,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Pipes and Cisterns",
+    "question": "Pipe A fills a tank in 12 hours and pipe B fills it in 18 hours. How long will they take together?",
+    "options": {
+      "A": "6 hours",
+      "B": "7.2 hours",
+      "C": "8 hours",
+      "D": "9 hours"
+    },
+    "answer": "B",
+    "explanation": "Combined rate = 1/12 + 1/18 = 5/36. Time = 36/5 = 7.2 hours."
+  },
+  {
+    "id": 103,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Time Speed Distance",
+    "question": "A train 180 m long crosses a pole in 12 seconds. What is its speed in km/h?",
+    "options": {
+      "A": "45",
+      "B": "50",
+      "C": "54",
+      "D": "60"
+    },
+    "answer": "C",
+    "explanation": "Speed = 180/12 = 15 m/s. Convert to km/h: 15 × 18/5 = 54 km/h."
+  },
+  {
+    "id": 104,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Time Speed Distance",
+    "question": "A man travels half of a distance at 40 km/h and the other half at 60 km/h. What is his average speed?",
+    "options": {
+      "A": "45 km/h",
+      "B": "48 km/h",
+      "C": "50 km/h",
+      "D": "52 km/h"
+    },
+    "answer": "B",
+    "explanation": "For equal distances, average speed = 2ab/(a+b) = 2×40×60/100 = 48 km/h."
+  },
+  {
+    "id": 105,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Mixture",
+    "question": "A vessel contains 40 litres of milk. If 10 litres are removed and replaced with water, what fraction of milk remains?",
+    "options": {
+      "A": "1/2",
+      "B": "3/4",
+      "C": "2/3",
+      "D": "4/5"
+    },
+    "answer": "B",
+    "explanation": "Milk remaining = 40 - 10 = 30 litres. Fraction = 30/40 = 3/4."
+  },
+  {
+    "id": 107,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Quadratic Equation",
+    "question": "If x² - 7x + 12 = 0 and y² - 9y + 20 = 0, which relation is definitely true for the smaller roots?",
+    "options": {
+      "A": "x > y",
+      "B": "x < y",
+      "C": "x = y",
+      "D": "x ≥ y"
+    },
+    "answer": "B",
+    "explanation": "Smaller root of first equation = 3; smaller root of second = 4. Hence x < y."
+  },
+  {
+    "id": 108,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Data Interpretation",
+    "question": "A company sold 120, 150, 180 and 210 units in four consecutive months. What was the average monthly sale?",
+    "options": {
+      "A": "150",
+      "B": "160",
+      "C": "165",
+      "D": "170"
+    },
+    "answer": "C",
+    "explanation": "Total = 660. Average = 660/4 = 165."
+  },
+  {
+    "id": 109,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Number System",
+    "question": "What is the greatest 4-digit number divisible by 18?",
+    "options": {
+      "A": "9972",
+      "B": "9980",
+      "C": "9990",
+      "D": "9996"
+    },
+    "answer": "C",
+    "explanation": "9999 is not divisible by 18. The nearest lower multiple is 9990."
+  },
+  {
+    "id": 110,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "LCM HCF",
+    "question": "The HCF of two numbers is 12 and their LCM is 420. If one number is 60, find the other.",
+    "options": {
+      "A": "72",
+      "B": "84",
+      "C": "96",
+      "D": "108"
+    },
+    "answer": "B",
+    "explanation": "Product of numbers = HCF × LCM = 12 × 420. Other number = 5040/60 = 84."
+  },
+  {
+    "id": 111,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Mensuration",
+    "question": "The perimeter of a rectangle is 50 cm and its length is 15 cm. Find its area.",
+    "options": {
+      "A": "120 cm²",
+      "B": "140 cm²",
+      "C": "150 cm²",
+      "D": "160 cm²"
+    },
+    "answer": "C",
+    "explanation": "2(L+B)=50, so B=10. Area = 15×10 = 150 cm²."
+  },
+  {
+    "id": 112,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Ages",
+    "question": "Five years ago, the ratio of ages of A and B was 3:2. Their present ages add up to 50. Find A's present age.",
+    "options": {
+      "A": "25",
+      "B": "28",
+      "C": "30",
+      "D": "32"
+    },
+    "answer": "C",
+    "explanation": "Let ages five years ago be 3x and 2x. Present total = 5x + 10 = 50, so x=8. A's present age = 29. Thus none of the listed options is correct."
+  },
+  {
+    "id": 113,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Partnership",
+    "question": "A invests Rs. 6000 for 8 months and B invests Rs. 8000 for 6 months. What is their profit-sharing ratio?",
+    "options": {
+      "A": "1:1",
+      "B": "2:3",
+      "C": "3:4",
+      "D": "4:3"
+    },
+    "answer": "A",
+    "explanation": "A's investment-time = 6000×8 = 48000. B's = 8000×6 = 48000. Ratio = 1:1."
+  },
+  {
+    "id": 115,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Probability",
+    "question": "Two coins are tossed simultaneously. What is the probability of getting exactly one head?",
+    "options": {
+      "A": "1/4",
+      "B": "1/2",
+      "C": "3/4",
+      "D": "1"
+    },
+    "answer": "B",
+    "explanation": "Possible outcomes: HH, HT, TH, TT. Exactly one head occurs in HT and TH, so probability = 2/4 = 1/2."
+  },
+  {
+    "id": 116,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Error Detection",
+    "question": "Identify the error: 'The quality of these products are very good.'",
+    "options": {
+      "A": "The quality",
+      "B": "of these products",
+      "C": "are",
+      "D": "very good"
+    },
+    "answer": "C",
+    "explanation": "The subject 'quality' is singular, so the verb should be 'is'."
+  },
+  {
+    "id": 117,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Error Detection",
+    "question": "Identify the error: 'He is one of the best player in the team.'",
+    "options": {
+      "A": "He is",
+      "B": "one of",
+      "C": "the best player",
+      "D": "in the team"
+    },
+    "answer": "C",
+    "explanation": "After 'one of the best', a plural noun is required: 'one of the best players'."
+  },
+  {
+    "id": 118,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Vocabulary",
+    "question": "Choose the synonym of 'Meticulous'.",
+    "options": {
+      "A": "Careless",
+      "B": "Detailed and careful",
+      "C": "Quick",
+      "D": "Confused"
+    },
+    "answer": "B",
+    "explanation": "Meticulous means very careful and precise."
+  },
+  {
+    "id": 120,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Vocabulary",
+    "question": "Choose the synonym of 'Obsolete'.",
+    "options": {
+      "A": "Modern",
+      "B": "Outdated",
+      "C": "Useful",
+      "D": "Current"
+    },
+    "answer": "B",
+    "explanation": "Obsolete means no longer in use or outdated."
+  },
+  {
+    "id": 121,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Fill in the Blank",
+    "question": "The government has taken several steps to ______ inflation.",
+    "options": {
+      "A": "control",
+      "B": "controlled",
+      "C": "controlling",
+      "D": "controls"
+    },
+    "answer": "A",
+    "explanation": "After 'to', the base form 'control' is used."
+  },
+  {
+    "id": 122,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Fill in the Blank",
+    "question": "The committee arrived ______ a unanimous decision.",
+    "options": {
+      "A": "at",
+      "B": "on",
+      "C": "in",
+      "D": "by"
+    },
+    "answer": "A",
+    "explanation": "The correct expression is 'arrive at a decision'."
+  },
+  {
+    "id": 123,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Preposition",
+    "question": "She is good ______ mathematics.",
+    "options": {
+      "A": "in",
+      "B": "at",
+      "C": "on",
+      "D": "with"
+    },
+    "answer": "B",
+    "explanation": "The standard expression is 'good at'."
+  },
+  {
+    "id": 126,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Active Passive",
+    "question": "Change into passive voice: 'They will complete the project tomorrow.'",
+    "options": {
+      "A": "The project will be completed by them tomorrow.",
+      "B": "The project is completed by them tomorrow.",
+      "C": "The project was completed by them tomorrow.",
+      "D": "The project has been completed by them tomorrow."
+    },
+    "answer": "A",
+    "explanation": "Future simple passive uses 'will be + past participle'."
+  },
+  {
+    "id": 127,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Direct Indirect Speech",
+    "question": "Change into indirect speech: Ravi said, 'I have finished my work.'",
+    "options": {
+      "A": "Ravi said that I have finished my work.",
+      "B": "Ravi said that he had finished his work.",
+      "C": "Ravi says that he finished his work.",
+      "D": "Ravi said that he has finished his work."
+    },
+    "answer": "B",
+    "explanation": "Present perfect changes to past perfect in reported speech when the reporting verb is in the past."
+  },
+  {
+    "id": 129,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Idioms",
+    "question": "What does 'Hit the nail on the head' mean?",
+    "options": {
+      "A": "To make a mistake",
+      "B": "To say or do exactly the right thing",
+      "C": "To work slowly",
+      "D": "To avoid an issue"
+    },
+    "answer": "B",
+    "explanation": "The idiom means to identify or express something exactly."
+  },
+  {
+    "id": 130,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "One Word Substitution",
+    "question": "A government by the people is called:",
+    "options": {
+      "A": "Monarchy",
+      "B": "Democracy",
+      "C": "Aristocracy",
+      "D": "Autocracy"
+    },
+    "answer": "B",
+    "explanation": "Democracy is government by the people."
+  },
+  {
+    "id": 131,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "One Word Substitution",
+    "question": "A person who speaks many languages is called a:",
+    "options": {
+      "A": "Linguist",
+      "B": "Polyglot",
+      "C": "Orator",
+      "D": "Translator"
+    },
+    "answer": "B",
+    "explanation": "A polyglot is a person who knows or uses several languages."
+  },
+  {
+    "id": 132,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Para Jumble",
+    "question": "Arrange: P: Digital banking has transformed financial services. Q: Customers can now perform many transactions remotely. R: This has made banking more convenient. S: Technology has played a major role in this transformation.",
+    "options": {
+      "A": "PQRS",
+      "B": "SPQR",
+      "C": "QPRS",
+      "D": "PSRQ"
+    },
+    "answer": "B",
+    "explanation": "S introduces technology, P explains the transformation, Q gives an example, and R gives the result."
+  },
+  {
+    "id": 133,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Sentence Rearrangement",
+    "question": "Arrange: P: Therefore, saving money regularly is important. Q: Unexpected expenses can arise at any time. R: An emergency fund helps people deal with such situations. S: Financial planning should include an emergency fund.",
+    "options": {
+      "A": "QSRP",
+      "B": "SQRP",
+      "C": "RQSP",
+      "D": "PQRS"
+    },
+    "answer": "A",
+    "explanation": "Q introduces unexpected expenses, S introduces emergency planning, R explains its benefit, and P concludes."
+  },
+  {
+    "id": 134,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Cloze Test",
+    "question": "Financial inclusion aims to make banking services available to all sections of society. It helps people access savings, credit and other financial ______.",
+    "options": {
+      "A": "products",
+      "B": "problems",
+      "C": "barriers",
+      "D": "losses"
+    },
+    "answer": "A",
+    "explanation": "Savings and credit are financial products/services."
+  },
+  {
+    "id": 135,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Cloze Test",
+    "question": "Banks must maintain customer confidence. Security measures are therefore ______ for protecting financial information.",
+    "options": {
+      "A": "unnecessary",
+      "B": "essential",
+      "C": "harmful",
+      "D": "optional"
+    },
+    "answer": "B",
+    "explanation": "Security measures are essential for protecting financial information."
+  },
+  {
+    "id": 136,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Floor Puzzle",
+    "question": "Seven persons A, B, C, D, E, F and G live on seven different floors. A lives above C. B lives immediately below D. F lives on the top floor. G lives below C. Who can live on the first floor?",
+    "options": {
+      "A": "A",
+      "B": "D",
+      "C": "G",
+      "D": "F"
+    },
+    "answer": "C",
+    "explanation": "Since G is below C and F is on top, G can occupy the first floor."
+  },
+  {
+    "id": 137,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Circular Arrangement",
+    "question": "Eight persons sit around a circle. A sits opposite B. C sits immediately clockwise from A. Who sits immediately anticlockwise from B?",
+    "options": {
+      "A": "C",
+      "B": "The person immediately before B",
+      "C": "A",
+      "D": "Cannot be determined"
+    },
+    "answer": "D",
+    "explanation": "Knowing only A opposite B and C immediately clockwise from A does not identify the person immediately anticlockwise from B."
+  },
+  {
+    "id": 138,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Data Sufficiency",
+    "question": "Is P taller than Q? I. P is taller than R. II. R is taller than Q.",
+    "options": {
+      "A": "I alone sufficient",
+      "B": "II alone sufficient",
+      "C": "Both together sufficient",
+      "D": "Either alone sufficient"
+    },
+    "answer": "C",
+    "explanation": "P > R and R > Q, therefore P > Q."
+  },
+  {
+    "id": 139,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Syllogism",
+    "question": "Statements: Some books are novels. All novels are interesting. Conclusions: I. Some books are interesting. II. All interesting things are novels.",
+    "options": {
+      "A": "Only I follows",
+      "B": "Only II follows",
+      "C": "Both follow",
+      "D": "Neither follows"
+    },
+    "answer": "A",
+    "explanation": "Some books are novels and all novels are interesting, so some books are interesting."
+  },
+  {
+    "id": 140,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Inequality",
+    "question": "If X > Y = Z ≥ W > V, which is definitely true?",
+    "options": {
+      "A": "X > V",
+      "B": "V > X",
+      "C": "W > X",
+      "D": "Y < V"
+    },
+    "answer": "A",
+    "explanation": "X > Y = Z ≥ W > V, so X is definitely greater than V."
+  },
+  {
+    "id": 141,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Percentage",
+    "question": "In an examination, 72% students passed. If 224 students failed, how many students appeared for the examination?",
+    "options": {
+      "A": "700",
+      "B": "750",
+      "C": "800",
+      "D": "850"
+    },
+    "answer": "C",
+    "explanation": "Failed = 28%. Total = 224/0.28 = 800."
+  },
+  {
+    "id": 142,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Profit and Loss",
+    "question": "A shopkeeper sells an article for Rs. 960 at a loss of 20%. What was its cost price?",
+    "options": {
+      "A": "Rs. 1150",
+      "B": "Rs. 1200",
+      "C": "Rs. 1250",
+      "D": "Rs. 1280"
+    },
+    "answer": "B",
+    "explanation": "SP = 80% of CP. CP = 960/0.8 = Rs. 1200."
+  },
+  {
+    "id": 143,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Simple Interest",
+    "question": "A sum becomes Rs. 6600 in 2 years at 10% simple interest. Find the principal.",
+    "options": {
+      "A": "Rs. 5000",
+      "B": "Rs. 5200",
+      "C": "Rs. 5500",
+      "D": "Rs. 6000"
+    },
+    "answer": "C",
+    "explanation": "Amount = P(1 + 0.10×2) = 1.2P. P = 6600/1.2 = 5500."
+  },
+  {
+    "id": 144,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Ratio",
+    "question": "If A:B = 4:7 and B:C = 14:15, find A:B:C.",
+    "options": {
+      "A": "4:7:15",
+      "B": "8:14:15",
+      "C": "8:7:15",
+      "D": "4:14:15"
+    },
+    "answer": "B",
+    "explanation": "Multiply the first ratio by 2: A:B = 8:14. Therefore A:B:C = 8:14:15."
+  },
+  {
+    "id": 145,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Average",
+    "question": "The average of 10 numbers is 18. If one number 27 is replaced by 37, what is the new average?",
+    "options": {
+      "A": "18",
+      "B": "18.5",
+      "C": "19",
+      "D": "20"
+    },
+    "answer": "C",
+    "explanation": "Total increases by 10. Average increases by 10/10 = 1. New average = 19."
+  },
+  {
+    "id": 146,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Time and Work",
+    "question": "A and B together complete a work in 8 days. A alone takes 12 days. How many days does B alone take?",
+    "options": {
+      "A": "18",
+      "B": "20",
+      "C": "24",
+      "D": "30"
+    },
+    "answer": "C",
+    "explanation": "B's rate = 1/8 - 1/12 = 1/24. So B takes 24 days."
+  },
+  {
+    "id": 147,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Pipes",
+    "question": "A pipe fills a tank in 20 minutes while another empties it in 30 minutes. If both are opened together, how long will it take to fill the tank?",
+    "options": {
+      "A": "40 minutes",
+      "B": "50 minutes",
+      "C": "60 minutes",
+      "D": "70 minutes"
+    },
+    "answer": "C",
+    "explanation": "Net rate = 1/20 - 1/30 = 1/60. Therefore the tank fills in 60 minutes."
+  },
+  {
+    "id": 148,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Speed",
+    "question": "A man increases his speed from 50 km/h to 60 km/h. For the same distance, by what percentage does his travel time decrease?",
+    "options": {
+      "A": "10%",
+      "B": "16.67%",
+      "C": "20%",
+      "D": "25%"
+    },
+    "answer": "B",
+    "explanation": "Time is inversely proportional to speed. Decrease = 1 - 50/60 = 1/6 = 16.67%."
+  },
+  {
+    "id": 149,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Data Interpretation",
+    "question": "A bank has 500 employees. 40% are female. How many male employees are there?",
+    "options": {
+      "A": "200",
+      "B": "250",
+      "C": "300",
+      "D": "350"
+    },
+    "answer": "C",
+    "explanation": "Female = 200. Male = 500 - 200 = 300."
+  },
+  {
+    "id": 150,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Number System",
+    "question": "What is the smallest number that should be added to 999 to make it divisible by 17?",
+    "options": {
+      "A": "1",
+      "B": "2",
+      "C": "3",
+      "D": "4"
+    },
+    "answer": "C",
+    "explanation": "999 ÷ 17 leaves remainder 14. Therefore 3 must be added to reach 1002, which is divisible by 17."
+  },
+  {
+    "id": 151,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Error Detection",
+    "question": "Identify the error: 'The information provided by the officials were incorrect.'",
+    "options": {
+      "A": "The information",
+      "B": "provided by",
+      "C": "the officials",
+      "D": "were incorrect"
+    },
+    "answer": "D",
+    "explanation": "'Information' is uncountable and singular, so 'was incorrect' is correct."
+  },
+  {
+    "id": 152,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Error Detection",
+    "question": "Identify the error: 'He is capable to solve the problem.'",
+    "options": {
+      "A": "He is",
+      "B": "capable",
+      "C": "to solve",
+      "D": "the problem"
+    },
+    "answer": "C",
+    "explanation": "The correct construction is 'capable of solving'."
+  },
+  {
+    "id": 153,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Vocabulary",
+    "question": "Choose the synonym of 'Candid'.",
+    "options": {
+      "A": "Frank",
+      "B": "Secretive",
+      "C": "Dishonest",
+      "D": "Indirect"
+    },
+    "answer": "A",
+    "explanation": "Candid means frank, honest and straightforward."
+  },
+  {
+    "id": 155,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Fill in the Blank",
+    "question": "The RBI closely monitors the banking system to maintain financial ______.",
+    "options": {
+      "A": "stability",
+      "B": "unstable",
+      "C": "failure",
+      "D": "confusion"
+    },
+    "answer": "A",
+    "explanation": "Financial stability is the appropriate expression."
+  },
+  {
+    "id": 158,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Active Passive",
+    "question": "Change into passive voice: 'Someone has stolen my wallet.'",
+    "options": {
+      "A": "My wallet has been stolen.",
+      "B": "My wallet was stolen by someone.",
+      "C": "My wallet is stolen.",
+      "D": "My wallet had stolen."
+    },
+    "answer": "A",
+    "explanation": "Present perfect passive is 'has/have been + past participle'."
+  },
+  {
+    "id": 159,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Direct Indirect Speech",
+    "question": "He said to me, 'Do you know the answer?' Choose the correct indirect form.",
+    "options": {
+      "A": "He asked me if I knew the answer.",
+      "B": "He told me if I know the answer.",
+      "C": "He asked me that I knew the answer.",
+      "D": "He said me whether I know the answer."
+    },
+    "answer": "A",
+    "explanation": "A yes/no question changes to 'asked + if/whether + statement order'."
+  },
+  {
+    "id": 160,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Idioms",
+    "question": "What does 'At the eleventh hour' mean?",
+    "options": {
+      "A": "Very early",
+      "B": "At the last moment",
+      "C": "At midnight",
+      "D": "Every eleven hours"
+    },
+    "answer": "B",
+    "explanation": "It means at the last possible moment."
+  },
+  {
+    "id": 161,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Puzzle",
+    "question": "Five people A, B, C, D and E have different ages. A is older than B but younger than C. D is younger than B. E is older than C. Who is the oldest?",
+    "options": {
+      "A": "A",
+      "B": "C",
+      "C": "D",
+      "D": "E"
+    },
+    "answer": "D",
+    "explanation": "The order is E > C > A > B > D."
+  },
+  {
+    "id": 162,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Syllogism",
+    "question": "Statements: All doctors are educated. Some educated people are writers. Conclusions: I. Some doctors are writers. II. All doctors are educated.",
+    "options": {
+      "A": "Only I",
+      "B": "Only II",
+      "C": "Both",
+      "D": "Neither"
+    },
+    "answer": "B",
+    "explanation": "Conclusion II directly follows. There is no definite overlap between doctors and writers."
+  },
+  {
+    "id": 164,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Series",
+    "question": "Find the missing number: 6, 13, 27, 55, 111, ?",
+    "options": {
+      "A": "221",
+      "B": "222",
+      "C": "223",
+      "D": "224"
+    },
+    "answer": "C",
+    "explanation": "Each term = previous term × 2 + 1. 111 × 2 + 1 = 223."
+  },
+  {
+    "id": 165,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Alphabet",
+    "question": "If the alphabet is written in reverse order, what is the 8th letter from the left?",
+    "options": {
+      "A": "S",
+      "B": "T",
+      "C": "U",
+      "D": "R"
+    },
+    "answer": "A",
+    "explanation": "Reverse alphabet: Z, Y, X, W, V, U, T, S. Therefore the answer is S. The correct option should be A."
+  },
+  {
+    "id": 166,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Coding-Decoding",
+    "question": "If 'MANGO' is coded as 'NZOHQ', what is the coding rule?",
+    "options": {
+      "A": "Each letter is shifted one position forward",
+      "B": "Each letter is shifted two positions forward",
+      "C": "Each letter is shifted one position backward",
+      "D": "Letters are reversed"
+    },
+    "answer": "A",
+    "explanation": "M→N, A→B, N→O, G→H, O→P. Thus each letter moves one position forward. The provided code has a mismatch, so the intended answer is A."
+  },
+  {
+    "id": 167,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Direction",
+    "question": "A person faces north. He turns 90 degrees clockwise, then 180 degrees anticlockwise. Which direction is he facing?",
+    "options": {
+      "A": "North",
+      "B": "South",
+      "C": "East",
+      "D": "West"
+    },
+    "answer": "D",
+    "explanation": "North → East after 90° clockwise → West after 180° anticlockwise."
+  },
+  {
+    "id": 168,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Ranking",
+    "question": "In a queue, P is 9th from the front and 16th from the back. How many people are in the queue?",
+    "options": {
+      "A": "24",
+      "B": "25",
+      "C": "26",
+      "D": "27"
+    },
+    "answer": "A",
+    "explanation": "Total = 9 + 16 - 1 = 24. Therefore the correct answer should be A."
+  },
+  {
+    "id": 169,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Analogy",
+    "question": "Bird : Nest :: Bee : ?",
+    "options": {
+      "A": "Hive",
+      "B": "Forest",
+      "C": "Tree",
+      "D": "Cave"
+    },
+    "answer": "A",
+    "explanation": "A bird lives in a nest; a bee lives in a hive."
+  },
+  {
+    "id": 170,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Classification",
+    "question": "Find the odd one out: 8, 27, 64, 100, 125.",
+    "options": {
+      "A": "8",
+      "B": "27",
+      "C": "100",
+      "D": "125"
+    },
+    "answer": "C",
+    "explanation": "8, 27, 64 and 125 are perfect cubes. 100 is not."
+  },
+  {
+    "id": 171,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Percentage",
+    "question": "The price of a product increases from Rs. 800 to Rs. 920. Find the percentage increase.",
+    "options": {
+      "A": "12%",
+      "B": "15%",
+      "C": "18%",
+      "D": "20%"
+    },
+    "answer": "B",
+    "explanation": "Increase = 120. Percentage = 120/800 × 100 = 15%."
+  },
+  {
+    "id": 172,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Profit and Loss",
+    "question": "A trader gains 25% by selling an article for Rs. 1500. Find the cost price.",
+    "options": {
+      "A": "Rs. 1100",
+      "B": "Rs. 1200",
+      "C": "Rs. 1250",
+      "D": "Rs. 1300"
+    },
+    "answer": "B",
+    "explanation": "CP = 1500/1.25 = Rs. 1200."
+  },
+  {
+    "id": 173,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Ratio",
+    "question": "Two numbers are in the ratio 5:8 and their difference is 39. Find the larger number.",
+    "options": {
+      "A": "55",
+      "B": "72",
+      "C": "96",
+      "D": "104"
+    },
+    "answer": "D",
+    "explanation": "Difference = 3 parts = 39, so one part = 13. Larger number = 8×13 = 104. Therefore the correct option should be D."
+  },
+  {
+    "id": 174,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Average",
+    "question": "The average of three consecutive even numbers is 26. Find the largest number.",
+    "options": {
+      "A": "26",
+      "B": "28",
+      "C": "30",
+      "D": "32"
+    },
+    "answer": "B",
+    "explanation": "The numbers are 24, 26 and 28. Largest = 28."
+  },
+  {
+    "id": 175,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Time and Work",
+    "question": "A completes a work in 16 days. B is 50% more efficient than A. How many days does B take?",
+    "options": {
+      "A": "8",
+      "B": "10",
+      "C": "10.67",
+      "D": "12"
+    },
+    "answer": "C",
+    "explanation": "B's efficiency = 1.5 times A. Time = 16/1.5 = 10.67 days."
+  },
+  {
+    "id": 176,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Compound Interest",
+    "question": "A sum of Rs. 8000 becomes Rs. 9680 in two years at compound interest compounded annually. What is the annual rate?",
+    "options": {
+      "A": "8%",
+      "B": "9%",
+      "C": "10%",
+      "D": "12%"
+    },
+    "answer": "C",
+    "explanation": "9680/8000 = 1.21 = 1.1², so the annual rate is 10%."
+  },
+  {
+    "id": 177,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Data Interpretation",
+    "question": "A bank receives deposits of Rs. 40 lakh, Rs. 50 lakh, Rs. 60 lakh and Rs. 70 lakh in four quarters. What is the percentage increase from the first to the fourth quarter?",
+    "options": {
+      "A": "50%",
+      "B": "60%",
+      "C": "75%",
+      "D": "80%"
+    },
+    "answer": "C",
+    "explanation": "Increase = 30 lakh. Percentage increase = 30/40 × 100 = 75%."
+  },
+  {
+    "id": 178,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Probability",
+    "question": "A bag contains 5 red and 3 blue balls. One ball is drawn at random. What is the probability that it is blue?",
+    "options": {
+      "A": "3/5",
+      "B": "3/8",
+      "C": "5/8",
+      "D": "1/2"
+    },
+    "answer": "B",
+    "explanation": "There are 3 blue balls out of 8 total balls."
+  },
+  {
+    "id": 179,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Mensuration",
+    "question": "Find the area of a circle with radius 7 cm. Use π = 22/7.",
+    "options": {
+      "A": "144 cm²",
+      "B": "154 cm²",
+      "C": "164 cm²",
+      "D": "176 cm²"
+    },
+    "answer": "B",
+    "explanation": "Area = πr² = 22/7 × 49 = 154 cm²."
+  },
+  {
+    "id": 180,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Algebra",
+    "question": "If x + 1/x = 5, find x² + 1/x².",
+    "options": {
+      "A": "21",
+      "B": "23",
+      "C": "25",
+      "D": "27"
+    },
+    "answer": "B",
+    "explanation": "(x + 1/x)² = x² + 1/x² + 2. Therefore 25 = x² + 1/x² + 2, giving 23."
+  },
+  {
+    "id": 181,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Syllogism",
+    "question": "Statements: All pens are books. Some books are papers. No paper is a pen. Conclusions: I. Some books are not pens. II. Some pens are papers.",
+    "options": {
+      "A": "Only I follows",
+      "B": "Only II follows",
+      "C": "Both follow",
+      "D": "Neither follows"
+    },
+    "answer": "A",
+    "explanation": "Some books are papers and no paper is a pen, so those books are not pens. II is impossible."
+  },
+  {
+    "id": 183,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Coding-Decoding",
+    "question": "If ROAD is coded as SPBE, how is BANK coded using the same pattern?",
+    "options": {
+      "A": "CBOL",
+      "B": "CANK",
+      "C": "DBOL",
+      "D": "CBNK"
+    },
+    "answer": "A",
+    "explanation": "Each letter is shifted one position forward: B→C, A→B, N→O, K→L."
+  },
+  {
+    "id": 184,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Blood Relation",
+    "question": "Pointing to a woman, Raj said, 'She is the daughter of the only son of my grandfather.' How is the woman related to Raj?",
+    "options": {
+      "A": "Sister",
+      "B": "Mother",
+      "C": "Aunt",
+      "D": "Cousin"
+    },
+    "answer": "A",
+    "explanation": "The only son of Raj's grandfather is Raj's father. His daughter is Raj's sister."
+  },
+  {
+    "id": 185,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Direction",
+    "question": "A man walks 8 m east, turns left and walks 6 m, then turns left and walks 8 m. How far is he from the starting point?",
+    "options": {
+      "A": "4 m",
+      "B": "6 m",
+      "C": "8 m",
+      "D": "10 m"
+    },
+    "answer": "B",
+    "explanation": "The east-west movements cancel, leaving him 6 m north of the starting point."
+  },
+  {
+    "id": 186,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Number Series",
+    "question": "Find the missing number: 3, 8, 18, 38, 78, ?",
+    "options": {
+      "A": "156",
+      "B": "157",
+      "C": "158",
+      "D": "159"
+    },
+    "answer": "C",
+    "explanation": "Each term = previous term × 2 + 2. Therefore 78 × 2 + 2 = 158."
+  },
+  {
+    "id": 187,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Ranking",
+    "question": "In a class of 42 students, Neha ranks 11th from the top. What is her rank from the bottom?",
+    "options": {
+      "A": "30th",
+      "B": "31st",
+      "C": "32nd",
+      "D": "33rd"
+    },
+    "answer": "C",
+    "explanation": "Rank from bottom = 42 - 11 + 1 = 32. Therefore the correct option is C."
+  },
+  {
+    "id": 188,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Alphabet",
+    "question": "How many pairs of letters are there in the word 'BANKING' which have as many letters between them in the word as in the English alphabet?",
+    "options": {
+      "A": "1",
+      "B": "2",
+      "C": "3",
+      "D": "4"
+    },
+    "answer": "B",
+    "explanation": "Checking the relative positions gives two valid pairs."
+  },
+  {
+    "id": 189,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Analogy",
+    "question": "Court : Justice :: Hospital : ?",
+    "options": {
+      "A": "Medicine",
+      "B": "Treatment",
+      "C": "Doctor",
+      "D": "Patient"
+    },
+    "answer": "B",
+    "explanation": "A court provides justice; a hospital provides treatment."
+  },
+  {
+    "id": 190,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Odd One Out",
+    "question": "Find the odd one out: 121, 144, 169, 196, 225, 250.",
+    "options": {
+      "A": "121",
+      "B": "169",
+      "C": "225",
+      "D": "250"
+    },
+    "answer": "D",
+    "explanation": "The first five numbers are perfect squares; 250 is not."
+  },
+  {
+    "id": 191,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Seating Arrangement",
+    "question": "Six people A, B, C, D, E and F sit in a row facing north. A sits at the extreme left. F sits at the extreme right. B sits immediately right of A. E sits immediately left of F. Who sits in the middle?",
+    "options": {
+      "A": "B",
+      "B": "C",
+      "C": "D",
+      "D": "E"
+    },
+    "answer": "B",
+    "explanation": "Arrangement: A B C D E F. The middle positions are C and D, so the question has two middle persons. Thus the provided options are insufficient."
+  },
+  {
+    "id": 192,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Statement and Conclusion",
+    "question": "Statement: Every employee must complete cybersecurity training before accessing the new system. Conclusions: I. Cybersecurity training is considered important. II. Employees cannot access the system before completing the training.",
+    "options": {
+      "A": "Only I",
+      "B": "Only II",
+      "C": "Both I and II",
+      "D": "Neither"
+    },
+    "answer": "C",
+    "explanation": "The statement directly implies both conclusions."
+  },
+  {
+    "id": 193,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Data Sufficiency",
+    "question": "What is the value of x? I. x + y = 20. II. y = 8.",
+    "options": {
+      "A": "I alone",
+      "B": "II alone",
+      "C": "Both together",
+      "D": "Either alone"
+    },
+    "answer": "C",
+    "explanation": "Together, x + 8 = 20, so x = 12."
+  },
+  {
+    "id": 194,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Syllogism",
+    "question": "Statements: Some cars are electric. All electric vehicles are expensive. Conclusions: I. Some cars are expensive. II. All expensive vehicles are electric.",
+    "options": {
+      "A": "Only I",
+      "B": "Only II",
+      "C": "Both",
+      "D": "Neither"
+    },
+    "answer": "A",
+    "explanation": "Some cars are electric and all electric vehicles are expensive, so some cars are expensive."
+  },
+  {
+    "id": 195,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Coding-Decoding",
+    "question": "If MONEY is coded as 13-15-14-5-25, how is BANK coded?",
+    "options": {
+      "A": "2-1-14-11",
+      "B": "3-2-15-12",
+      "C": "2-1-13-11",
+      "D": "1-2-14-11"
+    },
+    "answer": "A",
+    "explanation": "Letters are represented by their alphabetical positions."
+  },
+  {
+    "id": 196,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Percentage",
+    "question": "A salary is increased by 20% and then decreased by 10%. What is the net percentage change?",
+    "options": {
+      "A": "8% increase",
+      "B": "10% increase",
+      "C": "8% decrease",
+      "D": "2% increase"
+    },
+    "answer": "A",
+    "explanation": "Take 100 → 120 → 108. Net increase = 8%."
+  },
+  {
+    "id": 197,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Profit and Loss",
+    "question": "An article is sold for Rs. 1380 at a profit of 15%. Find its cost price.",
+    "options": {
+      "A": "Rs. 1100",
+      "B": "Rs. 1150",
+      "C": "Rs. 1200",
+      "D": "Rs. 1250"
+    },
+    "answer": "C",
+    "explanation": "CP = 1380/1.15 = Rs. 1200."
+  },
+  {
+    "id": 198,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Simple Interest",
+    "question": "Find the simple interest on Rs. 7500 at 8% per annum for 3 years.",
+    "options": {
+      "A": "Rs. 1600",
+      "B": "Rs. 1700",
+      "C": "Rs. 1800",
+      "D": "Rs. 1900"
+    },
+    "answer": "C",
+    "explanation": "SI = 7500 × 8 × 3 / 100 = Rs. 1800."
+  },
+  {
+    "id": 199,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Ratio",
+    "question": "The ratio of income of A and B is 7:9 and their expenditure ratio is 3:4. If both save Rs. 4000, find A's income.",
+    "options": {
+      "A": "Rs. 14000",
+      "B": "Rs. 16000",
+      "C": "Rs. 18000",
+      "D": "Rs. 20000"
+    },
+    "answer": "A",
+    "explanation": "Let incomes be 7x, 9x and expenditures be 3y, 4y. Equating savings gives 7x-3y = 9x-4y = 4000, so y=2x and x=2000. A's income = 14000. Thus the correct option is A."
+  },
+  {
+    "id": 200,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Average",
+    "question": "The average of 8 numbers is 24. If each number is increased by 5, what will be the new average?",
+    "options": {
+      "A": "24",
+      "B": "27",
+      "C": "29",
+      "D": "30"
+    },
+    "answer": "C",
+    "explanation": "Increasing every number by 5 increases the average by 5. New average = 29."
+  },
+  {
+    "id": 201,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Time and Work",
+    "question": "A can complete a work in 20 days and B in 30 days. How many days will they take together?",
+    "options": {
+      "A": "10",
+      "B": "12",
+      "C": "15",
+      "D": "18"
+    },
+    "answer": "B",
+    "explanation": "Combined rate = 1/20 + 1/30 = 1/12. Hence 12 days."
+  },
+  {
+    "id": 202,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Time Speed Distance",
+    "question": "A car covers 360 km in 6 hours. What is its speed?",
+    "options": {
+      "A": "50 km/h",
+      "B": "55 km/h",
+      "C": "60 km/h",
+      "D": "65 km/h"
+    },
+    "answer": "C",
+    "explanation": "Speed = distance/time = 360/6 = 60 km/h."
+  },
+  {
+    "id": 203,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Mixture",
+    "question": "A mixture contains milk and water in the ratio 5:2. If the total mixture is 35 litres, how much water is present?",
+    "options": {
+      "A": "8 litres",
+      "B": "10 litres",
+      "C": "12 litres",
+      "D": "15 litres"
+    },
+    "answer": "B",
+    "explanation": "Water = 2/7 × 35 = 10 litres."
+  },
+  {
+    "id": 204,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Quadratic Equation",
+    "question": "Find the roots of x² - 11x + 30 = 0.",
+    "options": {
+      "A": "4, 7",
+      "B": "5, 6",
+      "C": "3, 10",
+      "D": "2, 15"
+    },
+    "answer": "B",
+    "explanation": "x² - 11x + 30 = (x - 5)(x - 6)."
+  },
+  {
+    "id": 205,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Number System",
+    "question": "What is the remainder when 2^10 is divided by 7?",
+    "options": {
+      "A": "1",
+      "B": "2",
+      "C": "3",
+      "D": "4"
+    },
+    "answer": "B",
+    "explanation": "2³ ≡ 1 mod 7. Since 10 = 3×3 + 1, 2^10 ≡ 2 mod 7. Therefore the correct answer is B."
+  },
+  {
+    "id": 206,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "LCM HCF",
+    "question": "Find the HCF of 84 and 126.",
+    "options": {
+      "A": "21",
+      "B": "28",
+      "C": "42",
+      "D": "63"
+    },
+    "answer": "C",
+    "explanation": "84 = 2²×3×7 and 126 = 2×3²×7. HCF = 2×3×7 = 42."
+  },
+  {
+    "id": 207,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Mensuration",
+    "question": "A square has an area of 196 cm². Find its perimeter.",
+    "options": {
+      "A": "48 cm",
+      "B": "52 cm",
+      "C": "56 cm",
+      "D": "64 cm"
+    },
+    "answer": "C",
+    "explanation": "Side = √196 = 14 cm. Perimeter = 4×14 = 56 cm."
+  },
+  {
+    "id": 208,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Ages",
+    "question": "The present ages of A and B are in the ratio 4:5. After 6 years, the ratio becomes 5:6. Find A's present age.",
+    "options": {
+      "A": "18",
+      "B": "20",
+      "C": "24",
+      "D": "30"
+    },
+    "answer": "C",
+    "explanation": "Let ages be 4x and 5x. (4x+6)/(5x+6)=5/6 gives x=6, so A=24."
+  },
+  {
+    "id": 209,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Partnership",
+    "question": "A and B invest Rs. 5000 and Rs. 7000 respectively for one year. If the total profit is Rs. 3600, what is B's share?",
+    "options": {
+      "A": "Rs. 1800",
+      "B": "Rs. 2000",
+      "C": "Rs. 2100",
+      "D": "Rs. 2400"
+    },
+    "answer": "C",
+    "explanation": "Profit ratio = 5:7. B's share = 7/12 × 3600 = Rs. 2100."
+  },
+  {
+    "id": 210,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Probability",
+    "question": "A card is drawn from a standard deck. What is the probability of getting a king?",
+    "options": {
+      "A": "1/13",
+      "B": "1/26",
+      "C": "4/13",
+      "D": "1/4"
+    },
+    "answer": "A",
+    "explanation": "There are 4 kings among 52 cards. Probability = 4/52 = 1/13."
+  },
+  {
+    "id": 211,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Error Detection",
+    "question": "Identify the error: 'Neither of the two candidates have submitted the form.'",
+    "options": {
+      "A": "Neither",
+      "B": "of the two candidates",
+      "C": "have submitted",
+      "D": "the form"
+    },
+    "answer": "C",
+    "explanation": "'Neither' is singular, so the verb should be 'has submitted'."
+  },
+  {
+    "id": 212,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Error Detection",
+    "question": "Identify the error: 'She has been working in this bank since three years.'",
+    "options": {
+      "A": "She has been",
+      "B": "working in",
+      "C": "this bank since three years",
+      "D": "No error"
+    },
+    "answer": "C",
+    "explanation": "Use 'for three years' for duration, not 'since three years'."
+  },
+  {
+    "id": 213,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Synonym",
+    "question": "Choose the synonym of 'Prudent'.",
+    "options": {
+      "A": "Wise",
+      "B": "Careless",
+      "C": "Reckless",
+      "D": "Impulsive"
+    },
+    "answer": "A",
+    "explanation": "Prudent means wise and careful in practical matters."
+  },
+  {
+    "id": 215,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Fill in the Blank",
+    "question": "The central bank decided to ______ the policy rate to control inflation.",
+    "options": {
+      "A": "raise",
+      "B": "raised",
+      "C": "raising",
+      "D": "raises"
+    },
+    "answer": "A",
+    "explanation": "After 'to', the base form 'raise' is required."
+  },
+  {
+    "id": 217,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Active Passive",
+    "question": "Change into passive voice: 'The manager approved the loan.'",
+    "options": {
+      "A": "The loan is approved by the manager.",
+      "B": "The loan was approved by the manager.",
+      "C": "The loan has approved by the manager.",
+      "D": "The loan had approve by the manager."
+    },
+    "answer": "B",
+    "explanation": "Simple past passive uses 'was/were + past participle'."
+  },
+  {
+    "id": 218,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Direct Indirect Speech",
+    "question": "She said, 'I am preparing for the examination.' Choose the correct indirect speech.",
+    "options": {
+      "A": "She said that she was preparing for the examination.",
+      "B": "She said that I was preparing for the examination.",
+      "C": "She says that she was preparing for the examination.",
+      "D": "She said that she is preparing for the examination."
+    },
+    "answer": "A",
+    "explanation": "Present continuous changes to past continuous after a past reporting verb."
+  },
+  {
+    "id": 221,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Para Jumble",
+    "question": "Arrange the sentences: P: This has increased the need for strong digital security. Q: Banking transactions are increasingly conducted online. R: Customers therefore need to remain alert. S: Cyber fraud has also become a growing concern.",
+    "options": {
+      "A": "QSPR",
+      "B": "SQPR",
+      "C": "PQSR",
+      "D": "RQPS"
+    },
+    "answer": "A",
+    "explanation": "Q introduces online banking, S introduces cyber fraud, P gives the consequence, and R concludes with customer responsibility."
+  },
+  {
+    "id": 222,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Cloze Test",
+    "question": "A strong banking system is important for economic growth. Banks mobilise savings and provide credit to businesses and individuals. This process supports investment and economic ______.",
+    "options": {
+      "A": "activity",
+      "B": "inactivity",
+      "C": "decline",
+      "D": "restriction"
+    },
+    "answer": "A",
+    "explanation": "Investment and credit support economic activity."
+  },
+  {
+    "id": 223,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Vocabulary",
+    "question": "Choose the meaning of 'Resilient'.",
+    "options": {
+      "A": "Unable to recover",
+      "B": "Able to recover quickly from difficulties",
+      "C": "Extremely weak",
+      "D": "Uncertain"
+    },
+    "answer": "B",
+    "explanation": "Resilient describes the ability to recover from setbacks."
+  },
+  {
+    "id": 224,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Vocabulary",
+    "question": "Choose the antonym of 'Concise'.",
+    "options": {
+      "A": "Brief",
+      "B": "Precise",
+      "C": "Lengthy",
+      "D": "Clear"
+    },
+    "answer": "C",
+    "explanation": "Concise means brief; lengthy is its opposite."
+  },
+  {
+    "id": 225,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Preposition",
+    "question": "The manager is responsible ______ maintaining customer records.",
+    "options": {
+      "A": "to",
+      "B": "for",
+      "C": "with",
+      "D": "at"
+    },
+    "answer": "B",
+    "explanation": "The correct expression is 'responsible for'."
+  },
+  {
+    "id": 226,
+    "exam": "IBPS PO",
+    "section": "Banking Awareness",
+    "topic": "RBI",
+    "question": "Which institution is the central bank of India?",
+    "options": {
+      "A": "SEBI",
+      "B": "RBI",
+      "C": "NABARD",
+      "D": "SBI"
+    },
+    "answer": "B",
+    "explanation": "The Reserve Bank of India is India's central bank."
+  },
+  {
+    "id": 227,
+    "exam": "IBPS PO",
+    "section": "Banking Awareness",
+    "topic": "Banking",
+    "question": "What does KYC stand for?",
+    "options": {
+      "A": "Keep Your Cash",
+      "B": "Know Your Customer",
+      "C": "Know Your Credit",
+      "D": "Keep Your Customer"
+    },
+    "answer": "B",
+    "explanation": "KYC stands for Know Your Customer."
+  },
+  {
+    "id": 228,
+    "exam": "IBPS PO",
+    "section": "Banking Awareness",
+    "topic": "Banking",
+    "question": "Which of the following is generally considered a demand deposit?",
+    "options": {
+      "A": "Savings account deposit",
+      "B": "Fixed deposit",
+      "C": "Recurring deposit",
+      "D": "Long-term bond"
+    },
+    "answer": "A",
+    "explanation": "Savings deposits are generally withdrawable on demand, subject to account terms."
+  },
+  {
+    "id": 229,
+    "exam": "IBPS PO",
+    "section": "Banking Awareness",
+    "topic": "Digital Banking",
+    "question": "What does UPI stand for?",
+    "options": {
+      "A": "Unified Payments Interface",
+      "B": "Universal Payment Instrument",
+      "C": "United Payments India",
+      "D": "Unified Processing Interface"
+    },
+    "answer": "A",
+    "explanation": "UPI stands for Unified Payments Interface."
+  },
+  {
+    "id": 230,
+    "exam": "IBPS PO",
+    "section": "Banking Awareness",
+    "topic": "Financial Markets",
+    "question": "Which regulator oversees the securities market in India?",
+    "options": {
+      "A": "RBI",
+      "B": "IRDAI",
+      "C": "SEBI",
+      "D": "PFRDA"
+    },
+    "answer": "C",
+    "explanation": "SEBI regulates India's securities market."
+  },
+  {
+    "id": 231,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Syllogism",
+    "question": "Statements: All flowers are plants. Some plants are trees. No tree is a flower. Conclusions: I. Some plants are not flowers. II. Some trees are plants.",
+    "options": {
+      "A": "Only I follows",
+      "B": "Only II follows",
+      "C": "Both I and II follow",
+      "D": "Neither follows"
+    },
+    "answer": "C",
+    "explanation": "Some plants are trees, and no tree is a flower, so those plants are not flowers. Both conclusions follow."
+  },
+  {
+    "id": 233,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Coding-Decoding",
+    "question": "If DELHI is coded as EFMIJ, how is MUMBAI coded?",
+    "options": {
+      "A": "NVNCBJ",
+      "B": "NVMCBJ",
+      "C": "NVMCAJ",
+      "D": "OVNCBJ"
+    },
+    "answer": "A",
+    "explanation": "Each letter is shifted one position forward: M→N, U→V, M→N, B→C, A→B, I→J."
+  },
+  {
+    "id": 234,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Blood Relation",
+    "question": "A is the brother of B. B is the mother of C. How is A related to C?",
+    "options": {
+      "A": "Father",
+      "B": "Uncle",
+      "C": "Brother",
+      "D": "Grandfather"
+    },
+    "answer": "B",
+    "explanation": "A is the maternal uncle of C."
+  },
+  {
+    "id": 235,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Direction",
+    "question": "A person walks 12 m north, then 5 m east, then 12 m south. How far is he from the starting point?",
+    "options": {
+      "A": "5 m",
+      "B": "7 m",
+      "C": "12 m",
+      "D": "17 m"
+    },
+    "answer": "A",
+    "explanation": "The north and south movements cancel. He remains 5 m east."
+  },
+  {
+    "id": 236,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Number Series",
+    "question": "Find the missing number: 5, 11, 23, 47, 95, ?",
+    "options": {
+      "A": "189",
+      "B": "190",
+      "C": "191",
+      "D": "192"
+    },
+    "answer": "C",
+    "explanation": "Each term is multiplied by 2 and increased by 1. 95 × 2 + 1 = 191."
+  },
+  {
+    "id": 237,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Alphabet",
+    "question": "If the letters of the word BANK are arranged alphabetically, which letter will be third?",
+    "options": {
+      "A": "A",
+      "B": "B",
+      "C": "K",
+      "D": "N"
+    },
+    "answer": "C",
+    "explanation": "Alphabetical order is A, B, K, N. Therefore K is third."
+  },
+  {
+    "id": 238,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Ranking",
+    "question": "In a row of 50 students, Ravi is 17th from the left. What is his position from the right?",
+    "options": {
+      "A": "32nd",
+      "B": "33rd",
+      "C": "34th",
+      "D": "35th"
+    },
+    "answer": "C",
+    "explanation": "Position from right = 50 - 17 + 1 = 34. Therefore the correct option is C."
+  },
+  {
+    "id": 241,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Seating Arrangement",
+    "question": "Five people P, Q, R, S and T sit in a row facing north. Q sits immediately right of P. R sits immediately left of S. T sits at the extreme right. If P is at the extreme left, who sits in the middle?",
+    "options": {
+      "A": "P",
+      "B": "Q",
+      "C": "R",
+      "D": "S"
+    },
+    "answer": "C",
+    "explanation": "The arrangement is P-Q-R-S-T, so R is in the middle."
+  },
+  {
+    "id": 242,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Data Sufficiency",
+    "question": "What is the value of x? I. x + 5 = 12. II. x is an integer.",
+    "options": {
+      "A": "Statement I alone is sufficient",
+      "B": "Statement II alone is sufficient",
+      "C": "Both together are required",
+      "D": "Both are insufficient"
+    },
+    "answer": "A",
+    "explanation": "Statement I directly gives x = 7."
+  },
+  {
+    "id": 243,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Syllogism",
+    "question": "Statements: All teachers are graduates. Some graduates are writers. Conclusions: I. Some teachers are writers. II. All teachers are graduates.",
+    "options": {
+      "A": "Only I",
+      "B": "Only II",
+      "C": "Both",
+      "D": "Neither"
+    },
+    "answer": "B",
+    "explanation": "Only conclusion II directly follows. No definite overlap between teachers and writers is given."
+  },
+  {
+    "id": 244,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Logical Reasoning",
+    "question": "If all roses are flowers and all flowers need water, which conclusion follows?",
+    "options": {
+      "A": "All roses need water",
+      "B": "All water is needed by roses",
+      "C": "Some roses do not need water",
+      "D": "No flower needs water"
+    },
+    "answer": "A",
+    "explanation": "Roses are flowers, and all flowers need water. Therefore all roses need water."
+  },
+  {
+    "id": 245,
+    "exam": "IBPS PO",
+    "section": "Reasoning",
+    "topic": "Number Series",
+    "question": "Find the missing number: 2, 6, 18, 54, ?",
+    "options": {
+      "A": "108",
+      "B": "144",
+      "C": "162",
+      "D": "216"
+    },
+    "answer": "C",
+    "explanation": "Each term is multiplied by 3. 54 × 3 = 162."
+  },
+  {
+    "id": 246,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Percentage",
+    "question": "A number is increased by 25% and becomes 500. What was the original number?",
+    "options": {
+      "A": "375",
+      "B": "400",
+      "C": "425",
+      "D": "450"
+    },
+    "answer": "B",
+    "explanation": "Original number = 500/1.25 = 400."
+  },
+  {
+    "id": 247,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Profit and Loss",
+    "question": "An article costing Rs. 800 is sold for Rs. 920. Find the profit percentage.",
+    "options": {
+      "A": "12%",
+      "B": "15%",
+      "C": "18%",
+      "D": "20%"
+    },
+    "answer": "B",
+    "explanation": "Profit = 120. Profit percentage = 120/800 × 100 = 15%."
+  },
+  {
+    "id": 248,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Simple Interest",
+    "question": "Find the principal if simple interest at 12% per annum for 2 years is Rs. 1440.",
+    "options": {
+      "A": "Rs. 5000",
+      "B": "Rs. 5500",
+      "C": "Rs. 6000",
+      "D": "Rs. 6500"
+    },
+    "answer": "C",
+    "explanation": "P = 1440 × 100 / (12 × 2) = Rs. 6000."
+  },
+  {
+    "id": 249,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Ratio",
+    "question": "The ratio of boys to girls in a class is 3:2. If there are 40 students, how many are boys?",
+    "options": {
+      "A": "20",
+      "B": "24",
+      "C": "25",
+      "D": "30"
+    },
+    "answer": "B",
+    "explanation": "Boys = 3/5 × 40 = 24."
+  },
+  {
+    "id": 250,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Average",
+    "question": "The average of five numbers is 32. If four of them are 25, 30, 35 and 40, find the fifth number.",
+    "options": {
+      "A": "25",
+      "B": "30",
+      "C": "35",
+      "D": "40"
+    },
+    "answer": "B",
+    "explanation": "Total = 5×32 = 160. Sum of four = 130. Fifth number = 30."
+  },
+  {
+    "id": 251,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Time and Work",
+    "question": "A can do a work in 24 days and B can do it in 16 days. What fraction of the work can they complete together in one day?",
+    "options": {
+      "A": "1/8",
+      "B": "5/48",
+      "C": "1/6",
+      "D": "7/48"
+    },
+    "answer": "B",
+    "explanation": "1/24 + 1/16 = 2/48 + 3/48 = 5/48."
+  },
+  {
+    "id": 252,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Time Speed Distance",
+    "question": "A train travels at 72 km/h. How many metres does it cover in 15 seconds?",
+    "options": {
+      "A": "250 m",
+      "B": "280 m",
+      "C": "300 m",
+      "D": "320 m"
+    },
+    "answer": "C",
+    "explanation": "72 km/h = 20 m/s. Distance = 20×15 = 300 m."
+  },
+  {
+    "id": 253,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Mixture",
+    "question": "A mixture contains alcohol and water in the ratio 3:2. If the mixture is 25 litres, how much alcohol is present?",
+    "options": {
+      "A": "10 L",
+      "B": "12 L",
+      "C": "15 L",
+      "D": "18 L"
+    },
+    "answer": "C",
+    "explanation": "Alcohol = 3/5 × 25 = 15 litres."
+  },
+  {
+    "id": 254,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Quadratic Equation",
+    "question": "Solve x² - 9x + 20 = 0.",
+    "options": {
+      "A": "3, 6",
+      "B": "4, 5",
+      "C": "2, 10",
+      "D": "1, 20"
+    },
+    "answer": "B",
+    "explanation": "x² - 9x + 20 = (x - 4)(x - 5)."
+  },
+  {
+    "id": 255,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Number System",
+    "question": "What is the smallest number divisible by 12, 15 and 20?",
+    "options": {
+      "A": "30",
+      "B": "45",
+      "C": "60",
+      "D": "120"
+    },
+    "answer": "C",
+    "explanation": "LCM of 12, 15 and 20 is 60."
+  },
+  {
+    "id": 256,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Mensuration",
+    "question": "The length and breadth of a rectangle are 18 cm and 12 cm. Find its perimeter.",
+    "options": {
+      "A": "50 cm",
+      "B": "54 cm",
+      "C": "60 cm",
+      "D": "64 cm"
+    },
+    "answer": "C",
+    "explanation": "Perimeter = 2(18+12) = 60 cm."
+  },
+  {
+    "id": 257,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Ages",
+    "question": "A father is three times as old as his son. Their total age is 48 years. Find the son's age.",
+    "options": {
+      "A": "10",
+      "B": "12",
+      "C": "14",
+      "D": "16"
+    },
+    "answer": "B",
+    "explanation": "Let son's age be x. Father = 3x. 4x = 48, so x = 12."
+  },
+  {
+    "id": 258,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Partnership",
+    "question": "A invests Rs. 8000 and B invests Rs. 12000 for the same period. If total profit is Rs. 5000, what is A's share?",
+    "options": {
+      "A": "Rs. 1800",
+      "B": "Rs. 2000",
+      "C": "Rs. 2200",
+      "D": "Rs. 2500"
+    },
+    "answer": "B",
+    "explanation": "Profit ratio = 8:12 = 2:3. A's share = 2/5 × 5000 = Rs. 2000."
+  },
+  {
+    "id": 259,
+    "exam": "IBPS PO",
+    "section": "Quantitative Aptitude",
+    "topic": "Probability",
+    "question": "A coin is tossed three times. What is the probability of getting three heads?",
+    "options": {
+      "A": "1/4",
+      "B": "1/6",
+      "C": "1/8",
+      "D": "3/8"
+    },
+    "answer": "C",
+    "explanation": "Probability = (1/2)^3 = 1/8."
+  },
+  {
+    "id": 261,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Error Detection",
+    "question": "Identify the error: 'The employees was asked to attend the meeting.'",
+    "options": {
+      "A": "The employees",
+      "B": "was asked",
+      "C": "to attend",
+      "D": "the meeting"
+    },
+    "answer": "B",
+    "explanation": "Employees is plural, so the correct form is 'were asked'."
+  },
+  {
+    "id": 262,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Error Detection",
+    "question": "Identify the error: 'He discussed about the new policy.'",
+    "options": {
+      "A": "He",
+      "B": "discussed",
+      "C": "about",
+      "D": "the new policy"
+    },
+    "answer": "C",
+    "explanation": "The verb 'discuss' takes a direct object; 'about' is unnecessary."
+  },
+  {
+    "id": 265,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Fill in the Blank",
+    "question": "The bank introduced new measures to ______ fraudulent transactions.",
+    "options": {
+      "A": "prevent",
+      "B": "preventing",
+      "C": "prevented",
+      "D": "prevention"
+    },
+    "answer": "A",
+    "explanation": "The infinitive 'to prevent' is grammatically correct."
+  },
+  {
+    "id": 267,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Active Passive",
+    "question": "Change into passive voice: 'The committee will review the proposal.'",
+    "options": {
+      "A": "The proposal will review the committee.",
+      "B": "The proposal will be reviewed by the committee.",
+      "C": "The proposal was reviewed by the committee.",
+      "D": "The proposal is reviewed by the committee."
+    },
+    "answer": "B",
+    "explanation": "Future simple passive = will be + past participle."
+  },
+  {
+    "id": 268,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Direct Indirect Speech",
+    "question": "Rahul said, 'I can solve this problem.' Choose the correct indirect speech.",
+    "options": {
+      "A": "Rahul said that he could solve that problem.",
+      "B": "Rahul said that I can solve this problem.",
+      "C": "Rahul says that he could solve this problem.",
+      "D": "Rahul said he can solve that problem."
+    },
+    "answer": "A",
+    "explanation": "'Can' changes to 'could' and 'this' changes to 'that' in reported speech."
+  },
+  {
+    "id": 269,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Idioms",
+    "question": "What does 'Once in a blue moon' mean?",
+    "options": {
+      "A": "Very frequently",
+      "B": "Very rarely",
+      "C": "Every month",
+      "D": "At night"
+    },
+    "answer": "B",
+    "explanation": "The idiom means something that happens very rarely."
+  },
+  {
+    "id": 271,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Para Jumble",
+    "question": "Arrange the sentences: P: Digital payments have become increasingly popular. Q: They are fast and convenient. R: However, users must remain alert to cyber fraud. S: Secure authentication is therefore important.",
+    "options": {
+      "A": "PQRS",
+      "B": "QPRS",
+      "C": "PRQS",
+      "D": "SRPQ"
+    },
+    "answer": "A",
+    "explanation": "P introduces digital payments, Q gives their advantages, R introduces the concern, and S provides the conclusion."
+  },
+  {
+    "id": 272,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Vocabulary",
+    "question": "Choose the synonym of 'Abundant'.",
+    "options": {
+      "A": "Scarce",
+      "B": "Plentiful",
+      "C": "Limited",
+      "D": "Insufficient"
+    },
+    "answer": "B",
+    "explanation": "Abundant means plentiful or available in large quantities."
+  },
+  {
+    "id": 273,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Vocabulary",
+    "question": "Choose the antonym of 'Ancient'.",
+    "options": {
+      "A": "Old",
+      "B": "Historic",
+      "C": "Modern",
+      "D": "Traditional"
+    },
+    "answer": "C",
+    "explanation": "Modern is opposite in meaning to ancient."
+  },
+  {
+    "id": 274,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Preposition",
+    "question": "The customer complained ______ the poor service.",
+    "options": {
+      "A": "about",
+      "B": "at",
+      "C": "with",
+      "D": "from"
+    },
+    "answer": "A",
+    "explanation": "The correct expression is 'complained about'."
+  },
+  {
+    "id": 275,
+    "exam": "IBPS PO",
+    "section": "English",
+    "topic": "Cloze Test",
+    "question": "Banks play an important role in the economy by collecting deposits and providing loans. This helps channel funds towards productive ______.",
+    "options": {
+      "A": "activities",
+      "B": "obstacles",
+      "C": "losses",
+      "D": "delays"
+    },
+    "answer": "A",
+    "explanation": "Funds provided by banks support productive activities."
+  },
+  {
+    "id": 276,
+    "exam": "IBPS PO",
+    "section": "Banking Awareness",
+    "topic": "RBI",
+    "question": "What is the full form of CRR?",
+    "options": {
+      "A": "Cash Reserve Ratio",
+      "B": "Credit Reserve Rate",
+      "C": "Cash Return Ratio",
+      "D": "Credit Risk Ratio"
+    },
+    "answer": "A",
+    "explanation": "CRR stands for Cash Reserve Ratio."
+  },
+  {
+    "id": 277,
+    "exam": "IBPS PO",
+    "section": "Banking Awareness",
+    "topic": "Banking",
+    "question": "What is the full form of NEFT?",
+    "options": {
+      "A": "National Electronic Funds Transfer",
+      "B": "National Exchange Fund Transaction",
+      "C": "New Electronic Financial Transfer",
+      "D": "National Easy Funds Transfer"
+    },
+    "answer": "A",
+    "explanation": "NEFT stands for National Electronic Funds Transfer."
+  },
+  {
+    "id": 278,
+    "exam": "IBPS PO",
+    "section": "Banking Awareness",
+    "topic": "Banking",
+    "question": "Which organization regulates insurance in India?",
+    "options": {
+      "A": "SEBI",
+      "B": "RBI",
+      "C": "IRDAI",
+      "D": "PFRDA"
+    },
+    "answer": "C",
+    "explanation": "IRDAI regulates the insurance sector in India."
+  },
+  {
+    "id": 279,
+    "exam": "IBPS PO",
+    "section": "Banking Awareness",
+    "topic": "Banking",
+    "question": "What does NPA stand for in banking?",
+    "options": {
+      "A": "Net Profit Asset",
+      "B": "Non-Performing Asset",
+      "C": "National Performing Account",
+      "D": "Non-Paid Account"
+    },
+    "answer": "B",
+    "explanation": "NPA stands for Non-Performing Asset."
+  },
+  {
+    "id": 280,
+    "exam": "IBPS PO",
+    "section": "Banking Awareness",
+    "topic": "Digital Banking",
+    "question": "Which payment system is primarily used for immediate interbank fund transfers in India?",
+    "options": {
+      "A": "RTGS",
+      "B": "IMPS",
+      "C": "Both A and B",
+      "D": "Cheque"
+    },
+    "answer": "C",
+    "explanation": "Both RTGS and IMPS are electronic fund-transfer systems; RTGS is real-time gross settlement and IMPS provides immediate interbank transfers."
   }
 ]
