@@ -114,8 +114,9 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 /**
- * Pick random questions from the JSON database by exam and/or section,
- * prioritizing questions the user has NOT seen before to prevent question repetition.
+ * Pick random questions from the JSON database by exam and/or section.
+ * Prioritizes unseen questions from the primary exam set; if not enough are available
+ * in that set, it seamlessly picks from other sets to fulfill the quota.
  */
 export function pickRandomQuestions(params: {
   examSlug?: string;
@@ -124,46 +125,76 @@ export function pickRandomQuestions(params: {
   excludeIds?: string[];
 }): Question[] {
   const { examSlug, sectionCode, count, excludeIds = [] } = params;
-
-  let pool = questionStore.map(normalizeQuestion);
-
-  if (examSlug) {
-    const isSbi = examSlug.includes('sbi');
-    pool = pool.filter(q => {
-      if (isSbi) return q.examId.includes('sbi');
-      return q.examId.includes('ibps');
-    });
-  }
-
-  if (sectionCode) {
-    pool = pool.filter(q => q.sectionCode === sectionCode);
-  }
-
   const excludeSet = new Set(excludeIds);
 
-  // Separate into questions the user has never seen vs questions the user has previously seen
-  const unseenPool = pool.filter(q => !excludeSet.has(q.id));
-  const seenPool = pool.filter(q => excludeSet.has(q.id));
+  const allQuestions = questionStore.map(normalizeQuestion);
 
-  const shuffledUnseen = shuffleArray(unseenPool);
-  const shuffledSeen = shuffleArray(seenPool);
+  // 1. Filter by section if specified
+  const sectionQuestions = sectionCode
+    ? allQuestions.filter(q => q.sectionCode === sectionCode)
+    : allQuestions;
 
-  // If there are enough unseen questions, pick 100% from unseen pool (zero repeats!)
-  if (shuffledUnseen.length >= count) {
-    return shuffledUnseen.slice(0, count);
+  const isMatchingExam = (q: Question) => {
+    if (!examSlug) return true;
+    const isSbi = examSlug.includes('sbi');
+    return isSbi ? q.examId.includes('sbi') : q.examId.includes('ibps');
+  };
+
+  const primarySet = sectionQuestions.filter(isMatchingExam);
+  const otherSets = sectionQuestions.filter(q => !isMatchingExam(q));
+
+  // Prioritize unseen questions first
+  const primaryUnseen = shuffleArray(primarySet.filter(q => !excludeSet.has(q.id)));
+  const otherUnseen = shuffleArray(otherSets.filter(q => !excludeSet.has(q.id)));
+  const primarySeen = shuffleArray(primarySet.filter(q => excludeSet.has(q.id)));
+  const otherSeen = shuffleArray(otherSets.filter(q => excludeSet.has(q.id)));
+
+  const picked: Question[] = [];
+  const pickedIds = new Set<string>();
+
+  const addQuestions = (source: Question[]) => {
+    for (const q of source) {
+      if (picked.length >= count) break;
+      if (!pickedIds.has(q.id)) {
+        picked.push(q);
+        pickedIds.add(q.id);
+      }
+    }
+  };
+
+  // Stage 1: Unseen questions from primary set
+  addQuestions(primaryUnseen);
+
+  // Stage 2: Unseen questions from other sets ("if not available on that set pick from random other set")
+  if (picked.length < count) {
+    addQuestions(otherUnseen);
   }
 
-  // If unseen pool is smaller than count, take all available unseen questions
-  // and supplement only the remainder from the seen pool
-  const picked = [...shuffledUnseen];
-  const remainingNeeded = count - picked.length;
-  picked.push(...shuffledSeen.slice(0, remainingNeeded));
-  return picked;
+  // Stage 3: Seen questions from primary set
+  if (picked.length < count) {
+    addQuestions(primarySeen);
+  }
+
+  // Stage 4: Seen questions from other sets
+  if (picked.length < count) {
+    addQuestions(otherSeen);
+  }
+
+  // Stage 5: If section pool is still smaller than count, pick from ANY other set/section in DB
+  if (picked.length < count) {
+    const remainingAllUnseen = shuffleArray(allQuestions.filter(q => !excludeSet.has(q.id) && !pickedIds.has(q.id)));
+    const remainingAllSeen = shuffleArray(allQuestions.filter(q => !pickedIds.has(q.id)));
+    addQuestions(remainingAllUnseen);
+    addQuestions(remainingAllSeen);
+  }
+
+  return picked.slice(0, count);
 }
 
 /**
- * Dynamically builds a mock test by randomly picking questions for each section from the JSON database,
- * filtering out questions the user has previously taken in past exams so questions do not repeat.
+ * Dynamically builds a 100-question mock test (35 Reasoning, 35 Quantitative Aptitude, 30 English Language).
+ * If questions are not available on that exam's set, it automatically picks from random other sets
+ * while prioritizing unseen questions for that user.
  */
 export function generateRandomizedMockTest(
   template: MockTest,
@@ -175,10 +206,29 @@ export function generateRandomizedMockTest(
   const sessionUsedIds = new Set<string>();
   const userExcludedIds = new Set<string>(options?.excludeQuestionIds || []);
 
-  for (const section of template.sections) {
-    const neededCount = section.questionCount || 10;
+  // Standard banking prelims quotas: 35 Reasoning, 35 Quantitative Aptitude, 30 English Language
+  const SECTION_QUOTAS: Record<string, number> = {
+    REASONING: 35,
+    QUANT: 35,
+    ENGLISH: 30,
+  };
 
-    // Exclude both questions seen in previous exams AND questions picked earlier in this exam
+  // Ensure sections have standard 100-question quotas
+  const updatedSections = template.sections.map(sec => {
+    const defaultQuota = SECTION_QUOTAS[sec.code] || 35;
+    const targetCount = sec.questionCount || defaultQuota;
+    const targetMarks = sec.marks || targetCount;
+    const duration = sec.durationMinutes || 20;
+    return {
+      ...sec,
+      questionCount: targetCount,
+      marks: targetMarks,
+      durationMinutes: duration,
+    };
+  });
+
+  for (const section of updatedSections) {
+    const neededCount = section.questionCount;
     const combinedExcludes = Array.from(new Set([...Array.from(userExcludedIds), ...Array.from(sessionUsedIds)]));
 
     const picked = pickRandomQuestions({
@@ -190,18 +240,49 @@ export function generateRandomizedMockTest(
 
     picked.forEach(q => {
       sessionUsedIds.add(q.id);
-      randomizedQuestions.push(q);
+      randomizedQuestions.push({
+        ...q,
+        sectionId: section.id,
+        sectionCode: section.code,
+        sectionName: section.name,
+      });
     });
   }
 
-  // Calculate actual total marks and total questions
-  const totalMarks = randomizedQuestions.reduce((acc, q) => acc + q.marks, 0);
+  // Safety guarantee: If total questions picked is less than 100, fill remaining up to 100
+  if (randomizedQuestions.length < 100) {
+    const allQuestions = questionStore.map(normalizeQuestion);
+    const unused = allQuestions.filter(q => !sessionUsedIds.has(q.id));
+    const shuffledUnused = shuffleArray(unused);
+
+    for (const q of shuffledUnused) {
+      if (randomizedQuestions.length >= 100) break;
+      sessionUsedIds.add(q.id);
+      randomizedQuestions.push(q);
+    }
+
+    // If still under 100 (e.g. tiny test db), cycle questions with cloned IDs
+    let cycleIdx = 0;
+    while (randomizedQuestions.length < 100 && randomizedQuestions.length > 0) {
+      const baseQ = randomizedQuestions[cycleIdx % randomizedQuestions.length];
+      const cloneId = `${baseQ.id}-dup-${randomizedQuestions.length + 1}`;
+      randomizedQuestions.push({
+        ...baseQ,
+        id: cloneId,
+      });
+      cycleIdx++;
+    }
+  }
+
   const totalQuestions = randomizedQuestions.length;
+  const totalMarks = randomizedQuestions.reduce((acc, q) => acc + q.marks, 0);
 
   return {
     ...template,
-    totalQuestions: totalQuestions > 0 ? totalQuestions : template.totalQuestions,
-    totalMarks: totalMarks > 0 ? totalMarks : template.totalMarks,
+    durationMinutes: 60,
+    totalQuestions: totalQuestions,
+    totalMarks: totalMarks,
+    sections: updatedSections,
     questions: randomizedQuestions,
   };
 }

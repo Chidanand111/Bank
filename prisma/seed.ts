@@ -195,27 +195,33 @@ async function main() {
   const mockTest = await prisma.mockTest.upsert({
     where: { slug: 'ibps-po-prelims-mock-1' },
     update: {
-      totalMarks: 30,
-      totalQuestions: 30,
+      durationMinutes: 60,
+      totalMarks: 100,
+      totalQuestions: 100,
+      cutoffMarks: 54.5,
     },
     create: {
       id: 'mock-ibps-po-1',
       slug: 'ibps-po-prelims-mock-1',
       title: 'IBPS PO Prelims Full Mock Test 1',
-      description: '30-Question high-yield practice test for IBPS PO Prelims covering English Language, Quantitative Aptitude, and Reasoning Ability.',
+      description: '100-Question dynamic full-length practice test for IBPS PO Prelims covering Reasoning Ability (35), Quantitative Aptitude (35), and English Language (30).',
       examId: ibpsPo.id,
-      durationMinutes: 45,
-      totalMarks: 30,
-      totalQuestions: 30,
-      cutoffMarks: 18.5,
+      durationMinutes: 60,
+      totalMarks: 100,
+      totalQuestions: 100,
+      cutoffMarks: 54.5,
       isFree: true,
       isPublished: true,
     },
   });
 
   // Link questions to Mock Test
-  const ibpsQuestions = allQuestions.filter((q) => q.examId === 'exam-ibps-po').slice(0, 30);
-  const mockTestQuestionData = ibpsQuestions.map((q, idx) => {
+  const { generateRandomizedMockTest } = await import('../lib/db/questionDb');
+  const { MOCK_TESTS_DATA } = await import('../lib/data/mockTests');
+  const template = MOCK_TESTS_DATA[0];
+  const dynamicTest = generateRandomizedMockTest(template);
+
+  const mockTestQuestionData = dynamicTest.questions.map((q, idx) => {
     const sectionId =
       q.sectionCode === 'REASONING'
         ? secReasoning.id
