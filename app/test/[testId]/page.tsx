@@ -296,12 +296,24 @@ export default function TestPage({ params }: TestPageProps) {
     executeSubmission();
   }, [executeSubmission]);
 
-  if (loading || !test) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="text-center space-y-3">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-slate-600 font-medium">Loading BankMock Exam Engine...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!test || !test.questions || test.questions.length === 0) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-xs max-w-md w-full text-center space-y-4">
+          <h2 className="text-xl font-bold text-slate-800">Exam Session Not Found</h2>
+          <p className="text-sm text-slate-500">The requested test paper could not be loaded.</p>
+          <Button onClick={() => router.push('/tests')}>Return to Practice Tests</Button>
         </div>
       </div>
     );

@@ -20,7 +20,16 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   onSelectOption,
   isReviewMode = false,
 }) => {
+  if (!question) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-8 text-center text-slate-500">
+        Loading question content...
+      </div>
+    );
+  }
+
   const hasPassage = Boolean(question.passage || question.passageImageUrl);
+  const optionsList = Array.isArray(question.options) ? question.options : [];
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-full">
@@ -31,7 +40,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             Q{questionIndex + 1}
           </span>
           <span className="text-xs text-slate-500 font-medium">
-            of {totalQuestionsInSection} in {question.sectionName}
+            of {totalQuestionsInSection} in {question.sectionName || 'Section'}
           </span>
           {question.isPyq && (
             <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-0.5 rounded-full">
@@ -42,10 +51,10 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
         <div className="flex items-center gap-2">
           <Badge variant="slate" size="sm">
-            Topic: {question.topicName}
+            Topic: {question.topicName || 'General'}
           </Badge>
           <Badge variant="blue" size="sm">
-            +{question.marks} / -{question.negativeMarks} Marks
+            +{question.marks ?? 1.0} / -{question.negativeMarks ?? 0.25} Marks
           </Badge>
         </div>
       </div>
@@ -94,7 +103,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             Choose the correct option:
           </span>
 
-          {question.options.map((option, idx) => {
+          {optionsList.map((option, idx) => {
             const isSelected = selectedOptionId === option.id;
             const isCorrectOption = option.isCorrect;
 
