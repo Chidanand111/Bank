@@ -11,6 +11,7 @@ import { QuestionPalette } from '@/components/questions/QuestionPalette';
 import { SubmitConfirmModal } from '@/components/questions/SubmitConfirmModal';
 import { Button } from '@/components/ui/Button';
 import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Send } from 'lucide-react';
+import { getUserSeenQuestionIds, recordUserSeenQuestions } from '@/lib/services/userQuestionTracker';
 
 export interface TestPageProps {
   params: Promise<{ testId: string }>;
@@ -33,35 +34,73 @@ export default function TestPage({ params }: TestPageProps) {
   // Storage key for test state persistence
   const storageKey = `bankmock_test_progress_${testId}`;
 
-  // Fetch test details
+  // Fetch test details at start of exam
   useEffect(() => {
     async function loadTest() {
-      const foundTest = await getMockTestById(testId);
-      if (foundTest) {
-        setTest(foundTest);
-        setRemainingSeconds(foundTest.durationMinutes * 60);
+      // 1. Check if there's an in-progress session already saved
+      let inProgressQuestions: Question[] | null = null;
+      let inProgressResponses: Record<string, UserResponseState> | null = null;
+      let inProgressVisited: string[] | null = null;
+      let inProgressSeconds: number | null = null;
 
-        const initialSecCode = foundTest.sections[0]?.code || foundTest.questions[0]?.sectionCode || 'GENERAL';
-        const initialQId = foundTest.questions.find(q => q.sectionCode === initialSecCode)?.id || foundTest.questions[0]?.id || '';
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.questions && parsed.questions.length > 0) {
+            inProgressQuestions = parsed.questions;
+          }
+          if (parsed.responses) inProgressResponses = parsed.responses;
+          if (parsed.visitedQuestions) inProgressVisited = parsed.visitedQuestions;
+          if (typeof parsed.remainingSeconds === 'number' && parsed.remainingSeconds > 0) {
+            inProgressSeconds = parsed.remainingSeconds;
+          }
+        }
+      } catch (err) {
+        console.error('Error reading saved session:', err);
+      }
+
+      // 2. If resuming an active session, preserve its exact question set
+      if (inProgressQuestions && inProgressQuestions.length > 0) {
+        const baseTest = await getMockTestById(testId);
+        if (baseTest) {
+          const activeTest: MockTest = {
+            ...baseTest,
+            questions: inProgressQuestions,
+          };
+          setTest(activeTest);
+          if (inProgressResponses) setResponses(inProgressResponses);
+          if (inProgressVisited) setVisitedQuestions(inProgressVisited);
+          if (inProgressSeconds) setRemainingSeconds(inProgressSeconds);
+
+          const initialSecCode = activeTest.sections[0]?.code || activeTest.questions[0]?.sectionCode || 'GENERAL';
+          const initialQId = activeTest.questions.find(q => q.sectionCode === initialSecCode)?.id || activeTest.questions[0]?.id || '';
+          setCurrentSectionCode(initialSecCode);
+          setCurrentQuestionId(initialQId);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // 3. New exam start: Retrieve all questions previously seen by this user across past exams
+      const seenQuestionIds = getUserSeenQuestionIds();
+
+      // Pick randomly from the database excluding any question the user has already seen
+      const freshTest = await getMockTestById(testId, seenQuestionIds);
+      if (freshTest) {
+        setTest(freshTest);
+        setRemainingSeconds(freshTest.durationMinutes * 60);
+
+        const initialSecCode = freshTest.sections[0]?.code || freshTest.questions[0]?.sectionCode || 'GENERAL';
+        const initialQId = freshTest.questions.find(q => q.sectionCode === initialSecCode)?.id || freshTest.questions[0]?.id || '';
 
         setCurrentSectionCode(initialSecCode);
         setCurrentQuestionId(initialQId);
         setVisitedQuestions(initialQId ? [initialQId] : []);
 
-        // Load saved state from localStorage if present
-        try {
-          const saved = localStorage.getItem(storageKey);
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed.responses) setResponses(parsed.responses);
-            if (parsed.visitedQuestions) setVisitedQuestions(parsed.visitedQuestions);
-            if (typeof parsed.remainingSeconds === 'number' && parsed.remainingSeconds > 0) {
-              setRemainingSeconds(parsed.remainingSeconds);
-            }
-          }
-        } catch (err) {
-          console.error('Error loading saved test progress:', err);
-        }
+        // Record these newly assigned questions immediately so they will not repeat in subsequent exams
+        const newIds = freshTest.questions.map(q => q.id);
+        recordUserSeenQuestions(undefined, newIds);
       }
       setLoading(false);
     }
@@ -75,6 +114,8 @@ export default function TestPage({ params }: TestPageProps) {
       localStorage.setItem(
         storageKey,
         JSON.stringify({
+          testId,
+          questions: test.questions,
           responses,
           visitedQuestions,
           remainingSeconds,

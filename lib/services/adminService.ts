@@ -5,15 +5,12 @@ import { requireAdmin } from '../auth/permissions';
 import { getDatabaseUsers, updateDatabaseUserRole, getCurrentUser } from '../auth/session';
 import { EXAMS_DATA } from '../data/exams';
 import { MOCK_TESTS_DATA } from '../data/mockTests';
-import { IBPS_PO_QUESTIONS, SBI_CLERK_QUESTIONS } from '../data/questions';
 import { SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
+import { getAllQuestions, addQuestionToJsonDb, deleteQuestionFromJsonDb } from '../db/questionDb';
 import { AdminMockTestInput, AdminQuestionInput, AdminStats, AuthUser, MockTest, Question, Role } from '@/types';
 
-// In-memory working sets for admin modifications
-let dynamicQuestions: Question[] = [
-  ...IBPS_PO_QUESTIONS,
-  ...SBI_CLERK_QUESTIONS,
-];
+// In-memory working sets for admin modifications backed by JSON question store
+let dynamicQuestions: Question[] = getAllQuestions();
 
 let dynamicMockTests: MockTest[] = [...MOCK_TESTS_DATA];
 
@@ -151,6 +148,21 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
   };
 
   dynamicQuestions.unshift(newQuestion);
+  addQuestionToJsonDb({
+    id: newQuestionId,
+    exam: exam.title,
+    section: newQuestion.sectionName,
+    topic: input.topicName,
+    question: input.text,
+    options: input.options.reduce((acc, opt, i) => {
+      acc[String.fromCharCode(65 + i)] = opt.text;
+      return acc;
+    }, {} as Record<string, string>),
+    answer: String.fromCharCode(65 + Math.max(0, input.options.findIndex(o => o.isCorrect))),
+    explanation: input.explanation,
+    difficulty: input.difficulty,
+  });
+
   revalidatePath('/admin/questions');
   return { success: true };
 }
@@ -194,6 +206,7 @@ export async function deleteQuestionAction(questionId: string): Promise<{ succes
   await requireAdmin();
 
   dynamicQuestions = dynamicQuestions.filter(q => q.id !== questionId);
+  deleteQuestionFromJsonDb(questionId);
   revalidatePath('/admin/questions');
   return { success: true };
 }

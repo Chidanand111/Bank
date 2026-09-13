@@ -2,6 +2,9 @@ import { AttemptResult, DashboardStats, Exam, MockTest } from '@/types';
 import { EXAMS_DATA } from '../data/exams';
 import { MOCK_TESTS_DATA } from '../data/mockTests';
 import { INITIAL_DASHBOARD_STATS, SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
+import { generateRandomizedMockTest } from '../db/questionDb';
+
+import { recordUserSeenQuestions } from './userQuestionTracker';
 
 const ATTEMPTS_STORAGE_KEY = 'bankmock_attempts';
 
@@ -21,9 +24,15 @@ export async function getMockTests(examSlug?: string): Promise<MockTest[]> {
   return MOCK_TESTS_DATA;
 }
 
-export async function getMockTestById(idOrSlug: string): Promise<MockTest | null> {
+export async function getMockTestById(
+  idOrSlug: string,
+  excludeQuestionIds?: string[]
+): Promise<MockTest | null> {
   const test = MOCK_TESTS_DATA.find(m => m.id === idOrSlug || m.slug === idOrSlug);
-  return test || null;
+  if (!test) return null;
+
+  // Pick questions randomly from the JSON questions database with non-repeating exclusion
+  return generateRandomizedMockTest(test, { excludeQuestionIds });
 }
 
 export function saveAttemptResult(result: AttemptResult): void {
@@ -35,6 +44,14 @@ export function saveAttemptResult(result: AttemptResult): void {
     const filtered = existing.filter(a => a.id !== result.id);
     filtered.unshift(result);
     localStorage.setItem(ATTEMPTS_STORAGE_KEY, JSON.stringify(filtered));
+
+    // Record question IDs as seen for this user so future exams won't repeat them
+    if (result.questionDetails && Array.isArray(result.questionDetails)) {
+      const qIds = result.questionDetails
+        .map(qd => qd.question?.id)
+        .filter(Boolean) as string[];
+      recordUserSeenQuestions(undefined, qIds);
+    }
   } catch (err) {
     console.error('Failed to save attempt in localStorage:', err);
   }
