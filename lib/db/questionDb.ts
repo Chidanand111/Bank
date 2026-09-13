@@ -1,5 +1,6 @@
 import { Question, Option, Difficulty, MockTest } from '@/types';
 import rawQuestionsData from '@/data/questions.json';
+import pyqQuestionsData from '@/data/sbi_clerk_2024_pyq.json';
 
 export interface RawJsonQuestion {
   id: number | string;
@@ -22,8 +23,18 @@ export interface RawJsonQuestion {
   negativeMarks?: number;
 }
 
-// In-memory working database initialized from JSON file
-let questionStore: RawJsonQuestion[] = [...(rawQuestionsData as RawJsonQuestion[])];
+// In-memory working database initialized from JSON files (deduplicated by ID)
+const combinedRaw = [...(rawQuestionsData as RawJsonQuestion[]), ...(pyqQuestionsData as RawJsonQuestion[])];
+const initialStore: RawJsonQuestion[] = [];
+const seenStoreIds = new Set<string>();
+for (const q of combinedRaw) {
+  const strId = String(q.id);
+  if (!seenStoreIds.has(strId)) {
+    seenStoreIds.add(strId);
+    initialStore.push(q);
+  }
+}
+let questionStore: RawJsonQuestion[] = initialStore;
 
 /**
  * Standardize Exam names to exam IDs and slugs
@@ -241,7 +252,13 @@ export function generateRandomizedMockTest(
       return Boolean(q.isPyq);
     };
 
-    const dedicatedQuestions = allQuestions.filter(isThisPyqQuestion);
+    const dedicatedQuestions = allQuestions
+      .filter(isThisPyqQuestion)
+      .sort((a, b) => {
+        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
+        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
+        return numA - numB;
+      });
     const questionsToServe = dedicatedQuestions.length > 0 ? dedicatedQuestions : template.questions;
 
     const updatedSections = template.sections.map(sec => {
