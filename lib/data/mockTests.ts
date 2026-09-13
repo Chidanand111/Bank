@@ -94,4 +94,29 @@ export const MOCK_TESTS_DATA: MockTest[] = [
     ],
     questions: [],
   },
+
+  // --- SBI CLERK 2024 PRELIMS PYQ (PREVIOUS YEAR PAPER) ---
+  {
+    id: 'mock-sbi-clerk-2024-pyq',
+    slug: 'sbi-clerk-prelims-2024-pyq',
+    title: 'SBI Clerk Prelims 2024 - Previous Year Question Paper',
+    description: 'Authentic 100-question actual exam paper from SBI Clerk Prelims 2024 (35 Reasoning, 35 Numerical Ability, 30 English). Dedicated paper with exact official questions, interlinked puzzles, and reading passages.',
+    examId: 'exam-sbi-clerk',
+    examSlug: 'sbi-clerk',
+    examTitle: 'SBI Clerk (Junior Associate)',
+    durationMinutes: 60,
+    totalMarks: 100,
+    totalQuestions: 100,
+    cutoffMarks: 74.5,
+    isFree: true,
+    isFixed: true,
+    isPyq: true,
+    year: 2024,
+    sections: [
+      { id: 'sec-sbi-p-eng', code: 'ENGLISH', name: 'English Language', durationMinutes: 20, questionCount: 30, marks: 30 },
+      { id: 'sec-sbi-p-num', code: 'QUANT', name: 'Numerical Ability', durationMinutes: 20, questionCount: 35, marks: 35 },
+      { id: 'sec-sbi-p-reason', code: 'REASONING', name: 'Reasoning Ability', durationMinutes: 20, questionCount: 35, marks: 35 },
+    ],
+    questions: [],
+  },
 ];

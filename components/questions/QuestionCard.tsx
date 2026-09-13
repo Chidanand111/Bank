@@ -1,7 +1,7 @@
 import React from 'react';
 import { Question } from '@/types';
 import { Badge } from '../ui/Badge';
-import { CheckCircle2, XCircle, HelpCircle } from 'lucide-react';
+import { CheckCircle2, XCircle, HelpCircle, BookOpen } from 'lucide-react';
 
 export interface QuestionCardProps {
   question: Question;
@@ -20,6 +20,8 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   onSelectOption,
   isReviewMode = false,
 }) => {
+  const hasPassage = Boolean(question.passage || question.passageImageUrl);
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col h-full">
       {/* Question Header */}
@@ -31,6 +33,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           <span className="text-xs text-slate-500 font-medium">
             of {totalQuestionsInSection} in {question.sectionName}
           </span>
+          {question.isPyq && (
+            <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2.5 py-0.5 rounded-full">
+              PYQ {question.pyqYear || '2024'}
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -44,8 +51,33 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
       </div>
 
       {/* Question Content */}
-      <div className="p-5 sm:p-6 flex-1 overflow-y-auto space-y-6">
-        <div className="text-slate-900 text-base leading-relaxed font-medium whitespace-pre-line">
+      <div className="p-5 sm:p-6 flex-1 overflow-y-auto space-y-5">
+        {/* Interlinked Directions / Comprehension Passage Box */}
+        {hasPassage && (
+          <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 sm:p-5 text-slate-800 space-y-3">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-900 border-b border-indigo-100/80 pb-2">
+              <BookOpen className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>Directions & Context {question.groupId ? `(${question.groupId})` : ''}</span>
+            </div>
+            {question.passage && (
+              <div className="text-sm sm:text-base leading-relaxed text-slate-700 font-normal whitespace-pre-line max-h-72 overflow-y-auto pr-2">
+                {question.passage}
+              </div>
+            )}
+            {question.passageImageUrl && (
+              <div className="mt-3 border border-indigo-200 rounded-lg overflow-hidden bg-white p-2 max-w-xl">
+                <img
+                  src={question.passageImageUrl}
+                  alt="Passage Reference Diagram"
+                  className="w-full h-auto object-contain rounded"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Question Text */}
+        <div className="text-slate-900 text-base leading-relaxed font-semibold whitespace-pre-line">
           {question.text}
         </div>
 
@@ -108,8 +140,17 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                   </div>
                 )}
 
-                <div className="flex-1 text-sm sm:text-base leading-snug pt-0.5">
-                  {option.text}
+                <div className="flex-1 text-sm sm:text-base leading-snug pt-0.5 space-y-2">
+                  {option.text && <div>{option.text}</div>}
+                  {option.imageUrl && (
+                    <div className="border border-slate-200 rounded p-1 bg-white inline-block">
+                      <img
+                        src={option.imageUrl}
+                        alt={`Option ${String.fromCharCode(65 + idx)} illustration`}
+                        className="max-h-36 object-contain rounded"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {isSelected && !isReviewMode && (

@@ -80,6 +80,12 @@ model Question {
   id                String             @id @default(uuid())
   text              String
   imageUrl          String?
+  passage           String?            @db.Text
+  passageImageUrl   String?
+  groupId           String?
+  isPyq             Boolean            @default(false)
+  pyqYear           Int?
+  pyqExam           String?
   difficulty        Difficulty         @default(MEDIUM)
   explanation       String
   marks             Float              @default(1.0)
@@ -102,6 +108,7 @@ model Option {
   questionId String
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   text       String
+  imageUrl   String?
   isCorrect  Boolean  @default(false)
   order      Int      @default(0)
   answers    Answer[]
@@ -120,6 +127,9 @@ model MockTest {
   cutoffMarks       Float?
   isFree            Boolean            @default(true)
   isPublished       Boolean            @default(true)
+  isFixed           Boolean            @default(false)
+  isPyq             Boolean            @default(false)
+  year              Int?
   mockTestQuestions MockTestQuestion[]
   attempts          Attempt[]
   createdAt         DateTime           @default(now())

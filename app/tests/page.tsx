@@ -16,6 +16,8 @@ export default async function TestsPage({ searchParams }: TestsPageProps) {
 
   const filteredTests = examFilter === 'all'
     ? allTests
+    : examFilter === 'pyq'
+    ? allTests.filter(t => t.isPyq)
     : allTests.filter(t => t.examSlug === examFilter);
 
   return (
@@ -69,6 +71,16 @@ export default async function TestsPage({ searchParams }: TestsPageProps) {
             }`}
           >
             SBI Clerk ({allTests.filter(t => t.examSlug === 'sbi-clerk').length})
+          </Link>
+          <Link
+            href="/tests?exam=pyq"
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+              examFilter === 'pyq'
+                ? 'bg-purple-700 text-white shadow-xs'
+                : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
+            }`}
+          >
+            ★ PYQ Papers ({allTests.filter(t => t.isPyq).length})
           </Link>
         </div>
       </div>

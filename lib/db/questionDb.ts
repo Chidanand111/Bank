@@ -7,7 +7,14 @@ export interface RawJsonQuestion {
   section: string;
   topic: string;
   question: string;
-  options: Record<string, string>;
+  imageUrl?: string;
+  passage?: string;
+  passageImageUrl?: string;
+  groupId?: string;
+  isPyq?: boolean;
+  pyqYear?: number;
+  pyqExam?: string;
+  options: Record<string, string | { text: string; imageUrl?: string }>;
   answer: string;
   explanation: string;
   difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
@@ -53,26 +60,40 @@ export function mapSectionToCode(sectionName: string): { sectionCode: string; se
  * Convert a raw JSON question into the full application Question format
  */
 export function normalizeQuestion(raw: RawJsonQuestion): Question {
-  const qId = typeof raw.id === 'number' ? `q-json-${raw.id}` : raw.id;
+  const qId = typeof raw.id === 'number' ? `q-json-${raw.id}` : String(raw.id);
   const { examId } = mapExamToId(raw.exam);
   const { sectionCode, sectionId, sectionName } = mapSectionToCode(raw.section);
   const topicId = `top-${sectionCode.toLowerCase()}-${(raw.topic || 'general').toLowerCase().replace(/\s+/g, '-')}`;
 
   const optionKeys = Object.keys(raw.options || {}).sort();
   const options: Option[] = optionKeys.map((key, idx) => {
+    const rawOpt = raw.options[key];
+    const optText = typeof rawOpt === 'string' ? rawOpt : (rawOpt?.text || '');
+    const optImg = typeof rawOpt === 'object' ? rawOpt?.imageUrl : undefined;
     const isCorrect = key.trim().toUpperCase() === (raw.answer || '').trim().toUpperCase();
     return {
       id: `opt-${qId}-${key.toLowerCase()}`,
       questionId: qId,
-      text: raw.options[key],
+      text: optText,
+      imageUrl: optImg,
       isCorrect,
       order: idx + 1,
     };
   });
 
+  const isPyq = raw.isPyq ?? Boolean(raw.exam?.toLowerCase().includes('2024') || raw.exam?.toLowerCase().includes('pyq'));
+  const pyqYear = raw.pyqYear ?? (raw.exam?.includes('2024') ? 2024 : undefined);
+
   return {
     id: qId,
     text: raw.question,
+    imageUrl: raw.imageUrl,
+    passage: raw.passage,
+    passageImageUrl: raw.passageImageUrl,
+    groupId: raw.groupId,
+    isPyq,
+    pyqYear,
+    pyqExam: raw.pyqExam || (isPyq ? 'SBI Clerk Prelims 2024' : undefined),
     difficulty: (raw.difficulty as Difficulty) || 'MEDIUM',
     explanation: raw.explanation || '',
     marks: raw.marks ?? 1.0,
@@ -202,6 +223,48 @@ export function generateRandomizedMockTest(
     excludeQuestionIds?: string[];
   }
 ): MockTest {
+  // Strict Isolation for Fixed / PYQ Mock Tests:
+  // Strictly serve only its authentic questions in exact order.
+  // NO random or external questions are EVER injected into this exam.
+  if (template.isFixed || template.isPyq) {
+    const allQuestions = questionStore.map(normalizeQuestion);
+    const isThisPyqQuestion = (q: Question) => {
+      if (template.slug === 'sbi-clerk-prelims-2024-pyq' || template.id === 'mock-sbi-clerk-2024-pyq') {
+        const idStr = String(q.id).toLowerCase();
+        return (
+          Boolean(q.isPyq && q.pyqYear === 2024) ||
+          (q.pyqExam ? q.pyqExam.toLowerCase().includes('2024') : false) ||
+          idStr.includes('sbi-2024') ||
+          idStr.includes('sbi-clerk-2024')
+        );
+      }
+      return Boolean(q.isPyq);
+    };
+
+    const dedicatedQuestions = allQuestions.filter(isThisPyqQuestion);
+    const questionsToServe = dedicatedQuestions.length > 0 ? dedicatedQuestions : template.questions;
+
+    const updatedSections = template.sections.map(sec => {
+      const count = questionsToServe.filter(q => q.sectionCode === sec.code).length;
+      return {
+        ...sec,
+        questionCount: count || sec.questionCount,
+        marks: count || sec.marks,
+      };
+    });
+
+    const totalQuestions = questionsToServe.length || template.totalQuestions;
+    const totalMarks = questionsToServe.reduce((acc, q) => acc + q.marks, 0) || template.totalMarks;
+
+    return {
+      ...template,
+      totalQuestions,
+      totalMarks,
+      sections: updatedSections,
+      questions: questionsToServe,
+    };
+  }
+
   const randomizedQuestions: Question[] = [];
   const sessionUsedIds = new Set<string>();
   const userExcludedIds = new Set<string>(options?.excludeQuestionIds || []);

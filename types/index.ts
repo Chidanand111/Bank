@@ -30,6 +30,7 @@ export interface Option {
   id: string;
   questionId: string;
   text: string;
+  imageUrl?: string;
   isCorrect: boolean;
   order: number;
 }
@@ -38,6 +39,12 @@ export interface Question {
   id: string;
   text: string;
   imageUrl?: string;
+  passage?: string;
+  passageImageUrl?: string;
+  groupId?: string;
+  isPyq?: boolean;
+  pyqYear?: number;
+  pyqExam?: string;
   difficulty: Difficulty;
   explanation: string;
   marks: number;
@@ -104,6 +111,9 @@ export interface MockTest {
   totalQuestions: number;
   cutoffMarks: number;
   isFree: boolean;
+  isFixed?: boolean;
+  isPyq?: boolean;
+  year?: number;
   sections: {
     id: string;
     code: string;
