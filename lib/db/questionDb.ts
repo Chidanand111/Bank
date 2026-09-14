@@ -399,6 +399,29 @@ export function generateRandomizedMockTest(
 }
 
 /**
+ * Check if store question ID matches query question ID across formats
+ */
+export function matchesQuestionId(storeId: number | string, queryId: number | string): boolean {
+  const sStr = String(storeId).trim().toLowerCase();
+  const qStr = String(queryId).trim().toLowerCase();
+  if (sStr === qStr) return true;
+
+  const sNorm = sStr.replace(/^q-json-/, '').replace(/^q-/, '');
+  const qNorm = qStr.replace(/^q-json-/, '').replace(/^q-/, '');
+  if (sNorm === qNorm) return true;
+  if (sStr === qNorm || sNorm === qStr) return true;
+
+  // Handle PYQ id variations like 'sbi-2024-q1' vs 'q-sbi-2024-1'
+  const sDigits = sStr.match(/\d+/g)?.join('');
+  const qDigits = qStr.match(/\d+/g)?.join('');
+  if (sStr.includes('sbi') && qStr.includes('sbi') && sDigits && qDigits && sDigits === qDigits) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Add a new question to the JSON database
  */
 export function addQuestionToJsonDb(newQuestion: RawJsonQuestion): Question {
@@ -412,7 +435,7 @@ export function addQuestionToJsonDb(newQuestion: RawJsonQuestion): Question {
  * Update an existing question in the JSON database
  */
 export function updateQuestionInJsonDb(id: number | string, updates: Partial<RawJsonQuestion>): Question | null {
-  const idx = questionStore.findIndex(q => String(q.id) === String(id));
+  const idx = questionStore.findIndex(q => matchesQuestionId(q.id, id));
   if (idx === -1) return null;
 
   questionStore[idx] = {
@@ -427,6 +450,66 @@ export function updateQuestionInJsonDb(id: number | string, updates: Partial<Raw
  */
 export function deleteQuestionFromJsonDb(id: number | string): boolean {
   const initialLen = questionStore.length;
-  questionStore = questionStore.filter(q => String(q.id) !== String(id));
+  questionStore = questionStore.filter(q => !matchesQuestionId(q.id, id));
   return questionStore.length < initialLen;
 }
+
+/**
+ * Synchronize questions from PostgreSQL / Admin into in-memory questionStore
+ */
+export function syncQuestionsToStore(questions: Question[]): void {
+  for (const q of questions) {
+    const idx = questionStore.findIndex(existing => matchesQuestionId(existing.id, q.id));
+    const optionsRecord: Record<string, string | { text: string; imageUrl?: string }> = {};
+    q.options.forEach((opt, i) => {
+      const key = String.fromCharCode(65 + i);
+      if (opt.imageUrl) {
+        optionsRecord[key] = { text: opt.text, imageUrl: opt.imageUrl };
+      } else {
+        optionsRecord[key] = opt.text;
+      }
+    });
+
+    if (idx !== -1) {
+      questionStore[idx] = {
+        ...questionStore[idx],
+        question: q.text,
+        imageUrl: q.imageUrl,
+        passage: q.passage,
+        passageImageUrl: q.passageImageUrl,
+        groupId: q.groupId,
+        isPyq: q.isPyq,
+        pyqYear: q.pyqYear,
+        pyqExam: q.pyqExam,
+        difficulty: q.difficulty,
+        explanation: q.explanation,
+        marks: q.marks,
+        negativeMarks: q.negativeMarks,
+        options: optionsRecord,
+        answer: String.fromCharCode(65 + Math.max(0, q.options.findIndex(o => o.isCorrect))),
+      };
+    } else {
+      questionStore.push({
+        id: q.id,
+        exam: q.examId,
+        section: q.sectionName,
+        topic: q.topicName,
+        question: q.text,
+        imageUrl: q.imageUrl,
+        passage: q.passage,
+        passageImageUrl: q.passageImageUrl,
+        groupId: q.groupId,
+        isPyq: q.isPyq,
+        pyqYear: q.pyqYear,
+        pyqExam: q.pyqExam,
+        options: optionsRecord,
+        answer: String.fromCharCode(65 + Math.max(0, q.options.findIndex(o => o.isCorrect))),
+        explanation: q.explanation,
+        difficulty: q.difficulty,
+        marks: q.marks,
+        negativeMarks: q.negativeMarks,
+      });
+    }
+  }
+}
+

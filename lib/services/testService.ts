@@ -31,7 +31,35 @@ export async function getMockTestById(
   const test = MOCK_TESTS_DATA.find(m => m.id === idOrSlug || m.slug === idOrSlug);
   if (!test) return null;
 
-  // Pick questions randomly from the JSON questions database with non-repeating exclusion
+  // 1. Fetch live questions directly with diagrams from Neon PostgreSQL via Server Action
+  try {
+    const { getLiveExamQuestionsAction } = await import('./adminService');
+    const liveQuestions = await getLiveExamQuestionsAction(test.id || test.slug);
+    if (liveQuestions && liveQuestions.length > 0) {
+      const updatedSections = test.sections.map(sec => {
+        const count = liveQuestions.filter(q => q.sectionCode === sec.code).length;
+        return {
+          ...sec,
+          questionCount: count || sec.questionCount,
+          marks: count || sec.marks,
+        };
+      });
+
+      return {
+        ...test,
+        isFixed: true,
+        durationMinutes: test.durationMinutes || 60,
+        totalQuestions: liveQuestions.length,
+        totalMarks: liveQuestions.reduce((acc, q) => acc + (q.marks || 1), 0) || test.totalMarks,
+        sections: updatedSections,
+        questions: liveQuestions,
+      };
+    }
+  } catch (err) {
+    console.warn('Fallback to local deterministic questions for test:', err);
+  }
+
+  // Fallback to local deterministic questions
   return generateRandomizedMockTest(test, { excludeQuestionIds });
 }
 

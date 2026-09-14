@@ -13,10 +13,19 @@ import {
   updateQuestionInJsonDb,
   deleteQuestionFromJsonDb,
   getQuestionsForExamPartition,
+  syncQuestionsToStore,
 } from '../db/questionDb';
-import { AdminMockTestInput, AdminQuestionInput, AdminStats, AuthUser, MockTest, Question, Role } from '@/types';
+import { AdminMockTestInput, AdminQuestionInput, AdminStats, AuthUser, MockTest, Question, Role, Difficulty } from '@/types';
 
-// In-memory working sets for admin modifications backed by JSON question store
+function safeRevalidatePath(path: string) {
+  try {
+    revalidatePath(path);
+  } catch {
+    // Non-HTTP execution context (e.g. background scripts)
+  }
+}
+
+// In-memory working sets for admin modifications backed by JSON question store and Neon PostgreSQL
 let dynamicQuestions: Question[] = getAllQuestions();
 
 let dynamicMockTests: MockTest[] = [...MOCK_TESTS_DATA];
@@ -85,12 +94,158 @@ export async function updateUserRoleAction(userId: string, newRole: Role): Promi
     return { success: false, error: 'User not found in database.' };
   }
 
-  revalidatePath('/admin/users');
+  safeRevalidatePath('/admin/users');
   return { success: true };
 }
 
 /**
- * Server-side Question Management
+ * Partition questions list deterministically for any exam or partition key
+ */
+function partitionQuestionsList(all: Question[], partitionKey: string): Question[] {
+  const normKey = (partitionKey || 'ALL').toLowerCase().trim();
+  if (normKey === 'all') return all;
+
+  // 1. SBI Clerk 2024 PYQ (100 Authentic Questions)
+  if (normKey.includes('2024-pyq') || normKey.includes('2024_pyq') || normKey === 'pyq-2024') {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .sort((a, b) => {
+        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
+        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
+        return numA - numB;
+      });
+  }
+
+  // 2. SBI Clerk 2023-24 PYQ (100 Authentic Questions)
+  if (normKey.includes('2023-pyq') || normKey.includes('2023_pyq') || normKey === 'pyq-2023') {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2023 || q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .sort((a, b) => {
+        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
+        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
+        return numA - numB;
+      });
+  }
+
+  // Sliced standard practice tests
+  const nonPyq = all.filter(q => !q.isPyq && !String(q.id).toLowerCase().includes('2024'));
+  const engPool = nonPyq.filter(q => q.sectionCode === 'ENGLISH');
+  const quantPool = nonPyq.filter(q => q.sectionCode === 'QUANT');
+  const reasonPool = nonPyq.filter(q => q.sectionCode === 'REASONING');
+
+  const sliceSection = (pool: Question[], start: number, count: number, secCode: string, secName: string): Question[] => {
+    const list: Question[] = [];
+    for (let i = 0; i < count; i++) {
+      const item = pool[(start + i) % (pool.length || 1)];
+      if (item) {
+        list.push({
+          ...item,
+          sectionCode: secCode,
+          sectionName: secName,
+        });
+      }
+    }
+    return list;
+  };
+
+  if (normKey.includes('ibps-po-1') || normKey.includes('ibps-po-prelims-mock-1')) {
+    return [
+      ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
+      ...sliceSection(quantPool, 0, 35, 'QUANT', 'Quantitative Aptitude'),
+      ...sliceSection(reasonPool, 0, 35, 'REASONING', 'Reasoning Ability'),
+    ];
+  }
+
+  if (normKey.includes('ibps-po-2') || normKey.includes('ibps-po-prelims-mock-2')) {
+    return [
+      ...sliceSection(engPool, 30, 30, 'ENGLISH', 'English Language'),
+      ...sliceSection(quantPool, 35, 35, 'QUANT', 'Quantitative Aptitude'),
+      ...sliceSection(reasonPool, 35, 35, 'REASONING', 'Reasoning Ability'),
+    ];
+  }
+
+  if (normKey.includes('sbi-clerk-1') || normKey.includes('sbi-clerk-prelims-mock-1')) {
+    return [
+      ...sliceSection(engPool, 60, 30, 'ENGLISH', 'English Language'),
+      ...sliceSection(quantPool, 70, 35, 'QUANT', 'Numerical Ability'),
+      ...sliceSection(reasonPool, 70, 35, 'REASONING', 'Reasoning Ability'),
+    ];
+  }
+
+  if (normKey.includes('sbi-clerk-2') || normKey.includes('sbi-clerk-prelims-mock-2')) {
+    return [
+      ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
+      ...sliceSection(quantPool, 35, 35, 'QUANT', 'Numerical Ability'),
+      ...sliceSection(reasonPool, 0, 35, 'REASONING', 'Reasoning Ability'),
+    ];
+  }
+
+  return [
+    ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
+    ...sliceSection(quantPool, 0, 35, 'QUANT', 'Quantitative Aptitude'),
+    ...sliceSection(reasonPool, 0, 35, 'REASONING', 'Reasoning Ability'),
+  ];
+}
+
+/**
+ * Load latest questions directly from Neon PostgreSQL, syncing with in-memory stores
+ */
+export async function loadFreshQuestionsFromDb(): Promise<Question[]> {
+  try {
+    const dbQuestions = await prisma.question.findMany({
+      include: {
+        options: { orderBy: { order: 'asc' } },
+        exam: true,
+        section: true,
+        topic: true,
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    if (dbQuestions && dbQuestions.length > 0) {
+      const mapped: Question[] = dbQuestions.map(q => ({
+        id: q.id,
+        text: q.text,
+        imageUrl: q.imageUrl || undefined,
+        passage: q.passage || undefined,
+        passageImageUrl: q.passageImageUrl || undefined,
+        groupId: q.groupId || undefined,
+        isPyq: q.isPyq,
+        pyqYear: q.pyqYear || undefined,
+        pyqExam: q.pyqExam || undefined,
+        difficulty: (q.difficulty as Difficulty) || 'MEDIUM',
+        explanation: q.explanation || '',
+        marks: q.marks ?? 1.0,
+        negativeMarks: q.negativeMarks ?? 0.25,
+        examId: q.examId,
+        sectionId: q.sectionId,
+        sectionCode: q.section?.code || 'GENERAL',
+        sectionName: q.section?.name || 'General',
+        topicId: q.topicId,
+        topicName: q.topic?.name || 'General',
+        options: q.options.map(opt => ({
+          id: opt.id,
+          questionId: opt.questionId,
+          text: opt.text,
+          imageUrl: opt.imageUrl || undefined,
+          isCorrect: opt.isCorrect,
+          order: opt.order,
+        })),
+      }));
+
+      dynamicQuestions = mapped;
+      syncQuestionsToStore(mapped);
+      return mapped;
+    }
+  } catch (err) {
+    console.warn('Neon DB query in adminService:', err);
+  }
+
+  return dynamicQuestions;
+}
+
+/**
+ * Server-side Question Management with live Neon PostgreSQL storage
  */
 export async function getAdminQuestions(filters?: {
   search?: string;
@@ -101,13 +256,12 @@ export async function getAdminQuestions(filters?: {
 }): Promise<Question[]> {
   await requireAdmin();
 
-  let list: Question[];
+  // Load fresh data directly from Neon PostgreSQL
+  const sourceQuestions = await loadFreshQuestionsFromDb();
 
-  if (filters?.partition && filters.partition !== 'ALL') {
-    list = getQuestionsForExamPartition(filters.partition);
-  } else {
-    list = [...dynamicQuestions];
-  }
+  let list: Question[] = filters?.partition && filters.partition !== 'ALL'
+    ? partitionQuestionsList(sourceQuestions, filters.partition)
+    : [...sourceQuestions];
 
   if (filters?.search) {
     const q = filters.search.toLowerCase();
@@ -253,7 +407,7 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
     console.warn('Neon DB async sync on createQuestion:', dbErr);
   }
 
-  revalidatePath('/admin/questions');
+  safeRevalidatePath('/admin/questions');
   return { success: true };
 }
 
@@ -263,31 +417,41 @@ export async function updateQuestionAction(
 ): Promise<{ success: boolean; error?: string }> {
   await requireAdmin();
 
-  const index = dynamicQuestions.findIndex(q => q.id === questionId);
+  let index = dynamicQuestions.findIndex(q => q.id === questionId);
   if (index === -1) {
-    return { success: false, error: 'Question not found.' };
+    index = dynamicQuestions.findIndex(q => {
+      const qNorm = q.id.replace(/^q-json-/, '').replace(/^q-/, '');
+      const tNorm = questionId.replace(/^q-json-/, '').replace(/^q-/, '');
+      return qNorm === tNorm;
+    });
   }
 
-  const existing = dynamicQuestions[index];
+  const existing = index !== -1 ? dynamicQuestions[index] : null;
+  const actualId = existing ? existing.id : questionId;
+
   const updatedQuestion: Question = {
-    ...existing,
+    id: actualId,
     text: input.text,
     imageUrl: input.imageUrl,
     passage: input.passage,
     passageImageUrl: input.passageImageUrl,
     groupId: input.groupId,
-    isPyq: input.isPyq !== undefined ? input.isPyq : existing.isPyq,
-    pyqYear: input.pyqYear !== undefined ? input.pyqYear : existing.pyqYear,
-    pyqExam: input.pyqExam || existing.pyqExam,
+    isPyq: input.isPyq !== undefined ? input.isPyq : (existing?.isPyq ?? false),
+    pyqYear: input.pyqYear !== undefined ? input.pyqYear : existing?.pyqYear,
+    pyqExam: input.pyqExam || existing?.pyqExam,
     difficulty: input.difficulty,
     explanation: input.explanation,
     marks: input.marks,
     negativeMarks: input.negativeMarks,
+    examId: existing?.examId || input.examId,
+    sectionId: existing?.sectionId || `sec-${input.sectionCode.toLowerCase()}`,
     sectionCode: input.sectionCode,
+    sectionName: existing?.sectionName || (input.sectionCode === 'QUANT' ? 'Quantitative Aptitude' : input.sectionCode === 'ENGLISH' ? 'English Language' : 'Reasoning Ability'),
+    topicId: existing?.topicId || `top-${input.topicName.toLowerCase().replace(/\s+/g, '-')}`,
     topicName: input.topicName,
     options: input.options.map((opt, i) => ({
-      id: existing.options[i]?.id || `opt-${questionId}-${i + 1}`,
-      questionId,
+      id: existing?.options[i]?.id || `opt-${actualId}-${i + 1}`,
+      questionId: actualId,
       text: opt.text,
       imageUrl: opt.imageUrl,
       isCorrect: opt.isCorrect,
@@ -295,9 +459,13 @@ export async function updateQuestionAction(
     })),
   };
 
-  dynamicQuestions[index] = updatedQuestion;
+  if (index !== -1) {
+    dynamicQuestions[index] = updatedQuestion;
+  } else {
+    dynamicQuestions.unshift(updatedQuestion);
+  }
 
-  updateQuestionInJsonDb(questionId, {
+  updateQuestionInJsonDb(actualId, {
     question: input.text,
     imageUrl: input.imageUrl,
     passage: input.passage,
@@ -324,11 +492,18 @@ export async function updateQuestionAction(
     answer: String.fromCharCode(65 + Math.max(0, input.options.findIndex(o => o.isCorrect))),
   });
 
-  // Persist directly to Neon PostgreSQL Database
+  // Keep in-memory store in sync
+  syncQuestionsToStore([updatedQuestion]);
+
+  // Persist directly to Neon PostgreSQL Database via UPSERT
   try {
-    await prisma.question.update({
-      where: { id: questionId },
-      data: {
+    const finalExamId = updatedQuestion.examId;
+    const finalSecId = updatedQuestion.sectionId;
+    const finalTopicId = updatedQuestion.topicId;
+
+    await prisma.question.upsert({
+      where: { id: actualId },
+      update: {
         text: input.text,
         imageUrl: input.imageUrl || null,
         passage: input.passage || null,
@@ -342,16 +517,34 @@ export async function updateQuestionAction(
         marks: input.marks,
         negativeMarks: input.negativeMarks,
       },
+      create: {
+        id: actualId,
+        text: input.text,
+        imageUrl: input.imageUrl || null,
+        passage: input.passage || null,
+        passageImageUrl: input.passageImageUrl || null,
+        groupId: input.groupId || null,
+        isPyq: Boolean(input.isPyq),
+        pyqYear: input.pyqYear ? Number(input.pyqYear) : null,
+        pyqExam: input.pyqExam || null,
+        difficulty: input.difficulty,
+        explanation: input.explanation,
+        marks: input.marks,
+        negativeMarks: input.negativeMarks,
+        examId: finalExamId,
+        sectionId: finalSecId,
+        topicId: finalTopicId,
+      },
     });
 
-    // Update options in database
-    await prisma.option.deleteMany({ where: { questionId } });
+    // Update options in database with images
+    await prisma.option.deleteMany({ where: { questionId: actualId } });
     for (let i = 0; i < input.options.length; i++) {
       const opt = input.options[i];
       await prisma.option.create({
         data: {
-          id: `opt-${questionId}-${i + 1}`,
-          questionId,
+          id: `opt-${actualId}-${i + 1}`,
+          questionId: actualId,
           text: opt.text || '',
           imageUrl: opt.imageUrl || null,
           isCorrect: opt.isCorrect,
@@ -363,8 +556,17 @@ export async function updateQuestionAction(
     console.warn('Neon DB async sync on updateQuestion:', dbErr);
   }
 
-  revalidatePath('/admin/questions');
+  safeRevalidatePath('/admin/questions');
   return { success: true };
+}
+
+/**
+ * Server Action: Fetches fixed questions for live exam attempts directly from Neon PostgreSQL,
+ * guaranteeing all question and option diagrams are rendered during the test.
+ */
+export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<Question[]> {
+  const freshQuestions = await loadFreshQuestionsFromDb();
+  return partitionQuestionsList(freshQuestions, testIdOrSlug);
 }
 
 export async function deleteQuestionAction(questionId: string): Promise<{ success: boolean; error?: string }> {
@@ -380,7 +582,7 @@ export async function deleteQuestionAction(questionId: string): Promise<{ succes
     console.warn('Neon DB async sync on deleteQuestion:', dbErr);
   }
 
-  revalidatePath('/admin/questions');
+  safeRevalidatePath('/admin/questions');
   return { success: true };
 }
 
@@ -423,7 +625,7 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
   };
 
   dynamicMockTests.unshift(newTest);
-  revalidatePath('/admin/tests');
+  safeRevalidatePath('/admin/tests');
   return { success: true };
 }
 
@@ -431,7 +633,7 @@ export async function deleteMockTestAction(testId: string): Promise<{ success: b
   await requireAdmin();
 
   dynamicMockTests = dynamicMockTests.filter(t => t.id !== testId);
-  revalidatePath('/admin/tests');
+  safeRevalidatePath('/admin/tests');
   return { success: true };
 }
 

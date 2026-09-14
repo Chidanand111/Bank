@@ -60,13 +60,28 @@ export default function TestPage({ params }: TestPageProps) {
         console.error('Error reading saved session:', err);
       }
 
-      // 2. If resuming an active session, preserve its exact question set
+      // 2. If resuming an active session, preserve user answers but refresh any newly added diagrams
       if (inProgressQuestions && inProgressQuestions.length > 0) {
         const baseTest = await getMockTestById(testId);
         if (baseTest) {
+          const freshMap = new Map(baseTest.questions.map(q => [q.id, q]));
+          const refreshedQuestions = inProgressQuestions.map(oldQ => {
+            const fresh = freshMap.get(oldQ.id);
+            if (!fresh) return oldQ;
+            return {
+              ...oldQ,
+              imageUrl: fresh.imageUrl || oldQ.imageUrl,
+              passageImageUrl: fresh.passageImageUrl || oldQ.passageImageUrl,
+              options: oldQ.options.map((opt, idx) => ({
+                ...opt,
+                imageUrl: fresh.options[idx]?.imageUrl || opt.imageUrl,
+              })),
+            };
+          });
+
           const activeTest: MockTest = {
             ...baseTest,
-            questions: inProgressQuestions,
+            questions: refreshedQuestions,
           };
           setTest(activeTest);
           if (inProgressResponses) setResponses(inProgressResponses);
