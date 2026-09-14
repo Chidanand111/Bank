@@ -78,16 +78,16 @@ model Topic {
 
 model Question {
   id                String             @id @default(uuid())
-  text              String
-  imageUrl          String?
+  text              String             @db.Text
+  imageUrl          String?            @db.Text
   passage           String?            @db.Text
-  passageImageUrl   String?
+  passageImageUrl   String?            @db.Text
   groupId           String?
   isPyq             Boolean            @default(false)
   pyqYear           Int?
   pyqExam           String?
   difficulty        Difficulty         @default(MEDIUM)
-  explanation       String
+  explanation       String             @db.Text
   marks             Float              @default(1.0)
   negativeMarks     Float              @default(0.25)
   examId            String
@@ -107,8 +107,8 @@ model Option {
   id         String   @id @default(uuid())
   questionId String
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
-  text       String
-  imageUrl   String?
+  text       String   @db.Text
+  imageUrl   String?  @db.Text
   isCorrect  Boolean  @default(false)
   order      Int      @default(0)
   answers    Answer[]

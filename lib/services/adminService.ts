@@ -6,6 +6,7 @@ import { getDatabaseUsers, updateDatabaseUserRole, getCurrentUser } from '../aut
 import { EXAMS_DATA } from '../data/exams';
 import { MOCK_TESTS_DATA } from '../data/mockTests';
 import { SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
+import { prisma } from '../prisma';
 import {
   getAllQuestions,
   addQuestionToJsonDb,
@@ -198,6 +199,60 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
     negativeMarks: input.negativeMarks,
   });
 
+  // Persist directly to Neon PostgreSQL Database
+  try {
+    const dbExam = await prisma.exam.findFirst({
+      where: {
+        OR: [
+          { id: input.examId },
+          { slug: input.examId.replace('exam-', '') },
+        ],
+      },
+      include: { sections: { include: { topics: true } } },
+    });
+
+    const finalExamId = dbExam ? dbExam.id : (await prisma.exam.findFirst())?.id || input.examId;
+    const existingSec = dbExam?.sections.find(s => s.code === input.sectionCode);
+    const fallbackSec = existingSec ? null : await prisma.section.findFirst({ where: { code: input.sectionCode } });
+    const finalSecId = existingSec?.id || fallbackSec?.id || (await prisma.section.findFirst())?.id || newQuestion.sectionId;
+
+    const existingTopic = existingSec?.topics.find(t => t.name.toLowerCase() === input.topicName.toLowerCase());
+    const fallbackTopic = existingTopic ? null : await prisma.topic.findFirst({ where: { sectionId: finalSecId } });
+    const finalTopicId = existingTopic?.id || fallbackTopic?.id || (await prisma.topic.findFirst())?.id || newQuestion.topicId;
+
+    await prisma.question.create({
+      data: {
+        id: newQuestionId,
+        text: input.text,
+        imageUrl: input.imageUrl || null,
+        passage: input.passage || null,
+        passageImageUrl: input.passageImageUrl || null,
+        groupId: input.groupId || null,
+        isPyq: Boolean(input.isPyq),
+        pyqYear: input.pyqYear ? Number(input.pyqYear) : null,
+        pyqExam: input.pyqExam || null,
+        difficulty: input.difficulty,
+        explanation: input.explanation,
+        marks: input.marks,
+        negativeMarks: input.negativeMarks,
+        examId: finalExamId,
+        sectionId: finalSecId,
+        topicId: finalTopicId,
+        options: {
+          create: input.options.map((opt, i) => ({
+            id: `opt-${newQuestionId}-${i + 1}`,
+            text: opt.text || '',
+            imageUrl: opt.imageUrl || null,
+            isCorrect: opt.isCorrect,
+            order: i + 1,
+          })),
+        },
+      },
+    });
+  } catch (dbErr) {
+    console.warn('Neon DB async sync on createQuestion:', dbErr);
+  }
+
   revalidatePath('/admin/questions');
   return { success: true };
 }
@@ -269,6 +324,45 @@ export async function updateQuestionAction(
     answer: String.fromCharCode(65 + Math.max(0, input.options.findIndex(o => o.isCorrect))),
   });
 
+  // Persist directly to Neon PostgreSQL Database
+  try {
+    await prisma.question.update({
+      where: { id: questionId },
+      data: {
+        text: input.text,
+        imageUrl: input.imageUrl || null,
+        passage: input.passage || null,
+        passageImageUrl: input.passageImageUrl || null,
+        groupId: input.groupId || null,
+        isPyq: Boolean(input.isPyq),
+        pyqYear: input.pyqYear ? Number(input.pyqYear) : null,
+        pyqExam: input.pyqExam || null,
+        difficulty: input.difficulty,
+        explanation: input.explanation,
+        marks: input.marks,
+        negativeMarks: input.negativeMarks,
+      },
+    });
+
+    // Update options in database
+    await prisma.option.deleteMany({ where: { questionId } });
+    for (let i = 0; i < input.options.length; i++) {
+      const opt = input.options[i];
+      await prisma.option.create({
+        data: {
+          id: `opt-${questionId}-${i + 1}`,
+          questionId,
+          text: opt.text || '',
+          imageUrl: opt.imageUrl || null,
+          isCorrect: opt.isCorrect,
+          order: i + 1,
+        },
+      });
+    }
+  } catch (dbErr) {
+    console.warn('Neon DB async sync on updateQuestion:', dbErr);
+  }
+
   revalidatePath('/admin/questions');
   return { success: true };
 }
@@ -278,6 +372,14 @@ export async function deleteQuestionAction(questionId: string): Promise<{ succes
 
   dynamicQuestions = dynamicQuestions.filter(q => q.id !== questionId);
   deleteQuestionFromJsonDb(questionId);
+
+  try {
+    await prisma.option.deleteMany({ where: { questionId } });
+    await prisma.question.delete({ where: { id: questionId } });
+  } catch (dbErr) {
+    console.warn('Neon DB async sync on deleteQuestion:', dbErr);
+  }
+
   revalidatePath('/admin/questions');
   return { success: true };
 }

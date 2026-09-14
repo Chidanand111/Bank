@@ -74,11 +74,13 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               </div>
             )}
             {question.passageImageUrl && (
-              <div className="mt-3 border border-indigo-200 rounded-lg overflow-hidden bg-white p-2 max-w-xl">
+              <div className="mt-3 border border-indigo-200 rounded-xl overflow-hidden bg-white p-2.5 max-w-2xl shadow-xs">
                 <img
                   src={question.passageImageUrl}
                   alt="Passage Reference Diagram"
-                  className="w-full h-auto object-contain rounded"
+                  className="max-h-72 w-auto object-contain rounded"
+                  loading="lazy"
+                  onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }}
                 />
               </div>
             )}
@@ -92,8 +94,14 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
         {/* Optional Question Image */}
         {question.imageUrl && (
-          <div className="my-4 border border-slate-200 rounded-lg overflow-hidden bg-slate-50 p-2 max-w-lg">
-            <img src={question.imageUrl} alt="Question Diagram" className="w-full h-auto object-contain" />
+          <div className="my-3 border border-slate-200 rounded-xl overflow-hidden bg-white p-2.5 max-w-2xl inline-block shadow-xs">
+            <img
+              src={question.imageUrl}
+              alt="Question Diagram"
+              className="max-h-72 w-auto object-contain rounded"
+              loading="lazy"
+              onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }}
+            />
           </div>
         )}
 

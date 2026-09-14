@@ -27,6 +27,7 @@ import {
   BookOpen,
   Calendar,
   X,
+  Upload,
 } from 'lucide-react';
 
 interface ExamPartition {
@@ -161,6 +162,55 @@ export default function AdminQuestionsPage() {
     { text: '', imageUrl: '', isCorrect: false },
     { text: '', imageUrl: '', isCorrect: false },
   ]);
+
+  // Image file to compressed Base64 converter for direct database storage
+  const handleImageFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    onSuccess: (dataUrl: string) => void
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input value so same file can be re-selected if needed
+    e.target.value = '';
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const rawUrl = event.target?.result as string;
+      if (!rawUrl) return;
+
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 1000;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxDim || height > maxDim) {
+          if (width > height) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          } else {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.82);
+          onSuccess(compressed);
+        } else {
+          onSuccess(rawUrl);
+        }
+      };
+      img.src = rawUrl;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const [isPending, startTransition] = useTransition();
 
@@ -580,15 +630,14 @@ export default function AdminQuestionsPage() {
                         </div>
                       )}
                       {q.passageImageUrl && (
-                        <div className="pt-1">
-                          <a
-                            href={q.passageImageUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:underline font-semibold"
-                          >
-                            <ImageIcon className="w-3.5 h-3.5" /> View Passage Diagram
-                          </a>
+                        <div className="pt-2 border-t border-indigo-100">
+                          <span className="text-[10px] font-bold text-indigo-900 block mb-1">Passage Reference Diagram:</span>
+                          <img
+                            src={q.passageImageUrl}
+                            alt="Passage Reference Diagram"
+                            className="max-h-48 rounded-lg border border-indigo-200 object-contain bg-white shadow-2xs"
+                            loading="lazy"
+                          />
                         </div>
                       )}
                     </div>
@@ -601,14 +650,14 @@ export default function AdminQuestionsPage() {
 
                   {/* Question Image (if any) */}
                   {q.imageUrl && (
-                    <div className="border border-slate-200 rounded-lg p-2 bg-slate-50 max-w-sm inline-block">
-                      <div className="text-[10px] font-bold text-slate-500 mb-1 flex items-center gap-1">
-                        <ImageIcon className="w-3 h-3" /> Question Diagram:
+                    <div className="border border-slate-200 rounded-lg p-2.5 bg-slate-50 max-w-md inline-block shadow-2xs">
+                      <div className="text-[10px] font-bold text-slate-600 mb-1 flex items-center gap-1">
+                        <ImageIcon className="w-3.5 h-3.5 text-indigo-600" /> Question Diagram:
                       </div>
                       <img
                         src={q.imageUrl}
                         alt="Question Diagram"
-                        className="max-h-36 rounded object-contain"
+                        className="max-h-48 rounded-md object-contain bg-white border border-slate-100 p-1"
                         loading="lazy"
                       />
                     </div>
@@ -801,18 +850,39 @@ export default function AdminQuestionsPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="font-semibold text-slate-700 block mb-1">Passage Image URL (DI Chart / Graph)</label>
+            <div className="space-y-2">
+              <label className="font-semibold text-slate-700 block mb-1">Passage / DI Reference Diagram</label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg cursor-pointer text-xs font-semibold shrink-0">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload from Device</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleImageFileChange(e, (dataUrl) => setFormPassageImageUrl(dataUrl))}
+                  />
+                </label>
                 <input
-                  type="url"
+                  type="text"
                   value={formPassageImageUrl}
                   onChange={(e) => setFormPassageImageUrl(e.target.value)}
-                  placeholder="https://... image link"
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                  placeholder="Or paste image URL / Base64..."
+                  className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
                 />
+                {formPassageImageUrl && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setFormPassageImageUrl('')}
+                    className="text-red-600 hover:bg-red-50 text-xs py-1"
+                  >
+                    Clear
+                  </Button>
+                )}
               </div>
-              <div>
+              <div className="pt-1">
                 <label className="font-semibold text-slate-700 block mb-1">Context Group ID (Optional)</label>
                 <input
                   type="text"
@@ -826,11 +896,11 @@ export default function AdminQuestionsPage() {
 
             {formPassageImageUrl && (
               <div className="border border-slate-200 rounded-lg p-2 bg-white inline-block">
-                <span className="text-[10px] text-slate-400 font-medium block mb-1">Passage Image Preview:</span>
+                <span className="text-[10px] text-slate-500 font-bold block mb-1">Passage Diagram Preview:</span>
                 <img
                   src={formPassageImageUrl}
                   alt="Passage Preview"
-                  className="max-h-28 rounded object-contain"
+                  className="max-h-36 rounded object-contain"
                 />
               </div>
             )}
@@ -858,13 +928,23 @@ export default function AdminQuestionsPage() {
             </div>
 
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">Question Image URL (Diagram / Schematic)</label>
-              <div className="flex gap-2">
+              <label className="font-semibold text-slate-700 block mb-1">Question Image / Diagram</label>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg cursor-pointer text-xs font-semibold shrink-0">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Upload from Device</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleImageFileChange(e, (dataUrl) => setFormImageUrl(dataUrl))}
+                  />
+                </label>
                 <input
-                  type="url"
+                  type="text"
                   value={formImageUrl}
                   onChange={(e) => setFormImageUrl(e.target.value)}
-                  placeholder="https://... diagram URL"
+                  placeholder="Or paste image URL / Base64..."
                   className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500"
                 />
                 {formImageUrl && (
@@ -873,7 +953,7 @@ export default function AdminQuestionsPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setFormImageUrl('')}
-                    className="p-1.5 text-slate-400 hover:text-red-600"
+                    className="text-red-600 hover:bg-red-50 text-xs py-1"
                   >
                     Clear
                   </Button>
@@ -881,11 +961,11 @@ export default function AdminQuestionsPage() {
               </div>
               {formImageUrl && (
                 <div className="mt-2 border border-slate-200 rounded-lg p-2 bg-white inline-block">
-                  <span className="text-[10px] text-slate-400 font-medium block mb-1">Question Image Preview:</span>
+                  <span className="text-[10px] text-slate-500 font-bold block mb-1">Question Diagram Preview:</span>
                   <img
                     src={formImageUrl}
                     alt="Question Diagram Preview"
-                    className="max-h-28 rounded object-contain"
+                    className="max-h-36 rounded object-contain"
                   />
                 </div>
               )}
@@ -942,19 +1022,30 @@ export default function AdminQuestionsPage() {
                     )}
                   </div>
 
-                  {/* Option Image URL Field */}
+                  {/* Option Image Upload / URL Field */}
                   <div className="pl-6 flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                    <div className="flex-1 flex items-center gap-2 w-full">
-                      <ImageIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                    <div className="flex-1 flex flex-wrap items-center gap-2 w-full">
+                      <label className="inline-flex items-center gap-1 px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-md cursor-pointer text-[11px] font-semibold shrink-0">
+                        <Upload className="w-3 h-3 text-indigo-600" />
+                        <span>Upload Option Image</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleImageFileChange(e, (dataUrl) => {
+                            setOptions(prev => prev.map((o, idx) => idx === i ? { ...o, imageUrl: dataUrl } : o));
+                          })}
+                        />
+                      </label>
                       <input
-                        type="url"
+                        type="text"
                         value={opt.imageUrl}
                         onChange={(e) => {
                           const val = e.target.value;
                           setOptions(prev => prev.map((o, idx) => idx === i ? { ...o, imageUrl: val } : o));
                         }}
-                        placeholder={`Option ${String.fromCharCode(65 + i)} image URL (optional)`}
-                        className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-[11px] text-slate-700 focus:bg-white"
+                        placeholder={`Or paste image URL / Base64 for Option ${String.fromCharCode(65 + i)}`}
+                        className="flex-1 min-w-[180px] px-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-[11px] text-slate-700 focus:bg-white"
                       />
                       {opt.imageUrl && (
                         <button
@@ -962,9 +1053,9 @@ export default function AdminQuestionsPage() {
                           onClick={() => {
                             setOptions(prev => prev.map((o, idx) => idx === i ? { ...o, imageUrl: '' } : o));
                           }}
-                          className="text-[10px] text-slate-400 hover:text-red-600 shrink-0"
+                          className="text-[10px] text-red-600 hover:underline shrink-0 font-semibold"
                         >
-                          Clear
+                          Remove
                         </button>
                       )}
                     </div>
@@ -974,7 +1065,7 @@ export default function AdminQuestionsPage() {
                         <img
                           src={opt.imageUrl}
                           alt={`Option ${String.fromCharCode(65 + i)} preview`}
-                          className="max-h-12 rounded object-contain"
+                          className="max-h-16 rounded object-contain"
                         />
                       </div>
                     )}
