@@ -21,6 +21,7 @@ export const MOCK_TESTS_DATA: MockTest[] = [
     totalQuestions: 100,
     cutoffMarks: 54.5,
     isFree: true,
+    isFixed: true,
     sections: [
       { id: 'sec-ibps-p-eng', code: 'ENGLISH', name: 'English Language', durationMinutes: 20, questionCount: 30, marks: 30 },
       { id: 'sec-ibps-p-quant', code: 'QUANT', name: 'Quantitative Aptitude', durationMinutes: 20, questionCount: 35, marks: 35 },
@@ -43,6 +44,7 @@ export const MOCK_TESTS_DATA: MockTest[] = [
     totalQuestions: 100,
     cutoffMarks: 56.0,
     isFree: true,
+    isFixed: true,
     sections: [
       { id: 'sec-ibps-p-eng', code: 'ENGLISH', name: 'English Language', durationMinutes: 20, questionCount: 30, marks: 30 },
       { id: 'sec-ibps-p-quant', code: 'QUANT', name: 'Quantitative Aptitude', durationMinutes: 20, questionCount: 35, marks: 35 },
@@ -65,6 +67,7 @@ export const MOCK_TESTS_DATA: MockTest[] = [
     totalQuestions: 100,
     cutoffMarks: 68.5,
     isFree: true,
+    isFixed: true,
     sections: [
       { id: 'sec-sbi-p-eng', code: 'ENGLISH', name: 'English Language', durationMinutes: 20, questionCount: 30, marks: 30 },
       { id: 'sec-sbi-p-num', code: 'QUANT', name: 'Numerical Ability', durationMinutes: 20, questionCount: 35, marks: 35 },
@@ -87,6 +90,7 @@ export const MOCK_TESTS_DATA: MockTest[] = [
     totalQuestions: 100,
     cutoffMarks: 71.0,
     isFree: true,
+    isFixed: true,
     sections: [
       { id: 'sec-sbi-p-eng', code: 'ENGLISH', name: 'English Language', durationMinutes: 20, questionCount: 30, marks: 30 },
       { id: 'sec-sbi-p-num', code: 'QUANT', name: 'Numerical Ability', durationMinutes: 20, questionCount: 35, marks: 35 },

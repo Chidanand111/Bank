@@ -150,13 +150,18 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 )}
 
                 <div className="flex-1 text-sm sm:text-base leading-snug pt-0.5 space-y-2">
-                  {option.text && <div>{option.text}</div>}
+                  {option.text ? (
+                    <div>{option.text}</div>
+                  ) : option.imageUrl ? (
+                    <div className="text-xs text-slate-500 font-medium italic">[Figure / Diagram Option]</div>
+                  ) : null}
                   {option.imageUrl && (
-                    <div className="border border-slate-200 rounded p-1 bg-white inline-block">
+                    <div className="border border-slate-200 rounded-lg p-1.5 bg-white inline-block shadow-2xs hover:shadow-sm transition-shadow">
                       <img
                         src={option.imageUrl}
                         alt={`Option ${String.fromCharCode(65 + idx)} illustration`}
-                        className="max-h-36 object-contain rounded"
+                        className="max-h-40 object-contain rounded"
+                        loading="lazy"
                       />
                     </div>
                   )}

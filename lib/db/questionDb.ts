@@ -228,145 +228,173 @@ export function pickRandomQuestions(params: {
  * If questions are not available on that exam's set, it automatically picks from random other sets
  * while prioritizing unseen questions for that user.
  */
-export function generateRandomizedMockTest(
-  template: MockTest,
-  options?: {
-    excludeQuestionIds?: string[];
-  }
-): MockTest {
-  // Strict Isolation for Fixed / PYQ Mock Tests:
-  // Strictly serve only its authentic questions in exact order.
-  // NO random or external questions are EVER injected into this exam.
-  if (template.isFixed || template.isPyq) {
-    const allQuestions = questionStore.map(normalizeQuestion);
-    const isThisPyqQuestion = (q: Question) => {
-      if (
-        template.slug === 'sbi-clerk-prelims-2024-pyq' ||
-        template.id === 'mock-sbi-clerk-2024-pyq' ||
-        template.slug === 'sbi-clerk-prelims-2023-pyq' ||
-        template.id === 'mock-sbi-clerk-2023-pyq'
-      ) {
-        const idStr = String(q.id).toLowerCase();
-        return (
-          Boolean(q.isPyq) &&
-          (idStr.includes('sbi-2024') || idStr.includes('sbi-clerk-2024') || q.pyqYear === 2024 || q.pyqYear === 2023)
-        );
-      }
-      return Boolean(q.isPyq);
-    };
+/**
+ * Deterministically retrieves fixed questions for any mock test.
+ * Random selection is removed: each exam has dedicated, fixed questions.
+ * PYQ exams (2024 and 2023) remain strictly authentic and unchanged.
+ */
+export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
+  const allQuestions = questionStore.map(normalizeQuestion);
+  const norm = (testIdOrSlug || '').toLowerCase().trim();
 
-    const dedicatedQuestions = allQuestions
-      .filter(isThisPyqQuestion)
+  // 1. SBI Clerk 2024 PYQ (Authentic 100 official questions)
+  if (norm.includes('2024-pyq') || norm.includes('2024_pyq') || norm === 'pyq-2024') {
+    const pyq2024 = allQuestions
+      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
       .sort((a, b) => {
         const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
         const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
         return numA - numB;
       });
-    const questionsToServe = dedicatedQuestions.length > 0 ? dedicatedQuestions : template.questions;
-
-    const updatedSections = template.sections.map(sec => {
-      const count = questionsToServe.filter(q => q.sectionCode === sec.code).length;
-      return {
-        ...sec,
-        questionCount: count || sec.questionCount,
-        marks: count || sec.marks,
-      };
-    });
-
-    const totalQuestions = questionsToServe.length || template.totalQuestions;
-    const totalMarks = questionsToServe.reduce((acc, q) => acc + q.marks, 0) || template.totalMarks;
-
-    return {
-      ...template,
-      totalQuestions,
-      totalMarks,
-      sections: updatedSections,
-      questions: questionsToServe,
-    };
+    if (pyq2024.length > 0) return pyq2024;
   }
 
-  const randomizedQuestions: Question[] = [];
-  const sessionUsedIds = new Set<string>();
-  const userExcludedIds = new Set<string>(options?.excludeQuestionIds || []);
+  // 2. SBI Clerk 2023-24 PYQ (Authentic 100 official questions)
+  if (norm.includes('2023-pyq') || norm.includes('2023_pyq') || norm === 'pyq-2023') {
+    const pyq2023 = allQuestions
+      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2023 || q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .sort((a, b) => {
+        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
+        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
+        return numA - numB;
+      });
+    if (pyq2023.length > 0) return pyq2023;
+  }
 
-  // Standard banking prelims quotas: 35 Reasoning, 35 Quantitative Aptitude, 30 English Language
-  const SECTION_QUOTAS: Record<string, number> = {
-    REASONING: 35,
-    QUANT: 35,
-    ENGLISH: 30,
+  // Standard practice questions partitioned by section
+  const nonPyqQuestions = allQuestions.filter(q => !q.isPyq && !String(q.id).toLowerCase().includes('2024'));
+
+  const engPool = nonPyqQuestions.filter(q => q.sectionCode === 'ENGLISH');
+  const quantPool = nonPyqQuestions.filter(q => q.sectionCode === 'QUANT');
+  const reasonPool = nonPyqQuestions.filter(q => q.sectionCode === 'REASONING');
+
+  // Helper to slice fixed quota deterministically
+  const sliceSection = (pool: Question[], start: number, count: number, secCode: string, secName: string): Question[] => {
+    const list: Question[] = [];
+    for (let i = 0; i < count; i++) {
+      const item = pool[(start + i) % (pool.length || 1)];
+      if (item) {
+        list.push({
+          ...item,
+          sectionCode: secCode,
+          sectionName: secName,
+        });
+      }
+    }
+    return list;
   };
 
-  // Ensure sections have standard 100-question quotas
+  // 3. IBPS PO Mock 1: Fixed 30 English (0..29), 35 Quant (0..34), 35 Reasoning (0..34)
+  if (norm.includes('ibps-po-1') || norm.includes('ibps-po-prelims-mock-1')) {
+    return [
+      ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
+      ...sliceSection(quantPool, 0, 35, 'QUANT', 'Quantitative Aptitude'),
+      ...sliceSection(reasonPool, 0, 35, 'REASONING', 'Reasoning Ability'),
+    ];
+  }
+
+  // 4. IBPS PO Mock 2: Fixed 30 English (30..59), 35 Quant (35..69), 35 Reasoning (35..69)
+  if (norm.includes('ibps-po-2') || norm.includes('ibps-po-prelims-mock-2')) {
+    return [
+      ...sliceSection(engPool, 30, 30, 'ENGLISH', 'English Language'),
+      ...sliceSection(quantPool, 35, 35, 'QUANT', 'Quantitative Aptitude'),
+      ...sliceSection(reasonPool, 35, 35, 'REASONING', 'Reasoning Ability'),
+    ];
+  }
+
+  // 5. SBI Clerk Mock 1: Fixed 30 English (60..89), 35 Quant (70..104), 35 Reasoning (70..104)
+  if (norm.includes('sbi-clerk-1') || norm.includes('sbi-clerk-prelims-mock-1')) {
+    return [
+      ...sliceSection(engPool, 60, 30, 'ENGLISH', 'English Language'),
+      ...sliceSection(quantPool, 70, 35, 'QUANT', 'Numerical Ability'),
+      ...sliceSection(reasonPool, 70, 35, 'REASONING', 'Reasoning Ability'),
+    ];
+  }
+
+  // 6. SBI Clerk Mock 2: Fixed 30 English (0..29), 35 Quant (35..69), 35 Reasoning (0..34)
+  if (norm.includes('sbi-clerk-2') || norm.includes('sbi-clerk-prelims-mock-2')) {
+    return [
+      ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
+      ...sliceSection(quantPool, 35, 35, 'QUANT', 'Numerical Ability'),
+      ...sliceSection(reasonPool, 0, 35, 'REASONING', 'Reasoning Ability'),
+    ];
+  }
+
+  // Default fallback: 100 fixed questions
+  return [
+    ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
+    ...sliceSection(quantPool, 0, 35, 'QUANT', 'Quantitative Aptitude'),
+    ...sliceSection(reasonPool, 0, 35, 'REASONING', 'Reasoning Ability'),
+  ];
+}
+
+/**
+ * Returns questions for an exam partition in Admin view.
+ */
+export function getQuestionsForExamPartition(partitionKey: string): Question[] {
+  const allQuestions = getAllQuestions();
+  const normKey = (partitionKey || 'ALL').toLowerCase().trim();
+
+  if (normKey === 'all') {
+    return allQuestions;
+  }
+
+  if (normKey === 'pyq-2024' || normKey === 'mock-sbi-clerk-2024-pyq' || normKey === 'sbi-clerk-prelims-2024-pyq') {
+    return allQuestions
+      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .sort((a, b) => {
+        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
+        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
+        return numA - numB;
+      });
+  }
+
+  if (normKey === 'pyq-2023' || normKey === 'mock-sbi-clerk-2023-pyq' || normKey === 'sbi-clerk-prelims-2023-pyq') {
+    return allQuestions
+      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2023 || q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .sort((a, b) => {
+        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
+        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
+        return numA - numB;
+      });
+  }
+
+  return getFixedQuestionsForMockTest(partitionKey);
+}
+
+/**
+ * Builds a deterministic 100-question mock test with fixed questions.
+ * Random selection is permanently removed.
+ * Authentic PYQ papers (2024 and 2023) remain strictly unchanged.
+ */
+export function generateRandomizedMockTest(
+  template: MockTest,
+  _options?: {
+    excludeQuestionIds?: string[];
+  }
+): MockTest {
+  const questionsToServe = getFixedQuestionsForMockTest(template.id || template.slug);
+
   const updatedSections = template.sections.map(sec => {
-    const defaultQuota = SECTION_QUOTAS[sec.code] || 35;
-    const targetCount = sec.questionCount || defaultQuota;
-    const targetMarks = sec.marks || targetCount;
-    const duration = sec.durationMinutes || 20;
+    const count = questionsToServe.filter(q => q.sectionCode === sec.code).length;
     return {
       ...sec,
-      questionCount: targetCount,
-      marks: targetMarks,
-      durationMinutes: duration,
+      questionCount: count || sec.questionCount,
+      marks: count || sec.marks,
     };
   });
 
-  for (const section of updatedSections) {
-    const neededCount = section.questionCount;
-    const combinedExcludes = Array.from(new Set([...Array.from(userExcludedIds), ...Array.from(sessionUsedIds)]));
-
-    const picked = pickRandomQuestions({
-      examSlug: template.examSlug,
-      sectionCode: section.code,
-      count: neededCount,
-      excludeIds: combinedExcludes,
-    });
-
-    picked.forEach(q => {
-      sessionUsedIds.add(q.id);
-      randomizedQuestions.push({
-        ...q,
-        sectionId: section.id,
-        sectionCode: section.code,
-        sectionName: section.name,
-      });
-    });
-  }
-
-  // Safety guarantee: If total questions picked is less than 100, fill remaining up to 100
-  if (randomizedQuestions.length < 100) {
-    const allQuestions = questionStore.map(normalizeQuestion);
-    const unused = allQuestions.filter(q => !sessionUsedIds.has(q.id));
-    const shuffledUnused = shuffleArray(unused);
-
-    for (const q of shuffledUnused) {
-      if (randomizedQuestions.length >= 100) break;
-      sessionUsedIds.add(q.id);
-      randomizedQuestions.push(q);
-    }
-
-    // If still under 100 (e.g. tiny test db), cycle questions with cloned IDs
-    let cycleIdx = 0;
-    while (randomizedQuestions.length < 100 && randomizedQuestions.length > 0) {
-      const baseQ = randomizedQuestions[cycleIdx % randomizedQuestions.length];
-      const cloneId = `${baseQ.id}-dup-${randomizedQuestions.length + 1}`;
-      randomizedQuestions.push({
-        ...baseQ,
-        id: cloneId,
-      });
-      cycleIdx++;
-    }
-  }
-
-  const totalQuestions = randomizedQuestions.length;
-  const totalMarks = randomizedQuestions.reduce((acc, q) => acc + q.marks, 0);
+  const totalQuestions = questionsToServe.length || template.totalQuestions;
+  const totalMarks = questionsToServe.reduce((acc, q) => acc + (q.marks || 1), 0) || template.totalMarks;
 
   return {
     ...template,
-    durationMinutes: 60,
-    totalQuestions: totalQuestions,
-    totalMarks: totalMarks,
+    isFixed: true,
+    durationMinutes: template.durationMinutes || 60,
+    totalQuestions,
+    totalMarks,
     sections: updatedSections,
-    questions: randomizedQuestions,
+    questions: questionsToServe,
   };
 }
 

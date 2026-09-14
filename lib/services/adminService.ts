@@ -6,7 +6,13 @@ import { getDatabaseUsers, updateDatabaseUserRole, getCurrentUser } from '../aut
 import { EXAMS_DATA } from '../data/exams';
 import { MOCK_TESTS_DATA } from '../data/mockTests';
 import { SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
-import { getAllQuestions, addQuestionToJsonDb, deleteQuestionFromJsonDb } from '../db/questionDb';
+import {
+  getAllQuestions,
+  addQuestionToJsonDb,
+  updateQuestionInJsonDb,
+  deleteQuestionFromJsonDb,
+  getQuestionsForExamPartition,
+} from '../db/questionDb';
 import { AdminMockTestInput, AdminQuestionInput, AdminStats, AuthUser, MockTest, Question, Role } from '@/types';
 
 // In-memory working sets for admin modifications backed by JSON question store
@@ -90,16 +96,24 @@ export async function getAdminQuestions(filters?: {
   examId?: string;
   sectionCode?: string;
   difficulty?: string;
+  partition?: string;
 }): Promise<Question[]> {
   await requireAdmin();
 
-  let list = [...dynamicQuestions];
+  let list: Question[];
+
+  if (filters?.partition && filters.partition !== 'ALL') {
+    list = getQuestionsForExamPartition(filters.partition);
+  } else {
+    list = [...dynamicQuestions];
+  }
 
   if (filters?.search) {
     const q = filters.search.toLowerCase();
     list = list.filter(item =>
       item.text.toLowerCase().includes(q) ||
-      item.topicName.toLowerCase().includes(q)
+      item.topicName.toLowerCase().includes(q) ||
+      (item.passage && item.passage.toLowerCase().includes(q))
     );
   }
 
@@ -128,6 +142,12 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
     id: newQuestionId,
     text: input.text,
     imageUrl: input.imageUrl,
+    passage: input.passage,
+    passageImageUrl: input.passageImageUrl,
+    groupId: input.groupId,
+    isPyq: Boolean(input.isPyq),
+    pyqYear: input.pyqYear,
+    pyqExam: input.pyqExam || (input.isPyq ? (input.pyqYear === 2023 ? 'SBI Clerk Prelims 2023-24' : 'SBI Clerk Prelims 2024') : undefined),
     difficulty: input.difficulty,
     explanation: input.explanation,
     marks: input.marks,
@@ -142,6 +162,7 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
       id: `opt-${newQuestionId}-${i + 1}`,
       questionId: newQuestionId,
       text: opt.text,
+      imageUrl: opt.imageUrl,
       isCorrect: opt.isCorrect,
       order: i + 1,
     })),
@@ -150,17 +171,31 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
   dynamicQuestions.unshift(newQuestion);
   addQuestionToJsonDb({
     id: newQuestionId,
-    exam: exam.title,
+    exam: input.isPyq ? (input.pyqExam || 'SBI Clerk Prelims 2024 PYQ') : exam.title,
     section: newQuestion.sectionName,
     topic: input.topicName,
     question: input.text,
+    imageUrl: input.imageUrl,
+    passage: input.passage,
+    passageImageUrl: input.passageImageUrl,
+    groupId: input.groupId,
+    isPyq: input.isPyq,
+    pyqYear: input.pyqYear,
+    pyqExam: input.pyqExam,
     options: input.options.reduce((acc, opt, i) => {
-      acc[String.fromCharCode(65 + i)] = opt.text;
+      const key = String.fromCharCode(65 + i);
+      if (opt.imageUrl) {
+        acc[key] = { text: opt.text, imageUrl: opt.imageUrl };
+      } else {
+        acc[key] = opt.text;
+      }
       return acc;
-    }, {} as Record<string, string>),
+    }, {} as Record<string, string | { text: string; imageUrl?: string }>),
     answer: String.fromCharCode(65 + Math.max(0, input.options.findIndex(o => o.isCorrect))),
     explanation: input.explanation,
     difficulty: input.difficulty,
+    marks: input.marks,
+    negativeMarks: input.negativeMarks,
   });
 
   revalidatePath('/admin/questions');
@@ -179,10 +214,16 @@ export async function updateQuestionAction(
   }
 
   const existing = dynamicQuestions[index];
-  dynamicQuestions[index] = {
+  const updatedQuestion: Question = {
     ...existing,
     text: input.text,
     imageUrl: input.imageUrl,
+    passage: input.passage,
+    passageImageUrl: input.passageImageUrl,
+    groupId: input.groupId,
+    isPyq: input.isPyq !== undefined ? input.isPyq : existing.isPyq,
+    pyqYear: input.pyqYear !== undefined ? input.pyqYear : existing.pyqYear,
+    pyqExam: input.pyqExam || existing.pyqExam,
     difficulty: input.difficulty,
     explanation: input.explanation,
     marks: input.marks,
@@ -193,10 +234,40 @@ export async function updateQuestionAction(
       id: existing.options[i]?.id || `opt-${questionId}-${i + 1}`,
       questionId,
       text: opt.text,
+      imageUrl: opt.imageUrl,
       isCorrect: opt.isCorrect,
       order: i + 1,
     })),
   };
+
+  dynamicQuestions[index] = updatedQuestion;
+
+  updateQuestionInJsonDb(questionId, {
+    question: input.text,
+    imageUrl: input.imageUrl,
+    passage: input.passage,
+    passageImageUrl: input.passageImageUrl,
+    groupId: input.groupId,
+    isPyq: input.isPyq,
+    pyqYear: input.pyqYear,
+    pyqExam: input.pyqExam,
+    difficulty: input.difficulty,
+    explanation: input.explanation,
+    marks: input.marks,
+    negativeMarks: input.negativeMarks,
+    section: updatedQuestion.sectionName,
+    topic: input.topicName,
+    options: input.options.reduce((acc, opt, i) => {
+      const key = String.fromCharCode(65 + i);
+      if (opt.imageUrl) {
+        acc[key] = { text: opt.text, imageUrl: opt.imageUrl };
+      } else {
+        acc[key] = opt.text;
+      }
+      return acc;
+    }, {} as Record<string, string | { text: string; imageUrl?: string }>),
+    answer: String.fromCharCode(65 + Math.max(0, input.options.findIndex(o => o.isCorrect))),
+  });
 
   revalidatePath('/admin/questions');
   return { success: true };

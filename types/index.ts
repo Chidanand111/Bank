@@ -253,8 +253,16 @@ export interface AdminQuestionInput {
   marks: number;
   negativeMarks: number;
   imageUrl?: string;
+  passage?: string;
+  passageImageUrl?: string;
+  groupId?: string;
+  isPyq?: boolean;
+  pyqYear?: number;
+  pyqExam?: string;
+  mockTestId?: string;
   options: {
     text: string;
+    imageUrl?: string;
     isCorrect: boolean;
   }[];
 }
