@@ -240,13 +240,16 @@ export function generateRandomizedMockTest(
   if (template.isFixed || template.isPyq) {
     const allQuestions = questionStore.map(normalizeQuestion);
     const isThisPyqQuestion = (q: Question) => {
-      if (template.slug === 'sbi-clerk-prelims-2024-pyq' || template.id === 'mock-sbi-clerk-2024-pyq') {
+      if (
+        template.slug === 'sbi-clerk-prelims-2024-pyq' ||
+        template.id === 'mock-sbi-clerk-2024-pyq' ||
+        template.slug === 'sbi-clerk-prelims-2023-pyq' ||
+        template.id === 'mock-sbi-clerk-2023-pyq'
+      ) {
         const idStr = String(q.id).toLowerCase();
         return (
-          Boolean(q.isPyq && q.pyqYear === 2024) ||
-          (q.pyqExam ? q.pyqExam.toLowerCase().includes('2024') : false) ||
-          idStr.includes('sbi-2024') ||
-          idStr.includes('sbi-clerk-2024')
+          Boolean(q.isPyq) &&
+          (idStr.includes('sbi-2024') || idStr.includes('sbi-clerk-2024') || q.pyqYear === 2024 || q.pyqYear === 2023)
         );
       }
       return Boolean(q.isPyq);

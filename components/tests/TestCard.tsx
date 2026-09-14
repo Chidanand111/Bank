@@ -21,7 +21,7 @@ export const TestCard: React.FC<TestCardProps> = ({ test }) => {
             </Badge>
             {test.isPyq ? (
               <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                ★ 2024 PYQ PAPER
+                ★ {test.year ? `${test.year} PYQ PAPER` : 'PYQ PAPER'}
               </span>
             ) : test.isFree ? (
               <Badge variant="green" size="sm">
