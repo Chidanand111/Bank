@@ -182,7 +182,7 @@ export default function AdminQuestionsPage() {
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const maxDim = 1000;
+        const maxDim = 850;
         let width = img.width;
         let height = img.height;
 
@@ -200,8 +200,11 @@ export default function AdminQuestionsPage() {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          // Fill crisp white background so transparent diagram PNGs don't turn black
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
           ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/jpeg', 0.82);
+          const compressed = canvas.toDataURL('image/jpeg', 0.78);
           onSuccess(compressed);
         } else {
           onSuccess(rawUrl);
@@ -322,22 +325,49 @@ export default function AdminQuestionsPage() {
     };
 
     startTransition(async () => {
-      let res;
-      if (editingQuestionId) {
-        res = await updateQuestionAction(editingQuestionId, inputData);
-      } else {
-        res = await createQuestionAction(inputData);
+      let res: { success: boolean; error?: string } | undefined;
+      try {
+        if (editingQuestionId) {
+          res = await updateQuestionAction(editingQuestionId, inputData);
+          if (!res?.success) {
+            // Direct API route fallback for large payloads / proxies
+            const apiRes = await fetch('/api/admin/questions/update', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ questionId: editingQuestionId, inputData }),
+            });
+            res = await apiRes.json();
+          }
+        } else {
+          res = await createQuestionAction(inputData);
+        }
+      } catch (saveErr) {
+        console.warn('Server Action save error, falling back to API route:', saveErr);
+        if (editingQuestionId) {
+          try {
+            const apiRes = await fetch('/api/admin/questions/update', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ questionId: editingQuestionId, inputData }),
+            });
+            res = await apiRes.json();
+          } catch (apiErr) {
+            res = { success: false, error: apiErr instanceof Error ? apiErr.message : String(apiErr) };
+          }
+        } else {
+          res = { success: false, error: saveErr instanceof Error ? saveErr.message : String(saveErr) };
+        }
       }
 
-      if (res.success) {
+      if (res?.success) {
         setFeedback({
-          text: `Question successfully ${editingQuestionId ? 'updated' : 'created'}.`,
+          text: `Question successfully ${editingQuestionId ? 'updated' : 'created'} and saved to Database.`,
           type: 'success',
         });
         setIsEditModalOpen(false);
         await loadQuestions();
       } else {
-        setFeedback({ text: res.error || 'Failed to save question.', type: 'error' });
+        setFeedback({ text: res?.error || 'Failed to save question to database.', type: 'error' });
       }
     });
   };

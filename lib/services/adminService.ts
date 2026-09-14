@@ -14,6 +14,7 @@ import {
   deleteQuestionFromJsonDb,
   getQuestionsForExamPartition,
   syncQuestionsToStore,
+  partitionQuestionsList,
 } from '../db/questionDb';
 import { AdminMockTestInput, AdminQuestionInput, AdminStats, AuthUser, MockTest, Question, Role, Difficulty } from '@/types';
 
@@ -96,95 +97,6 @@ export async function updateUserRoleAction(userId: string, newRole: Role): Promi
 
   safeRevalidatePath('/admin/users');
   return { success: true };
-}
-
-/**
- * Partition questions list deterministically for any exam or partition key
- */
-function partitionQuestionsList(all: Question[], partitionKey: string): Question[] {
-  const normKey = (partitionKey || 'ALL').toLowerCase().trim();
-  if (normKey === 'all') return all;
-
-  // 1. SBI Clerk 2024 PYQ (100 Authentic Questions)
-  if (normKey.includes('2024-pyq') || normKey.includes('2024_pyq') || normKey === 'pyq-2024') {
-    return all
-      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
-      .sort((a, b) => {
-        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
-        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
-        return numA - numB;
-      });
-  }
-
-  // 2. SBI Clerk 2023-24 PYQ (100 Authentic Questions)
-  if (normKey.includes('2023-pyq') || normKey.includes('2023_pyq') || normKey === 'pyq-2023') {
-    return all
-      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2023 || q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
-      .sort((a, b) => {
-        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
-        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
-        return numA - numB;
-      });
-  }
-
-  // Sliced standard practice tests
-  const nonPyq = all.filter(q => !q.isPyq && !String(q.id).toLowerCase().includes('2024'));
-  const engPool = nonPyq.filter(q => q.sectionCode === 'ENGLISH');
-  const quantPool = nonPyq.filter(q => q.sectionCode === 'QUANT');
-  const reasonPool = nonPyq.filter(q => q.sectionCode === 'REASONING');
-
-  const sliceSection = (pool: Question[], start: number, count: number, secCode: string, secName: string): Question[] => {
-    const list: Question[] = [];
-    for (let i = 0; i < count; i++) {
-      const item = pool[(start + i) % (pool.length || 1)];
-      if (item) {
-        list.push({
-          ...item,
-          sectionCode: secCode,
-          sectionName: secName,
-        });
-      }
-    }
-    return list;
-  };
-
-  if (normKey.includes('ibps-po-1') || normKey.includes('ibps-po-prelims-mock-1')) {
-    return [
-      ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
-      ...sliceSection(quantPool, 0, 35, 'QUANT', 'Quantitative Aptitude'),
-      ...sliceSection(reasonPool, 0, 35, 'REASONING', 'Reasoning Ability'),
-    ];
-  }
-
-  if (normKey.includes('ibps-po-2') || normKey.includes('ibps-po-prelims-mock-2')) {
-    return [
-      ...sliceSection(engPool, 30, 30, 'ENGLISH', 'English Language'),
-      ...sliceSection(quantPool, 35, 35, 'QUANT', 'Quantitative Aptitude'),
-      ...sliceSection(reasonPool, 35, 35, 'REASONING', 'Reasoning Ability'),
-    ];
-  }
-
-  if (normKey.includes('sbi-clerk-1') || normKey.includes('sbi-clerk-prelims-mock-1')) {
-    return [
-      ...sliceSection(engPool, 60, 30, 'ENGLISH', 'English Language'),
-      ...sliceSection(quantPool, 70, 35, 'QUANT', 'Numerical Ability'),
-      ...sliceSection(reasonPool, 70, 35, 'REASONING', 'Reasoning Ability'),
-    ];
-  }
-
-  if (normKey.includes('sbi-clerk-2') || normKey.includes('sbi-clerk-prelims-mock-2')) {
-    return [
-      ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
-      ...sliceSection(quantPool, 35, 35, 'QUANT', 'Numerical Ability'),
-      ...sliceSection(reasonPool, 0, 35, 'REASONING', 'Reasoning Ability'),
-    ];
-  }
-
-  return [
-    ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
-    ...sliceSection(quantPool, 0, 35, 'QUANT', 'Quantitative Aptitude'),
-    ...sliceSection(reasonPool, 0, 35, 'REASONING', 'Reasoning Ability'),
-  ];
 }
 
 /**
@@ -553,7 +465,11 @@ export async function updateQuestionAction(
       });
     }
   } catch (dbErr) {
-    console.warn('Neon DB async sync on updateQuestion:', dbErr);
+    console.error('Neon DB save error on updateQuestion:', dbErr);
+    return {
+      success: false,
+      error: `Failed to persist to database: ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`,
+    };
   }
 
   safeRevalidatePath('/admin/questions');

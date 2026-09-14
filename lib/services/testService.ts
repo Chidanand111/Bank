@@ -1,4 +1,4 @@
-import { AttemptResult, DashboardStats, Exam, MockTest } from '@/types';
+import { AttemptResult, DashboardStats, Exam, MockTest, Question } from '@/types';
 import { EXAMS_DATA } from '../data/exams';
 import { MOCK_TESTS_DATA } from '../data/mockTests';
 import { INITIAL_DASHBOARD_STATS, SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
@@ -31,35 +31,74 @@ export async function getMockTestById(
   const test = MOCK_TESTS_DATA.find(m => m.id === idOrSlug || m.slug === idOrSlug);
   if (!test) return null;
 
-  // 1. Fetch live questions directly with diagrams from Neon PostgreSQL via Server Action
-  try {
-    const { getLiveExamQuestionsAction } = await import('./adminService');
-    const liveQuestions = await getLiveExamQuestionsAction(test.id || test.slug);
-    if (liveQuestions && liveQuestions.length > 0) {
-      const updatedSections = test.sections.map(sec => {
-        const count = liveQuestions.filter(q => q.sectionCode === sec.code).length;
-        return {
-          ...sec,
-          questionCount: count || sec.questionCount,
-          marks: count || sec.marks,
-        };
-      });
+  const targetKey = test.id || test.slug;
 
-      return {
-        ...test,
-        isFixed: true,
-        durationMinutes: test.durationMinutes || 60,
-        totalQuestions: liveQuestions.length,
-        totalMarks: liveQuestions.reduce((acc, q) => acc + (q.marks || 1), 0) || test.totalMarks,
-        sections: updatedSections,
-        questions: liveQuestions,
-      };
+  // 1. In browser environment (Client Components), fetch directly from API route
+  if (typeof window !== 'undefined') {
+    try {
+      const res = await fetch(`/api/exam-questions/${encodeURIComponent(targetKey)}`, {
+        cache: 'no-store',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.questions) && data.questions.length > 0) {
+          const liveQuestions = data.questions;
+          const updatedSections = test.sections.map(sec => {
+            const count = liveQuestions.filter((q: Question) => q.sectionCode === sec.code).length;
+            return {
+              ...sec,
+              questionCount: count || sec.questionCount,
+              marks: count || sec.marks,
+            };
+          });
+
+          return {
+            ...test,
+            isFixed: true,
+            durationMinutes: test.durationMinutes || 60,
+            totalQuestions: liveQuestions.length,
+            totalMarks: liveQuestions.reduce((acc: number, q: Question) => acc + (q.marks || 1), 0) || test.totalMarks,
+            sections: updatedSections,
+            questions: liveQuestions,
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('API route fetch fallback in testService:', err);
     }
-  } catch (err) {
-    console.warn('Fallback to local deterministic questions for test:', err);
   }
 
-  // Fallback to local deterministic questions
+  // 2. In server environment, load directly from Neon PostgreSQL
+  if (typeof window === 'undefined') {
+    try {
+      const { getLiveExamQuestionsAction } = await import('./adminService');
+      const liveQuestions = await getLiveExamQuestionsAction(targetKey);
+      if (liveQuestions && liveQuestions.length > 0) {
+        const updatedSections = test.sections.map(sec => {
+          const count = liveQuestions.filter(q => q.sectionCode === sec.code).length;
+          return {
+            ...sec,
+            questionCount: count || sec.questionCount,
+            marks: count || sec.marks,
+          };
+        });
+
+        return {
+          ...test,
+          isFixed: true,
+          durationMinutes: test.durationMinutes || 60,
+          totalQuestions: liveQuestions.length,
+          totalMarks: liveQuestions.reduce((acc, q) => acc + (q.marks || 1), 0) || test.totalMarks,
+          sections: updatedSections,
+          questions: liveQuestions,
+        };
+      }
+    } catch (err) {
+      console.warn('Server loader fallback for test:', err);
+    }
+  }
+
+  // 3. Fallback to local deterministic questions
   return generateRandomizedMockTest(test, { excludeQuestionIds });
 }
 
