@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadFreshQuestionsFromDb } from '@/lib/services/adminService';
-import { partitionQuestionsList } from '@/lib/db/questionDb';
+import { getLiveExamQuestionsAction } from '@/lib/services/adminService';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,8 +9,7 @@ export async function GET(
 ) {
   try {
     const { testId } = await params;
-    const freshQuestions = await loadFreshQuestionsFromDb();
-    const questions = partitionQuestionsList(freshQuestions, testId);
+    const questions = await getLiveExamQuestionsAction(testId);
     return NextResponse.json({ success: true, questions }, {
       headers: {
         'Cache-Control': 'no-store, max-age=0',

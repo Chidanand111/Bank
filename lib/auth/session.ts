@@ -8,7 +8,7 @@ const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // In-memory / dynamic user store that mirrors the database
 // Changes made during admin operations (e.g. promoting a user) update here
-let liveUsers: StoredUser[] = [...INITIAL_USERS];
+const liveUsers: StoredUser[] = [...INITIAL_USERS];
 
 export function getDatabaseUsers(): StoredUser[] {
   return liveUsers;

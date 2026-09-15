@@ -331,6 +331,31 @@ export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
     if (pyq2023.length > 0) return pyq2023;
   }
 
+  // Dynamic match for any custom-created PYQ or Mock Test
+  const dynamicMatch = allQuestions.filter(q => {
+    const qPyq = (q.pyqExam || '').toLowerCase().trim();
+    const qId = String(q.id).toLowerCase().trim();
+    const cleanNorm = norm.replace(/^mock-/, '');
+    return (
+      (qPyq && (qPyq === norm || cleanNorm.includes(qPyq) || qPyq.includes(cleanNorm))) ||
+      qId.includes(cleanNorm)
+    );
+  });
+  if (dynamicMatch.length > 0) {
+    return dynamicMatch.sort((a, b) => {
+      const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+      const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+      const numA = matchA ? parseInt(matchA[1], 10) : 0;
+      const numB = matchB ? parseInt(matchB[1], 10) : 0;
+      return numA - numB;
+    });
+  }
+
+  // If a custom PYQ paper was requested but has no questions yet, return empty array
+  if (norm.includes('pyq')) {
+    return [];
+  }
+
   // Standard practice questions partitioned by section (strictly exclude any PYQ)
   const nonPyqQuestions = allQuestions.filter(q =>
     !q.isPyq &&
@@ -453,8 +478,7 @@ export function partitionQuestionsList(all: Question[], partitionKey: string): Q
 
   // 4. SBI Clerk 2024 PYQ (100 Authentic Questions)
   if (
-    (normKey.includes('sbi') && (normKey.includes('2024') || normKey === 'mock-sbi-clerk-2024-pyq' || normKey === 'sbi-clerk-prelims-2024-pyq')) ||
-    (!normKey.includes('ibps') && (normKey.includes('2024-pyq') || normKey.includes('2024_pyq') || normKey === 'pyq-2024'))
+    normKey.includes('sbi') && (normKey.includes('2024') || normKey === 'mock-sbi-clerk-2024-pyq' || normKey === 'sbi-clerk-prelims-2024-pyq')
   ) {
     return all
       .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('SBI Clerk') || String(q.id).toLowerCase().includes('sbi')) && (q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
@@ -469,8 +493,7 @@ export function partitionQuestionsList(all: Question[], partitionKey: string): Q
 
   // 5. SBI Clerk 2023-24 PYQ (100 Authentic Questions)
   if (
-    (normKey.includes('sbi') && (normKey.includes('2023') || normKey === 'mock-sbi-clerk-2023-pyq' || normKey === 'sbi-clerk-prelims-2023-pyq')) ||
-    (!normKey.includes('ibps') && (normKey.includes('2023-pyq') || normKey.includes('2023_pyq') || normKey === 'pyq-2023'))
+    normKey.includes('sbi') && (normKey.includes('2023') || normKey === 'mock-sbi-clerk-2023-pyq' || normKey === 'sbi-clerk-prelims-2023-pyq')
   ) {
     return all
       .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('SBI Clerk') || String(q.id).toLowerCase().includes('sbi')) && (q.pyqYear === 2023 || q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
@@ -481,6 +504,31 @@ export function partitionQuestionsList(all: Question[], partitionKey: string): Q
         const numB = matchB ? parseInt(matchB[1], 10) : 0;
         return numA - numB;
       });
+  }
+
+  // Dynamic match for any custom-created PYQ or Mock Test partition
+  const dynamicMatch = all.filter(q => {
+    const qPyq = (q.pyqExam || '').toLowerCase().trim();
+    const qId = String(q.id).toLowerCase().trim();
+    const cleanNorm = normKey.replace(/^mock-/, '');
+    return (
+      (qPyq && (qPyq === normKey || cleanNorm.includes(qPyq) || qPyq.includes(cleanNorm))) ||
+      qId.includes(cleanNorm)
+    );
+  });
+  if (dynamicMatch.length > 0) {
+    return dynamicMatch.sort((a, b) => {
+      const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+      const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+      const numA = matchA ? parseInt(matchA[1], 10) : 0;
+      const numB = matchB ? parseInt(matchB[1], 10) : 0;
+      return numA - numB;
+    });
+  }
+
+  // If a custom PYQ partition was requested but has no questions yet, return empty list
+  if (normKey.includes('pyq')) {
+    return [];
   }
 
   // Sliced standard practice tests (strictly exclude any PYQ)

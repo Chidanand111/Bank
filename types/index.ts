@@ -267,15 +267,26 @@ export interface AdminQuestionInput {
   }[];
 }
 
+export interface AdminExamInput {
+  title: string;
+  slug?: string;
+  category?: ExamCategory;
+  description?: string;
+}
+
 export interface AdminMockTestInput {
   title: string;
   slug: string;
   description: string;
   examId: string;
+  customExamTitle?: string;
+  customExamCategory?: ExamCategory;
   durationMinutes: number;
   totalMarks: number;
   cutoffMarks: number;
   isFree: boolean;
+  isPyq?: boolean;
+  year?: number;
   sections: {
     code: string;
     name: string;

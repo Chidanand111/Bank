@@ -1,5 +1,5 @@
 import React from 'react';
-import { getMockTests } from '@/lib/services/testService';
+import { getMockTests, getExams } from '@/lib/services/testService';
 import { TestCard } from '@/components/tests/TestCard';
 import { Badge } from '@/components/ui/Badge';
 import { Award, Search } from 'lucide-react';
@@ -12,7 +12,10 @@ export interface TestsPageProps {
 export default async function TestsPage({ searchParams }: TestsPageProps) {
   const resolvedSearchParams = await searchParams;
   const examFilter = resolvedSearchParams.exam || 'all';
-  const allTests = await getMockTests();
+  const [allTests, allExams] = await Promise.all([
+    getMockTests(),
+    getExams(),
+  ]);
 
   const filteredTests = examFilter === 'all'
     ? allTests
@@ -53,26 +56,6 @@ export default async function TestsPage({ searchParams }: TestsPageProps) {
             All Tests ({allTests.length})
           </Link>
           <Link
-            href="/tests?exam=ibps-po"
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
-              examFilter === 'ibps-po'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            IBPS PO ({allTests.filter(t => t.examSlug === 'ibps-po').length})
-          </Link>
-          <Link
-            href="/tests?exam=sbi-clerk"
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
-              examFilter === 'sbi-clerk'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            SBI Clerk ({allTests.filter(t => t.examSlug === 'sbi-clerk').length})
-          </Link>
-          <Link
             href="/tests?exam=pyq"
             className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
               examFilter === 'pyq'
@@ -82,6 +65,23 @@ export default async function TestsPage({ searchParams }: TestsPageProps) {
           >
             ★ PYQ Papers ({allTests.filter(t => t.isPyq).length})
           </Link>
+          {allExams.map((ex) => {
+            const count = allTests.filter(t => t.examSlug === ex.slug).length;
+            if (count === 0 && examFilter !== ex.slug) return null;
+            return (
+              <Link
+                key={ex.id}
+                href={`/tests?exam=${ex.slug}`}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${
+                  examFilter === ex.slug
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                {ex.title} ({count})
+              </Link>
+            );
+          })}
         </div>
       </div>
 
@@ -96,7 +96,7 @@ export default async function TestsPage({ searchParams }: TestsPageProps) {
         <div className="bg-white rounded-2xl p-12 text-center border border-slate-200 space-y-3">
           <Search className="w-10 h-10 text-slate-400 mx-auto" />
           <h3 className="text-lg font-bold text-slate-800">No mock tests found for this exam filter.</h3>
-          <p className="text-xs text-slate-500">Try selecting 'All Tests' to explore available mock tests.</p>
+          <p className="text-xs text-slate-500">Try selecting &apos;All Tests&apos; to explore available mock tests.</p>
         </div>
       )}
     </div>

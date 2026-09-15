@@ -9,26 +9,44 @@ import { recordUserSeenQuestions } from './userQuestionTracker';
 const ATTEMPTS_STORAGE_KEY = 'bankmock_attempts';
 
 export async function getExams(): Promise<Exam[]> {
-  return EXAMS_DATA;
+  try {
+    const { getAdminExams } = await import('./adminService');
+    return await getAdminExams();
+  } catch {
+    return EXAMS_DATA;
+  }
 }
 
 export async function getExamBySlug(slug: string): Promise<Exam | null> {
-  const exam = EXAMS_DATA.find(e => e.slug === slug);
+  const exams = await getExams();
+  const exam = exams.find(e => e.slug === slug);
   return exam || null;
 }
 
 export async function getMockTests(examSlug?: string): Promise<MockTest[]> {
+  let list = MOCK_TESTS_DATA;
+  try {
+    const { loadFreshMockTestsFromDb } = await import('./adminService');
+    list = await loadFreshMockTestsFromDb();
+  } catch {}
+
   if (examSlug) {
-    return MOCK_TESTS_DATA.filter(m => m.examSlug === examSlug);
+    return list.filter(m => m.examSlug === examSlug);
   }
-  return MOCK_TESTS_DATA;
+  return list;
 }
 
 export async function getMockTestById(
   idOrSlug: string,
   excludeQuestionIds?: string[]
 ): Promise<MockTest | null> {
-  const test = MOCK_TESTS_DATA.find(m => m.id === idOrSlug || m.slug === idOrSlug);
+  let allTests = MOCK_TESTS_DATA;
+  try {
+    const { loadFreshMockTestsFromDb } = await import('./adminService');
+    allTests = await loadFreshMockTestsFromDb();
+  } catch {}
+
+  const test = allTests.find(m => m.id === idOrSlug || m.slug === idOrSlug);
   if (!test) return null;
 
   const targetKey = test.id || test.slug;
@@ -98,7 +116,21 @@ export async function getMockTestById(
     }
   }
 
-  // 3. Fallback to local deterministic questions
+  // 3. If test has dedicated preloaded questions (from DB or state)
+  if (test.questions && test.questions.length > 0) {
+    return test;
+  }
+
+  // 4. If this is an authentic PYQ paper or dedicated fixed mock test with 0 questions yet,
+  // do NOT fall back to random practice questions pool
+  if (test.isPyq || test.isFixed) {
+    return {
+      ...test,
+      questions: [],
+    };
+  }
+
+  // 5. Fallback to local deterministic questions for standard dynamic mocks
   return generateRandomizedMockTest(test, { excludeQuestionIds });
 }
 

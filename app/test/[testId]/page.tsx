@@ -195,7 +195,7 @@ export default function TestPage({ params }: TestPageProps) {
       if (!existing) return prev;
 
       const isMarked = existing.isMarkedForReview;
-      let newStatus: QuestionStatus = isMarked ? 'MARKED_FOR_REVIEW' : 'NOT_ANSWERED';
+      const newStatus: QuestionStatus = isMarked ? 'MARKED_FOR_REVIEW' : 'NOT_ANSWERED';
 
       return {
         ...prev,

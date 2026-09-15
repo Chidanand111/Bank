@@ -1,78 +1,147 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
+import Link from 'next/link';
 import {
   getAdminMockTests,
+  getAdminExams,
   createMockTestAction,
   deleteMockTestAction,
 } from '@/lib/services/adminService';
 import { AdminNav } from '@/components/admin/AdminNav';
-import { AdminMockTestInput, MockTest } from '@/types';
+import { AdminMockTestInput, Exam, MockTest } from '@/types';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { Award, PlusCircle, Trash2, Clock, FileText, CheckCircle2, AlertTriangle, Layers } from 'lucide-react';
+import {
+  Award,
+  PlusCircle,
+  Trash2,
+  Clock,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  Layers,
+  Calendar,
+  Sparkles,
+  ExternalLink,
+  BookOpen,
+} from 'lucide-react';
 
 export default function AdminTestsPage() {
   const [tests, setTests] = useState<MockTest[]>([]);
+  const [exams, setExams] = useState<Exam[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingTest, setDeletingTest] = useState<MockTest | null>(null);
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-  // Form
+  // Form states
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [description, setDescription] = useState('');
   const [examId, setExamId] = useState('exam-ibps-po');
+  const [customExamTitle, setCustomExamTitle] = useState('');
+  const [customExamCategory, setCustomExamCategory] = useState<'PO' | 'CLERK' | 'SO' | 'OTHER'>('PO');
+  const [isPyq, setIsPyq] = useState(false);
+  const [year, setYear] = useState<number | ''>(new Date().getFullYear());
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [totalMarks, setTotalMarks] = useState(100);
   const [cutoffMarks, setCutoffMarks] = useState(60);
+  const [sectionPreset, setSectionPreset] = useState<'PRELIMS_3' | 'MAINS_4' | 'CUSTOM'>('PRELIMS_3');
 
   const [isPending, startTransition] = useTransition();
 
-  const loadTests = async () => {
+  const loadData = async () => {
     try {
-      const data = await getAdminMockTests();
-      setTests(data);
+      const [testsData, examsData] = await Promise.all([
+        getAdminMockTests(),
+        getAdminExams(),
+      ]);
+      setTests(testsData);
+      setExams(examsData);
     } catch (e) {
-      console.error(e);
+      console.error('Failed to load admin tests or exams:', e);
     }
   };
 
   useEffect(() => {
-    loadTests();
+    loadData();
   }, []);
+
+  const openCreateModal = (asPyq = false) => {
+    setIsPyq(asPyq);
+    setYear(asPyq ? new Date().getFullYear() : '');
+    setTitle(asPyq ? `SBI Clerk Prelims ${new Date().getFullYear()} - Previous Year Question Paper` : '');
+    setSlug('');
+    setDescription(asPyq ? 'Authentic Previous Year Exam Paper with fixed official questions and solution breakdowns.' : 'Full-length practice test.');
+    setExamId('exam-ibps-po');
+    setCustomExamTitle('');
+    setSectionPreset('PRELIMS_3');
+    setDurationMinutes(60);
+    setTotalMarks(100);
+    setCutoffMarks(60);
+    setIsCreateModalOpen(true);
+  };
+
+  // Auto-adjust duration and marks on preset change
+  const handlePresetChange = (preset: 'PRELIMS_3' | 'MAINS_4' | 'CUSTOM') => {
+    setSectionPreset(preset);
+    if (preset === 'PRELIMS_3') {
+      setDurationMinutes(60);
+      setTotalMarks(100);
+      setCutoffMarks(65);
+    } else if (preset === 'MAINS_4') {
+      setDurationMinutes(180);
+      setTotalMarks(200);
+      setCutoffMarks(75);
+    }
+  };
 
   const handleCreateTest = (e: React.FormEvent) => {
     e.preventDefault();
 
+    let sections = [
+      { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30 },
+      { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35 },
+      { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35 },
+    ];
+
+    if (sectionPreset === 'MAINS_4') {
+      sections = [
+        { code: 'REASONING', name: 'Reasoning & Computer Aptitude', questionCount: 45, marks: 60 },
+        { code: 'ENGLISH', name: 'English Language', questionCount: 35, marks: 40 },
+        { code: 'QUANT', name: 'Data Analysis & Interpretation', questionCount: 35, marks: 60 },
+        { code: 'FINANCIAL_AWARENESS', name: 'General / Banking Awareness', questionCount: 40, marks: 40 },
+      ];
+    }
+
     const inputData: AdminMockTestInput = {
       title,
-      slug: slug.trim() || title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      slug: slug.trim() || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
       description,
-      examId,
+      examId: examId === '__NEW_EXAM__' ? 'exam-custom' : examId,
+      customExamTitle: examId === '__NEW_EXAM__' ? customExamTitle.trim() : undefined,
+      customExamCategory: examId === '__NEW_EXAM__' ? customExamCategory : undefined,
       durationMinutes: Number(durationMinutes),
       totalMarks: Number(totalMarks),
       cutoffMarks: Number(cutoffMarks),
       isFree: true,
-      sections: [
-        { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30 },
-        { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35 },
-        { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35 },
-      ],
+      isPyq: Boolean(isPyq),
+      year: isPyq && year ? Number(year) : undefined,
+      sections,
     };
 
     startTransition(async () => {
       const res = await createMockTestAction(inputData);
       if (res.success) {
-        setFeedback({ text: 'Mock test created successfully.', type: 'success' });
+        setFeedback({
+          text: `${isPyq ? 'Previous Year Paper (PYQ)' : 'Mock Test Suite'} created successfully. You can now add fixed questions to it!`,
+          type: 'success',
+        });
         setIsCreateModalOpen(false);
-        setTitle('');
-        setSlug('');
-        setDescription('');
-        await loadTests();
+        await loadData();
       } else {
         setFeedback({ text: res.error || 'Failed to create test.', type: 'error' });
       }
@@ -85,10 +154,10 @@ export default function AdminTestsPage() {
     startTransition(async () => {
       const res = await deleteMockTestAction(deletingTest.id);
       if (res.success) {
-        setFeedback({ text: 'Mock test deleted successfully.', type: 'success' });
+        setFeedback({ text: 'Exam paper deleted successfully.', type: 'success' });
         setIsDeleteModalOpen(false);
         setDeletingTest(null);
-        await loadTests();
+        await loadData();
       } else {
         setFeedback({ text: res.error || 'Failed to delete test.', type: 'error' });
       }
@@ -104,25 +173,35 @@ export default function AdminTestsPage() {
         <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <Badge variant="purple" size="sm">MOCK TEST SUITES</Badge>
-              <span className="text-xs text-slate-500">• {tests.length} Active Tests</span>
+              <Badge variant="purple" size="sm">EXAM SUITES & PYQ PAPERS</Badge>
+              <span className="text-xs text-slate-500">• {tests.length} Total Papers</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
-              Mock Test Management
+              Mock Test & PYQ Paper Management
             </h1>
             <p className="text-sm text-slate-600">
-              Create, configure duration, set sectional question quotas, cut-off benchmarks, and publish mock tests.
+              Create official Previous Year Question Papers (PYQs) or standard practice tests, title any exam, configure duration and sectional patterns, and manage questions directly.
             </p>
           </div>
 
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-1.5 shadow-xs"
-          >
-            <PlusCircle className="w-4 h-4" /> Create Mock Test
-          </Button>
+          <div className="flex items-center gap-2.5">
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => openCreateModal(true)}
+              className="bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 flex items-center gap-1.5 shadow-xs font-bold"
+            >
+              <Calendar className="w-4 h-4 text-purple-600" /> Create PYQ Paper
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => openCreateModal(false)}
+              className="flex items-center gap-1.5 shadow-xs"
+            >
+              <PlusCircle className="w-4 h-4" /> Create Mock Test
+            </Button>
+          </div>
         </div>
 
         {feedback && (
@@ -141,22 +220,32 @@ export default function AdminTestsPage() {
         {/* Tests List Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {tests.map((test) => (
-            <Card key={test.id} className="border border-slate-200 shadow-xs flex flex-col justify-between">
+            <Card key={test.id} className="border border-slate-200 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-colors">
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
-                  <Badge variant="blue" size="sm">{test.examTitle}</Badge>
+                  <div className="flex items-center gap-1.5">
+                    <Badge variant={test.isPyq ? 'purple' : 'blue'} size="sm">
+                      {test.examTitle}
+                    </Badge>
+                    {test.isPyq && (
+                      <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded">
+                        PYQ {test.year || ''}
+                      </span>
+                    )}
+                  </div>
                   <Button
                     variant="danger"
                     size="sm"
                     onClick={() => { setDeletingTest(test); setIsDeleteModalOpen(true); }}
                     className="p-1.5"
+                    title="Delete this test paper"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>
                 </div>
 
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">{test.title}</h3>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900 leading-snug">{test.title}</h3>
                   <p className="text-xs text-slate-500 mt-1 line-clamp-2">{test.description}</p>
                 </div>
 
@@ -166,12 +255,12 @@ export default function AdminTestsPage() {
                     <span className="font-bold text-slate-800">{test.durationMinutes} mins</span>
                   </div>
                   <div className="text-center p-1.5 bg-slate-50 rounded-lg">
-                    <span className="text-[10px] text-slate-400 block">Marks</span>
+                    <span className="text-[10px] text-slate-400 block">Total Marks</span>
                     <span className="font-bold text-slate-800">{test.totalMarks}</span>
                   </div>
                   <div className="text-center p-1.5 bg-slate-50 rounded-lg">
-                    <span className="text-[10px] text-slate-400 block">Cutoff</span>
-                    <span className="font-bold text-slate-800">{test.cutoffMarks}</span>
+                    <span className="text-[10px] text-slate-400 block">Questions</span>
+                    <span className="font-bold text-indigo-700">{test.totalQuestions || test.questions?.length || 100} Qs</span>
                   </div>
                 </div>
 
@@ -187,6 +276,26 @@ export default function AdminTestsPage() {
                     ))}
                   </div>
                 </div>
+
+                {/* Direct Action Links */}
+                <div className="pt-2 flex items-center justify-between gap-2 border-t border-slate-100">
+                  <Link
+                    href={`/admin/questions?partition=${encodeURIComponent(test.id)}`}
+                    className="flex-1 text-center py-2 px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold rounded-xl text-xs transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <BookOpen className="w-3.5 h-3.5" />
+                    Manage Questions ({test.questions?.length || test.totalQuestions || 0})
+                  </Link>
+
+                  <Link
+                    href={`/test/${encodeURIComponent(test.slug || test.id)}`}
+                    target="_blank"
+                    className="p-2 text-slate-500 hover:text-slate-800 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                    title="Preview Live Test Interface"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </Link>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -197,29 +306,94 @@ export default function AdminTestsPage() {
       <Modal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
-        title="Create New Mock Test Suite"
+        title={isPyq ? 'Create Previous Year Question Paper (PYQ)' : 'Create New Mock Test Suite'}
       >
         <form onSubmit={handleCreateTest} className="space-y-4 text-xs">
+          {/* Paper Type Toggle */}
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+            <div>
+              <span className="font-bold text-slate-800 block text-xs">Previous Year Question Paper (PYQ)?</span>
+              <span className="text-[11px] text-slate-500">Marks this exam paper as an authentic official memory-based test</span>
+            </div>
+            <input
+              type="checkbox"
+              checked={isPyq}
+              onChange={(e) => setIsPyq(e.target.checked)}
+              className="w-4 h-4 text-purple-600 rounded border-slate-300 focus:ring-purple-500"
+            />
+          </div>
+
+          {/* Exam Selection / Custom Exam Creation */}
           <div>
-            <label className="font-semibold text-slate-700 block mb-1">Target Exam</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="font-semibold text-slate-700 block">Target Exam</label>
+              <span className="text-[11px] text-indigo-600 font-semibold">Choose existing or create any custom exam title</span>
+            </div>
             <select
               value={examId}
               onChange={(e) => setExamId(e.target.value)}
               className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
             >
-              <option value="exam-ibps-po">IBPS PO</option>
-              <option value="exam-sbi-clerk">SBI Clerk</option>
+              {exams.map(e => (
+                <option key={e.id} value={e.id}>{e.title}</option>
+              ))}
+              <option value="__NEW_EXAM__">➕ Create New Exam (Title it anything)...</option>
             </select>
           </div>
 
+          {/* New Exam Input if selected */}
+          {examId === '__NEW_EXAM__' && (
+            <div className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-2.5">
+              <div>
+                <label className="font-bold text-indigo-950 block mb-1">New Exam Title</label>
+                <input
+                  type="text"
+                  required
+                  value={customExamTitle}
+                  onChange={(e) => setCustomExamTitle(e.target.value)}
+                  placeholder="e.g. IBPS RRB Officer Scale 1, RBI Assistant, SBI PO, LIC AAO..."
+                  className="w-full px-2.5 py-2 bg-white border border-indigo-200 rounded-lg text-xs"
+                />
+              </div>
+              <div>
+                <label className="font-bold text-indigo-950 block mb-1">Category</label>
+                <select
+                  value={customExamCategory}
+                  onChange={(e) => setCustomExamCategory(e.target.value as any)}
+                  className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs"
+                >
+                  <option value="PO">PO (Probationary Officer / Scale 1)</option>
+                  <option value="CLERK">Clerk (Junior Associate / Assistant)</option>
+                  <option value="SO">SO (Specialist Officer)</option>
+                  <option value="OTHER">Other Banking / Insurance</option>
+                </select>
+              </div>
+            </div>
+          )}
+
+          {/* PYQ Year (if PYQ) */}
+          {isPyq && (
+            <div>
+              <label className="font-semibold text-slate-700 block mb-1">Exam Paper Year</label>
+              <input
+                type="number"
+                required
+                value={year}
+                onChange={(e) => setYear(e.target.value ? Number(e.target.value) : '')}
+                placeholder="e.g. 2022, 2023, 2024"
+                className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+              />
+            </div>
+          )}
+
           <div>
-            <label className="font-semibold text-slate-700 block mb-1">Test Title</label>
+            <label className="font-semibold text-slate-700 block mb-1">Paper Title</label>
             <input
               type="text"
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. IBPS PO Prelims Speed Drill Mock 3"
+              placeholder={isPyq ? 'e.g. SBI Clerk Prelims 2022 - Previous Year Question Paper' : 'e.g. IBPS PO Prelims Speed Drill Mock 3'}
               className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
             />
           </div>
@@ -230,7 +404,7 @@ export default function AdminTestsPage() {
               type="text"
               value={slug}
               onChange={(e) => setSlug(e.target.value)}
-              placeholder="ibps-po-prelims-mock-3 (leave blank to auto-generate)"
+              placeholder="Leave blank to auto-generate from title"
               className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
             />
           </div>
@@ -242,9 +416,23 @@ export default function AdminTestsPage() {
               rows={2}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Comprehensive prelims test covering all syllabus sections..."
+              placeholder="Paper overview, instructions, and syllabus coverage..."
               className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
             />
+          </div>
+
+          {/* Section Pattern Preset */}
+          <div>
+            <label className="font-semibold text-slate-700 block mb-1">Exam Pattern & Sections</label>
+            <select
+              value={sectionPreset}
+              onChange={(e) => handlePresetChange(e.target.value as any)}
+              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold"
+            >
+              <option value="PRELIMS_3">Prelims Standard (3 Sections: English 30, Quant 35, Reasoning 35 — 100 Qs / 60 Mins)</option>
+              <option value="MAINS_4">Mains Standard (4 Sections: Reasoning 45, English 35, Quant/DI 35, GA 40 — 155 Qs / 180 Mins)</option>
+              <option value="CUSTOM">Custom Timing & Marks</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -282,8 +470,8 @@ export default function AdminTestsPage() {
             <Button variant="secondary" size="md" type="button" onClick={() => setIsCreateModalOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" size="md" type="submit" isLoading={isPending}>
-              Create Test Suite
+            <Button variant="primary" size="md" type="submit" isLoading={isPending} className="bg-indigo-600 hover:bg-indigo-700">
+              {isPyq ? 'Publish PYQ Paper' : 'Create Test Suite'}
             </Button>
           </div>
         </form>
@@ -294,14 +482,14 @@ export default function AdminTestsPage() {
         <Modal
           isOpen={isDeleteModalOpen}
           onClose={() => setIsDeleteModalOpen(false)}
-          title="Confirm Mock Test Deletion"
+          title="Confirm Exam Paper Deletion"
           footer={
             <>
               <Button variant="secondary" size="md" onClick={() => setIsDeleteModalOpen(false)}>
                 Cancel
               </Button>
               <Button variant="danger" size="md" isLoading={isPending} onClick={handleDeleteTest}>
-                Delete Test
+                Delete Paper
               </Button>
             </>
           }
@@ -309,7 +497,7 @@ export default function AdminTestsPage() {
           <div className="space-y-3 text-xs text-slate-600">
             <div className="p-3 bg-red-50 text-red-800 border border-red-200 rounded-xl flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
-              <span>Are you sure you want to permanently delete this mock test?</span>
+              <span>Are you sure you want to permanently delete this exam paper? All linked test records will be removed.</span>
             </div>
             <p className="font-bold text-slate-900">{deletingTest.title}</p>
           </div>
