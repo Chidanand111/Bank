@@ -1,6 +1,9 @@
 import { Question, Option, Difficulty, MockTest } from '@/types';
 import rawQuestionsData from '@/data/questions.json';
 import pyqQuestionsData from '@/data/sbi_clerk_2024_pyq.json';
+import ibpsPo2024Data from '@/data/ibps_po_2024_prelims_pyq.json';
+import ibpsPo2023Data from '@/data/ibps_po_2023_prelims_pyq.json';
+import ibpsPo2025MainsData from '@/data/ibps_po_2025_mains_pyq.json';
 
 export interface RawJsonQuestion {
   id: number | string;
@@ -24,7 +27,13 @@ export interface RawJsonQuestion {
 }
 
 // In-memory working database initialized from JSON files (deduplicated by ID)
-const combinedRaw = [...(rawQuestionsData as RawJsonQuestion[]), ...(pyqQuestionsData as RawJsonQuestion[])];
+const combinedRaw = [
+  ...(rawQuestionsData as RawJsonQuestion[]),
+  ...(pyqQuestionsData as RawJsonQuestion[]),
+  ...(ibpsPo2024Data as RawJsonQuestion[]),
+  ...(ibpsPo2023Data as RawJsonQuestion[]),
+  ...(ibpsPo2025MainsData as RawJsonQuestion[]),
+];
 const initialStore: RawJsonQuestion[] = [];
 const seenStoreIds = new Set<string>();
 for (const q of combinedRaw) {
@@ -52,17 +61,17 @@ export function mapExamToId(examName: string): { examId: string; examSlug: strin
  */
 export function mapSectionToCode(sectionName: string): { sectionCode: string; sectionId: string; sectionName: string } {
   const norm = (sectionName || '').toLowerCase();
-  if (norm.includes('reason')) {
-    return { sectionCode: 'REASONING', sectionId: 'sec-ibps-p-reason', sectionName: 'Reasoning Ability' };
+  if (norm.includes('reason') || norm.includes('computer')) {
+    return { sectionCode: 'REASONING', sectionId: 'sec-ibps-p-reason', sectionName: sectionName || 'Reasoning Ability' };
   }
-  if (norm.includes('quant') || norm.includes('numer') || norm.includes('math')) {
-    return { sectionCode: 'QUANT', sectionId: 'sec-ibps-p-quant', sectionName: 'Quantitative Aptitude' };
+  if (norm.includes('quant') || norm.includes('numer') || norm.includes('math') || norm.includes('data') || norm.includes('analysis') || norm.includes('interpret')) {
+    return { sectionCode: 'QUANT', sectionId: 'sec-ibps-p-quant', sectionName: sectionName || 'Quantitative Aptitude' };
   }
   if (norm.includes('eng')) {
-    return { sectionCode: 'ENGLISH', sectionId: 'sec-ibps-p-eng', sectionName: 'English Language' };
+    return { sectionCode: 'ENGLISH', sectionId: 'sec-ibps-p-eng', sectionName: sectionName || 'English Language' };
   }
-  if (norm.includes('general') || norm.includes('aware') || norm.includes('ga')) {
-    return { sectionCode: 'FINANCIAL_AWARENESS', sectionId: 'sec-sbi-m-ga', sectionName: 'General / Financial Awareness' };
+  if (norm.includes('general') || norm.includes('aware') || norm.includes('ga') || norm.includes('bank') || norm.includes('financial')) {
+    return { sectionCode: 'FINANCIAL_AWARENESS', sectionId: 'sec-ibps-m-ga', sectionName: sectionName || 'General / Banking Awareness' };
   }
   return { sectionCode: 'GENERAL', sectionId: 'sec-general', sectionName: sectionName };
 }
@@ -92,8 +101,17 @@ export function normalizeQuestion(raw: RawJsonQuestion): Question {
     };
   });
 
-  const isPyq = raw.isPyq ?? Boolean(raw.exam?.toLowerCase().includes('2024') || raw.exam?.toLowerCase().includes('pyq'));
-  const pyqYear = raw.pyqYear ?? (raw.exam?.includes('2024') ? 2024 : undefined);
+  const isPyq = raw.isPyq ?? Boolean(
+    raw.exam?.toLowerCase().includes('2024') ||
+    raw.exam?.toLowerCase().includes('2023') ||
+    raw.exam?.toLowerCase().includes('2025') ||
+    raw.exam?.toLowerCase().includes('pyq')
+  );
+  const pyqYear = raw.pyqYear ?? (
+    raw.exam?.includes('2025') ? 2025 :
+    raw.exam?.includes('2023') ? 2023 :
+    raw.exam?.includes('2024') ? 2024 : undefined
+  );
 
   return {
     id: qId,
@@ -104,7 +122,7 @@ export function normalizeQuestion(raw: RawJsonQuestion): Question {
     groupId: raw.groupId,
     isPyq,
     pyqYear,
-    pyqExam: raw.pyqExam || (isPyq ? 'SBI Clerk Prelims 2024' : undefined),
+    pyqExam: raw.pyqExam || (isPyq ? (raw.exam || 'SBI Clerk Prelims 2024') : undefined),
     difficulty: (raw.difficulty as Difficulty) || 'MEDIUM',
     explanation: raw.explanation || '',
     marks: raw.marks ?? 1.0,
@@ -237,32 +255,91 @@ export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
   const allQuestions = questionStore.map(normalizeQuestion);
   const norm = (testIdOrSlug || '').toLowerCase().trim();
 
-  // 1. SBI Clerk 2024 PYQ (Authentic 100 official questions)
-  if (norm.includes('2024-pyq') || norm.includes('2024_pyq') || norm === 'pyq-2024') {
-    const pyq2024 = allQuestions
-      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+  // 1. IBPS PO Mains 2025 PYQ (Authentic 155 official questions)
+  if ((norm.includes('ibps') && norm.includes('2025')) || norm === 'mock-ibps-po-2025-mains-pyq' || norm === 'ibps-po-mains-2025-pyq') {
+    const pyq2025Mains = allQuestions
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Mains 2025') || String(q.id).toLowerCase().includes('ibps-po-2025')))
       .sort((a, b) => {
-        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
-        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+    if (pyq2025Mains.length > 0) return pyq2025Mains;
+  }
+
+  // 2. IBPS PO Prelims 2024 PYQ (Authentic 100 official questions)
+  if ((norm.includes('ibps') && norm.includes('2024')) || norm === 'mock-ibps-po-2024-pyq' || norm === 'ibps-po-prelims-2024-pyq') {
+    const pyq2024IBPS = allQuestions
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2024') || String(q.id).toLowerCase().includes('ibps-po-2024')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+    if (pyq2024IBPS.length > 0) return pyq2024IBPS;
+  }
+
+  // 3. IBPS PO Prelims 2023 PYQ (Authentic 100 official questions)
+  if ((norm.includes('ibps') && norm.includes('2023')) || norm === 'mock-ibps-po-2023-pyq' || norm === 'ibps-po-prelims-2023-pyq') {
+    const pyq2023IBPS = allQuestions
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2023') || String(q.id).toLowerCase().includes('ibps-po-2023')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+    if (pyq2023IBPS.length > 0) return pyq2023IBPS;
+  }
+
+  // 4. SBI Clerk 2024 PYQ (Authentic 100 official questions)
+  if (
+    (norm.includes('sbi') && (norm.includes('2024') || norm === 'mock-sbi-clerk-2024-pyq' || norm === 'sbi-clerk-prelims-2024-pyq')) ||
+    (!norm.includes('ibps') && (norm.includes('2024-pyq') || norm.includes('2024_pyq') || norm === 'pyq-2024'))
+  ) {
+    const pyq2024 = allQuestions
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('SBI Clerk') || String(q.id).toLowerCase().includes('sbi')) && (q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
         return numA - numB;
       });
     if (pyq2024.length > 0) return pyq2024;
   }
 
-  // 2. SBI Clerk 2023-24 PYQ (Authentic 100 official questions)
-  if (norm.includes('2023-pyq') || norm.includes('2023_pyq') || norm === 'pyq-2023') {
+  // 5. SBI Clerk 2023-24 PYQ (Authentic 100 official questions)
+  if (
+    (norm.includes('sbi') && (norm.includes('2023') || norm === 'mock-sbi-clerk-2023-pyq' || norm === 'sbi-clerk-prelims-2023-pyq')) ||
+    (!norm.includes('ibps') && (norm.includes('2023-pyq') || norm.includes('2023_pyq') || norm === 'pyq-2023'))
+  ) {
     const pyq2023 = allQuestions
-      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2023 || q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('SBI Clerk') || String(q.id).toLowerCase().includes('sbi')) && (q.pyqYear === 2023 || q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
       .sort((a, b) => {
-        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
-        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
         return numA - numB;
       });
     if (pyq2023.length > 0) return pyq2023;
   }
 
-  // Standard practice questions partitioned by section
-  const nonPyqQuestions = allQuestions.filter(q => !q.isPyq && !String(q.id).toLowerCase().includes('2024'));
+  // Standard practice questions partitioned by section (strictly exclude any PYQ)
+  const nonPyqQuestions = allQuestions.filter(q =>
+    !q.isPyq &&
+    !String(q.id).toLowerCase().includes('2024') &&
+    !String(q.id).toLowerCase().includes('2023') &&
+    !String(q.id).toLowerCase().includes('2025') &&
+    !String(q.id).toLowerCase().includes('ibps-po-20') &&
+    !String(q.id).toLowerCase().includes('sbi-clerk-20')
+  );
 
   const engPool = nonPyqQuestions.filter(q => q.sectionCode === 'ENGLISH');
   const quantPool = nonPyqQuestions.filter(q => q.sectionCode === 'QUANT');
@@ -284,7 +361,7 @@ export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
     return list;
   };
 
-  // 3. IBPS PO Mock 1: Fixed 30 English (0..29), 35 Quant (0..34), 35 Reasoning (0..34)
+  // 6. IBPS PO Mock 1: Fixed 30 English (0..29), 35 Quant (0..34), 35 Reasoning (0..34)
   if (norm.includes('ibps-po-1') || norm.includes('ibps-po-prelims-mock-1')) {
     return [
       ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
@@ -293,7 +370,7 @@ export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
     ];
   }
 
-  // 4. IBPS PO Mock 2: Fixed 30 English (30..59), 35 Quant (35..69), 35 Reasoning (35..69)
+  // 7. IBPS PO Mock 2: Fixed 30 English (30..59), 35 Quant (35..69), 35 Reasoning (35..69)
   if (norm.includes('ibps-po-2') || norm.includes('ibps-po-prelims-mock-2')) {
     return [
       ...sliceSection(engPool, 30, 30, 'ENGLISH', 'English Language'),
@@ -302,7 +379,7 @@ export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
     ];
   }
 
-  // 5. SBI Clerk Mock 1: Fixed 30 English (60..89), 35 Quant (70..104), 35 Reasoning (70..104)
+  // 8. SBI Clerk Mock 1: Fixed 30 English (60..89), 35 Quant (70..104), 35 Reasoning (70..104)
   if (norm.includes('sbi-clerk-1') || norm.includes('sbi-clerk-prelims-mock-1')) {
     return [
       ...sliceSection(engPool, 60, 30, 'ENGLISH', 'English Language'),
@@ -311,7 +388,7 @@ export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
     ];
   }
 
-  // 6. SBI Clerk Mock 2: Fixed 30 English (0..29), 35 Quant (35..69), 35 Reasoning (0..34)
+  // 9. SBI Clerk Mock 2: Fixed 30 English (0..29), 35 Quant (35..69), 35 Reasoning (0..34)
   if (norm.includes('sbi-clerk-2') || norm.includes('sbi-clerk-prelims-mock-2')) {
     return [
       ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
@@ -335,30 +412,86 @@ export function partitionQuestionsList(all: Question[], partitionKey: string): Q
   const normKey = (partitionKey || 'ALL').toLowerCase().trim();
   if (normKey === 'all') return all;
 
-  // 1. SBI Clerk 2024 PYQ (100 Authentic Questions)
-  if (normKey.includes('2024-pyq') || normKey.includes('2024_pyq') || normKey === 'pyq-2024') {
+  // 1. IBPS PO Mains 2025 PYQ (155 Authentic Questions)
+  if ((normKey.includes('ibps') && normKey.includes('2025')) || normKey === 'mock-ibps-po-2025-mains-pyq' || normKey === 'ibps-po-mains-2025-pyq') {
     return all
-      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Mains 2025') || String(q.id).toLowerCase().includes('ibps-po-2025')))
       .sort((a, b) => {
-        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
-        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
         return numA - numB;
       });
   }
 
-  // 2. SBI Clerk 2023-24 PYQ (100 Authentic Questions)
-  if (normKey.includes('2023-pyq') || normKey.includes('2023_pyq') || normKey === 'pyq-2023') {
+  // 2. IBPS PO Prelims 2024 PYQ (100 Authentic Questions)
+  if ((normKey.includes('ibps') && normKey.includes('2024')) || normKey === 'mock-ibps-po-2024-pyq' || normKey === 'ibps-po-prelims-2024-pyq') {
     return all
-      .filter(q => Boolean(q.isPyq) && (q.pyqYear === 2023 || q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2024') || String(q.id).toLowerCase().includes('ibps-po-2024')))
       .sort((a, b) => {
-        const numA = parseInt(String(a.id).replace(/\D+/g, ''), 10) || 0;
-        const numB = parseInt(String(b.id).replace(/\D+/g, ''), 10) || 0;
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
         return numA - numB;
       });
   }
 
-  // Sliced standard practice tests
-  const nonPyq = all.filter(q => !q.isPyq && !String(q.id).toLowerCase().includes('2024'));
+  // 3. IBPS PO Prelims 2023 PYQ (100 Authentic Questions)
+  if ((normKey.includes('ibps') && normKey.includes('2023')) || normKey === 'mock-ibps-po-2023-pyq' || normKey === 'ibps-po-prelims-2023-pyq') {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2023') || String(q.id).toLowerCase().includes('ibps-po-2023')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+  }
+
+  // 4. SBI Clerk 2024 PYQ (100 Authentic Questions)
+  if (
+    (normKey.includes('sbi') && (normKey.includes('2024') || normKey === 'mock-sbi-clerk-2024-pyq' || normKey === 'sbi-clerk-prelims-2024-pyq')) ||
+    (!normKey.includes('ibps') && (normKey.includes('2024-pyq') || normKey.includes('2024_pyq') || normKey === 'pyq-2024'))
+  ) {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('SBI Clerk') || String(q.id).toLowerCase().includes('sbi')) && (q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+  }
+
+  // 5. SBI Clerk 2023-24 PYQ (100 Authentic Questions)
+  if (
+    (normKey.includes('sbi') && (normKey.includes('2023') || normKey === 'mock-sbi-clerk-2023-pyq' || normKey === 'sbi-clerk-prelims-2023-pyq')) ||
+    (!normKey.includes('ibps') && (normKey.includes('2023-pyq') || normKey.includes('2023_pyq') || normKey === 'pyq-2023'))
+  ) {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('SBI Clerk') || String(q.id).toLowerCase().includes('sbi')) && (q.pyqYear === 2023 || q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+  }
+
+  // Sliced standard practice tests (strictly exclude any PYQ)
+  const nonPyq = all.filter(q =>
+    !q.isPyq &&
+    !String(q.id).toLowerCase().includes('2024') &&
+    !String(q.id).toLowerCase().includes('2023') &&
+    !String(q.id).toLowerCase().includes('2025') &&
+    !String(q.id).toLowerCase().includes('ibps-po-20') &&
+    !String(q.id).toLowerCase().includes('sbi-clerk-20')
+  );
   const engPool = nonPyq.filter(q => q.sectionCode === 'ENGLISH');
   const quantPool = nonPyq.filter(q => q.sectionCode === 'QUANT');
   const reasonPool = nonPyq.filter(q => q.sectionCode === 'REASONING');
@@ -473,10 +606,13 @@ export function matchesQuestionId(storeId: number | string, queryId: number | st
   if (sNorm === qNorm) return true;
   if (sStr === qNorm || sNorm === qStr) return true;
 
-  // Handle PYQ id variations like 'sbi-2024-q1' vs 'q-sbi-2024-1'
+  // Handle PYQ id variations like 'sbi-2024-q1' vs 'q-sbi-2024-1' or 'ibps-po-2024-prelims-q1'
   const sDigits = sStr.match(/\d+/g)?.join('');
   const qDigits = qStr.match(/\d+/g)?.join('');
   if (sStr.includes('sbi') && qStr.includes('sbi') && sDigits && qDigits && sDigits === qDigits) {
+    return true;
+  }
+  if (sStr.includes('ibps') && qStr.includes('ibps') && sDigits && qDigits && sDigits === qDigits) {
     return true;
   }
 
