@@ -837,6 +837,126 @@ export async function createExamAction(input: AdminExamInput): Promise<{ success
   }
 }
 
+export async function updateExamTitleAction(
+  examIdOrSlug: string,
+  newTitle: string,
+  description?: string
+): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+
+  const trimmedTitle = newTitle?.trim();
+  if (!trimmedTitle) {
+    return { success: false, error: 'Exam title is required.' };
+  }
+
+  try {
+    const dbExam = await prisma.exam.findFirst({
+      where: {
+        OR: [
+          { id: examIdOrSlug },
+          { slug: examIdOrSlug },
+          { slug: examIdOrSlug.replace(/^exam-/, '') },
+        ],
+      },
+    });
+
+    if (dbExam) {
+      await prisma.exam.update({
+        where: { id: dbExam.id },
+        data: {
+          title: trimmedTitle,
+          ...(description !== undefined ? { description: description.trim() } : {}),
+        },
+      });
+    }
+
+    // Update in-memory EXAMS_DATA
+    const staticExam = EXAMS_DATA.find(e => e.id === examIdOrSlug || e.slug === examIdOrSlug || (dbExam && e.id === dbExam.id));
+    if (staticExam) {
+      staticExam.title = trimmedTitle;
+      if (description) {
+        staticExam.description = description.trim();
+        staticExam.shortDescription = description.trim();
+      }
+    }
+
+    // Update references in dynamicMockTests
+    for (const mt of dynamicMockTests) {
+      if (mt.examId === examIdOrSlug || (dbExam && mt.examId === dbExam.id)) {
+        mt.examTitle = trimmedTitle;
+      }
+    }
+
+    safeRevalidatePath('/admin/exams');
+    safeRevalidatePath('/admin/tests');
+    safeRevalidatePath('/admin/questions');
+    safeRevalidatePath('/exams');
+    safeRevalidatePath('/tests');
+
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to update exam title:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export async function updateMockTestTitleAction(
+  testIdOrSlug: string,
+  newTitle: string,
+  description?: string
+): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+
+  const trimmedTitle = newTitle?.trim();
+  if (!trimmedTitle) {
+    return { success: false, error: 'Title is required.' };
+  }
+
+  try {
+    const dbTest = await prisma.mockTest.findFirst({
+      where: {
+        OR: [
+          { id: testIdOrSlug },
+          { slug: testIdOrSlug },
+          { slug: testIdOrSlug.replace(/^mock-/, '') },
+        ],
+      },
+    });
+
+    if (dbTest) {
+      await prisma.mockTest.update({
+        where: { id: dbTest.id },
+        data: {
+          title: trimmedTitle,
+          ...(description !== undefined ? { description: description.trim() } : {}),
+        },
+      });
+    }
+
+    // Update in-memory dynamicMockTests
+    const inMem = dynamicMockTests.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug || (dbTest && t.id === dbTest.id));
+    if (inMem) {
+      inMem.title = trimmedTitle;
+      if (description) inMem.description = description.trim();
+    }
+
+    const staticMem = MOCK_TESTS_DATA.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug || (dbTest && t.id === dbTest.id));
+    if (staticMem) {
+      staticMem.title = trimmedTitle;
+      if (description) staticMem.description = description.trim();
+    }
+
+    safeRevalidatePath('/admin/tests');
+    safeRevalidatePath('/admin/questions');
+    safeRevalidatePath('/tests');
+
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to update mock test title:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 /**
  * Load latest mock tests and PYQs directly from Neon PostgreSQL
  */

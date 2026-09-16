@@ -7,6 +7,7 @@ import {
   getAdminExams,
   createMockTestAction,
   deleteMockTestAction,
+  updateMockTestTitleAction,
 } from '@/lib/services/adminService';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { AdminMockTestInput, Exam, MockTest } from '@/types';
@@ -18,6 +19,7 @@ import {
   Award,
   PlusCircle,
   Trash2,
+  Edit2,
   Clock,
   FileText,
   CheckCircle2,
@@ -36,6 +38,11 @@ export default function AdminTestsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingTest, setDeletingTest] = useState<MockTest | null>(null);
   const [feedback, setFeedback] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  // Edit Test Title State
+  const [editingTest, setEditingTest] = useState<MockTest | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
   // Form states
   const [title, setTitle] = useState('');
@@ -164,6 +171,28 @@ export default function AdminTestsPage() {
     });
   };
 
+  const openEditModal = (test: MockTest) => {
+    setEditingTest(test);
+    setEditTitle(test.title);
+    setEditDescription(test.description || '');
+  };
+
+  const handleUpdateTestTitle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTest) return;
+
+    startTransition(async () => {
+      const res = await updateMockTestTitleAction(editingTest.id, editTitle, editDescription);
+      if (res.success) {
+        setFeedback({ type: 'success', text: `Paper title updated to "${editTitle}" successfully.` });
+        setEditingTest(null);
+        await loadData();
+      } else {
+        setFeedback({ type: 'error', text: res.error || 'Failed to update paper title.' });
+      }
+    });
+  };
+
   return (
     <div className="pb-16">
       <AdminNav />
@@ -233,15 +262,26 @@ export default function AdminTestsPage() {
                       </span>
                     )}
                   </div>
-                  <Button
-                    variant="danger"
-                    size="sm"
-                    onClick={() => { setDeletingTest(test); setIsDeleteModalOpen(true); }}
-                    className="p-1.5"
-                    title="Delete this test paper"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditModal(test)}
+                      className="p-1.5 text-slate-600 hover:text-indigo-600 border-slate-200"
+                      title="Edit this paper title"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => { setDeletingTest(test); setIsDeleteModalOpen(true); }}
+                      className="p-1.5"
+                      title="Delete this test paper"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
 
                 <div>
@@ -501,6 +541,51 @@ export default function AdminTestsPage() {
             </div>
             <p className="font-bold text-slate-900">{deletingTest.title}</p>
           </div>
+        </Modal>
+      )}
+
+      {/* Edit Test Title Modal */}
+      {editingTest && (
+        <Modal
+          isOpen={Boolean(editingTest)}
+          onClose={() => setEditingTest(null)}
+          title="Edit Paper / Session Title"
+        >
+          <form onSubmit={handleUpdateTestTitle} className="space-y-4 text-xs">
+            <div>
+              <label className="font-bold text-slate-800 block mb-1">
+                Paper Title <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500"
+                placeholder="e.g. IBPS RRB PO 2024 Prelims Mock 1"
+              />
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-800 block mb-1">Description</label>
+              <textarea
+                rows={3}
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500"
+                placeholder="Paper instructions, syllabus details, and structure..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button variant="secondary" size="md" type="button" onClick={() => setEditingTest(null)}>
+                Cancel
+              </Button>
+              <Button variant="primary" size="md" type="submit" isLoading={isPending} className="bg-indigo-600 hover:bg-indigo-700">
+                Save Paper Title
+              </Button>
+            </div>
+          </form>
         </Modal>
       )}
     </div>

@@ -9,6 +9,8 @@ import {
   getAdminPartitions,
   getAdminExams,
   createMockTestAction,
+  updateMockTestTitleAction,
+  updateExamTitleAction,
   AdminPartitionInfo,
 } from '@/lib/services/adminService';
 import { AdminNav } from '@/components/admin/AdminNav';
@@ -248,7 +250,7 @@ export default function AdminQuestionsPage() {
   const [partitions, setPartitions] = useState<ExamPartition[]>(PARTITIONS);
   const [exams, setExams] = useState<Exam[]>([]);
 
-  // Create PYQ Modal States
+  // Create Exam / PYQ Modal States
   const [isCreatePyqModalOpen, setIsCreatePyqModalOpen] = useState(false);
   const [pyqTitle, setPyqTitle] = useState('');
   const [pyqExamId, setPyqExamId] = useState('exam-ibps-po');
@@ -260,6 +262,16 @@ export default function AdminQuestionsPage() {
   const [pyqCutoff, setPyqCutoff] = useState(60);
   const [pyqDescription, setPyqDescription] = useState('Authentic Previous Year Question Paper with official questions.');
   const [pyqPreset, setPyqPreset] = useState<'PRELIMS_3' | 'MAINS_4'>('PRELIMS_3');
+
+  // Partition Organizing & Search States
+  const [partitionFilter, setPartitionFilter] = useState<'ALL' | 'PYQ' | 'MOCK'>('ALL');
+  const [partitionSearch, setPartitionSearch] = useState('');
+
+  // Edit Partition Title States
+  const [editingPartition, setEditingPartition] = useState<ExamPartition | null>(null);
+  const [editPartitionTitle, setEditPartitionTitle] = useState('');
+  const [editPartitionDesc, setEditPartitionDesc] = useState('');
+  const [isEditPartitionModalOpen, setIsEditPartitionModalOpen] = useState(false);
 
   const activePartition = partitions.find(p => p.id === activePartitionId) || partitions[0] || PARTITIONS[0];
 
@@ -358,6 +370,38 @@ export default function AdminQuestionsPage() {
         setPyqCustomExamTitle('');
       } else {
         setFeedback({ text: res.error || 'Failed to create PYQ paper.', type: 'error' });
+      }
+    });
+  };
+
+  const openEditPartitionModal = (part: ExamPartition) => {
+    setEditingPartition(part);
+    setEditPartitionTitle(part.title);
+    setEditPartitionDesc(part.description || '');
+    setIsEditPartitionModalOpen(true);
+  };
+
+  const handleSavePartitionTitle = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPartition || editingPartition.id === 'ALL') return;
+
+    startTransition(async () => {
+      const res = await updateMockTestTitleAction(editingPartition.id, editPartitionTitle, editPartitionDesc);
+      if (res.success) {
+        setFeedback({
+          text: `Exam title updated to "${editPartitionTitle}" successfully.`,
+          type: 'success',
+        });
+        setPartitions(prev => prev.map(p => p.id === editingPartition.id ? { ...p, title: editPartitionTitle, label: editPartitionTitle, description: editPartitionDesc } : p));
+        setIsEditPartitionModalOpen(false);
+        setEditingPartition(null);
+        const freshParts = await getAdminPartitions();
+        if (freshParts) setPartitions(freshParts);
+      } else {
+        setFeedback({
+          text: res.error || 'Failed to update exam title.',
+          type: 'error',
+        });
       }
     });
   };
@@ -562,63 +606,225 @@ export default function AdminQuestionsPage() {
           </div>
         )}
 
-        {/* Partition Tabs Selector */}
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs space-y-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
-                <Layers className="w-3.5 h-3.5 text-indigo-600" />
-                Exam Partitions & Sessions:
-              </span>
-              <span className="text-[11px] text-slate-400 hidden md:inline">
-                • Select a partition to view, edit, or add fixed questions for that specific exam
-              </span>
+        {/* Organised Partition Tabs & Sessions Selector */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                  <Layers className="w-4 h-4 text-indigo-600" />
+                  Exam Partitions & Sessions:
+                </span>
+                <span className="bg-indigo-50 text-indigo-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-indigo-100">
+                  {partitions.length} Available
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Organized exam spaces: select any partition to view, curate, or add dedicated questions for that exam paper.
+              </p>
             </div>
+
             <Button
               variant="outline"
               size="sm"
               onClick={() => setIsCreatePyqModalOpen(true)}
-              className="flex items-center gap-1.5 text-xs font-bold border-purple-300 text-purple-700 hover:bg-purple-50 shrink-0"
+              className="flex items-center gap-1.5 text-xs font-bold border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 shrink-0 shadow-xs"
             >
-              <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-              + Create New PYQ Paper
+              <PlusCircle className="w-3.5 h-3.5 text-indigo-600" />
+              + Create New Exam
             </Button>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {partitions.map(partition => {
-              const isActive = activePartitionId === partition.id;
-              return (
+          {/* Filter Toolbar & Quick Search */}
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setPartitionFilter('ALL')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  partitionFilter === 'ALL'
+                    ? 'bg-white text-indigo-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All Partitions ({partitions.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPartitionFilter('PYQ')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  partitionFilter === 'PYQ'
+                    ? 'bg-white text-purple-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-purple-600" />
+                ★ Official PYQs ({partitions.filter(p => p.category === 'PYQ').length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPartitionFilter('MOCK')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  partitionFilter === 'MOCK'
+                    ? 'bg-white text-blue-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-blue-600" />
+                🎯 Mock Sessions ({partitions.filter(p => p.category === 'MOCK').length})
+              </button>
+            </div>
+
+            <div className="relative md:w-64">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Filter partitions by title, year..."
+                value={partitionSearch}
+                onChange={(e) => setPartitionSearch(e.target.value)}
+                className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+
+          {/* Grouped Partitions Layout */}
+          {partitionFilter === 'ALL' && !partitionSearch.trim() ? (
+            <div className="space-y-3 pt-1">
+              {/* 1. Global Repository */}
+              <div>
                 <button
-                  key={partition.id}
-                  onClick={() => setActivePartitionId(partition.id)}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border ${
-                    isActive
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                  type="button"
+                  onClick={() => setActivePartitionId('ALL')}
+                  className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between sm:justify-start gap-3 border ${
+                    activePartitionId === 'ALL'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-300'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
                   }`}
                 >
-                  {partition.category === 'PYQ' && (
-                    <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-amber-300' : 'bg-purple-600'}`} />
-                  )}
-                  <span>{partition.label}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.5 rounded ${
-                      isActive ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-200 text-slate-600'
-                    }`}
-                  >
-                    {partition.badge}
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>Master Question Bank (All Questions)</span>
+                  </div>
+                  <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${activePartitionId === 'ALL' ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-200 text-slate-700'}`}>
+                    Complete Repository
                   </span>
                 </button>
-              );
-            })}
-          </div>
+              </div>
+
+              {/* 2. Official Previous Year Papers */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-purple-900">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                  Official Previous Year Question Papers (PYQs)
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {partitions.filter(p => p.category === 'PYQ').map(partition => {
+                    const isActive = activePartitionId === partition.id;
+                    return (
+                      <button
+                        key={partition.id}
+                        type="button"
+                        onClick={() => setActivePartitionId(partition.id)}
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border ${
+                          isActive
+                            ? 'bg-purple-700 text-white border-purple-700 shadow-xs ring-2 ring-purple-300'
+                            : 'bg-purple-50/60 hover:bg-purple-100 text-purple-900 border-purple-200'
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-amber-300' : 'bg-purple-600'}`} />
+                        <span>{partition.label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${isActive ? 'bg-purple-800 text-purple-100' : 'bg-purple-200/80 text-purple-800'}`}>
+                          {partition.badge}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 3. Dedicated Mock Exam Sessions */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-900">
+                  <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                  Dedicated Mock Exam Sessions
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {partitions.filter(p => p.category === 'MOCK').map(partition => {
+                    const isActive = activePartitionId === partition.id;
+                    return (
+                      <button
+                        key={partition.id}
+                        type="button"
+                        onClick={() => setActivePartitionId(partition.id)}
+                        className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border ${
+                          isActive
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-300'
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
+                        }`}
+                      >
+                        <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-amber-300' : 'bg-blue-500'}`} />
+                        <span>{partition.label}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${isActive ? 'bg-blue-700 text-blue-100' : 'bg-slate-200 text-slate-700'}`}>
+                          {partition.badge}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {partitions
+                .filter(p => {
+                  if (partitionFilter !== 'ALL' && p.category !== partitionFilter && p.id !== 'ALL') return false;
+                  if (!partitionSearch.trim()) return true;
+                  const q = partitionSearch.toLowerCase();
+                  return (
+                    p.label.toLowerCase().includes(q) ||
+                    p.title.toLowerCase().includes(q) ||
+                    p.badge.toLowerCase().includes(q) ||
+                    (p.pyqYear && String(p.pyqYear).includes(q))
+                  );
+                })
+                .map(partition => {
+                  const isActive = activePartitionId === partition.id;
+                  return (
+                    <button
+                      key={partition.id}
+                      type="button"
+                      onClick={() => setActivePartitionId(partition.id)}
+                      className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border ${
+                        isActive
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-300'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
+                      }`}
+                    >
+                      {partition.category === 'PYQ' && (
+                        <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-amber-300' : 'bg-purple-600'}`} />
+                      )}
+                      {partition.category === 'MOCK' && (
+                        <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-amber-300' : 'bg-blue-500'}`} />
+                      )}
+                      <span>{partition.label}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.5 rounded ${
+                          isActive ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {partition.badge}
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          )}
         </div>
 
         {/* Exam Partition Banner (When specific exam selected) */}
         {activePartitionId !== 'ALL' && (
           <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="space-y-1.5 max-w-3xl">
+            <div className="space-y-2 max-w-3xl">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="bg-amber-400 text-amber-950 text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md shadow-xs">
                   {activePartition.category === 'PYQ' ? 'Official Previous Year Paper' : 'Fixed Exam Session'}
@@ -629,25 +835,46 @@ export default function AdminQuestionsPage() {
                   </span>
                 )}
                 <span className="bg-indigo-700/80 text-indigo-100 text-[11px] font-semibold px-2 py-0.5 rounded-md">
-                  {questions.length} Questions (Fixed Paper)
+                  {questions.length} Questions (Dedicated Paper)
                 </span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                {activePartition.title}
-              </h2>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  {activePartition.title}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => openEditPartitionModal(activePartition)}
+                  className="px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white transition-colors text-xs font-bold flex items-center gap-1.5 border border-white/20 shadow-xs shrink-0"
+                  title="Edit Exam / Paper Title"
+                >
+                  <Edit2 className="w-3 h-3 text-amber-300" />
+                  Edit Title
+                </button>
+              </div>
+
               <p className="text-xs sm:text-sm text-indigo-200 leading-relaxed">
                 {activePartition.description}
               </p>
             </div>
 
-            <div className="shrink-0 flex items-center gap-2">
+            <div className="shrink-0 flex items-center gap-2.5">
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => openEditPartitionModal(activePartition)}
+                className="bg-white/10 hover:bg-white/20 text-white border-white/30 font-bold flex items-center gap-1.5 shadow-sm"
+              >
+                <Edit2 className="w-4 h-4 text-amber-300" /> Edit Title
+              </Button>
               <Button
                 variant="primary"
                 size="md"
                 onClick={() => openCreateModal(activePartition)}
                 className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold border-none shadow-sm flex items-center gap-1.5"
               >
-                <PlusCircle className="w-4 h-4" /> Add Question to this Exam
+                <PlusCircle className="w-4 h-4" /> Add Question
               </Button>
             </div>
           </div>
@@ -1318,17 +1545,17 @@ export default function AdminQuestionsPage() {
         </Modal>
       )}
 
-      {/* Create PYQ Paper Modal */}
+      {/* Create Exam / PYQ Paper Modal */}
       <Modal
         isOpen={isCreatePyqModalOpen}
         onClose={() => setIsCreatePyqModalOpen(false)}
-        title="Create New PYQ Paper & Dedicated Partition"
+        title="Create New Exam / Dedicated Partition"
       >
         <form onSubmit={handleCreatePyqFromModal} className="space-y-4 text-xs">
-          <div className="bg-purple-50 p-3 rounded-xl border border-purple-200 text-purple-900 text-xs flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
+          <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200 text-indigo-950 text-xs flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
             <span>
-              Create an official Previous Year Question (PYQ) paper under any existing or custom exam. A dedicated partition will be created immediately, allowing you to add, manage, and curate official questions for this exact paper.
+              Create a new exam paper or official PYQ under any existing or custom exam. A dedicated partition will be created immediately, allowing you to add, manage, and curate official questions for this exact paper.
             </span>
           </div>
 
@@ -1351,7 +1578,7 @@ export default function AdminQuestionsPage() {
           </div>
 
           {pyqExamId === '__NEW_EXAM__' && (
-            <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl space-y-3">
+            <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-3">
               <div>
                 <label className="font-bold text-indigo-950 block mb-1">
                   Custom Exam Title <span className="text-red-500">*</span>
@@ -1425,7 +1652,7 @@ export default function AdminQuestionsPage() {
 
           <div>
             <label className="font-semibold text-slate-700 block mb-1">
-              PYQ Paper Title <span className="text-red-500">*</span>
+              Exam Paper Title <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
@@ -1482,12 +1709,67 @@ export default function AdminQuestionsPage() {
             <Button variant="secondary" size="md" type="button" onClick={() => setIsCreatePyqModalOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" size="md" type="submit" isLoading={isPending} className="bg-purple-600 hover:bg-purple-700">
-              Create PYQ & Open Partition
+            <Button variant="primary" size="md" type="submit" isLoading={isPending} className="bg-indigo-600 hover:bg-indigo-700 font-bold">
+              Create Exam & Open Partition
             </Button>
           </div>
         </form>
       </Modal>
+
+      {/* Edit Partition Title Modal */}
+      {editingPartition && (
+        <Modal
+          isOpen={Boolean(editingPartition)}
+          onClose={() => setEditingPartition(null)}
+          title="Edit Exam / Paper Title"
+        >
+          <form onSubmit={handleSavePartitionTitle} className="space-y-4 text-xs">
+            <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200 text-indigo-950 text-xs flex items-center gap-2">
+              <Edit2 className="w-4 h-4 text-indigo-600 shrink-0" />
+              <span>
+                Edit the display title and description for this exam paper or partition. Changes will instantly update across all admin partitions and student test lists.
+              </span>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-800 block mb-1">
+                Exam Paper Title <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={editPartitionTitle}
+                onChange={(e) => setEditPartitionTitle(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500"
+                placeholder="e.g. IBPS RRB PO 2023 Prelims - Shift 1 Official Question Paper"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                This title is displayed on question partitions, student test lists, and scorecards.
+              </p>
+            </div>
+
+            <div>
+              <label className="font-bold text-slate-800 block mb-1">Description / Notes</label>
+              <textarea
+                rows={3}
+                value={editPartitionDesc}
+                onChange={(e) => setEditPartitionDesc(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500"
+                placeholder="Paper instructions, details, or syllabus coverage..."
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button variant="secondary" size="md" type="button" onClick={() => setEditingPartition(null)}>
+                Cancel
+              </Button>
+              <Button variant="primary" size="md" type="submit" isLoading={isPending} className="bg-indigo-600 hover:bg-indigo-700 font-bold">
+                Save Exam Title
+              </Button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }
