@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { AuthUser, Role, SessionPayload } from '@/types';
+import { AuthUser, Role, UserStatus, SessionPayload } from '@/types';
 import { signSession, verifySession } from './crypto';
 import { INITIAL_USERS, StoredUser } from '../data/users';
 
@@ -7,7 +7,7 @@ export const SESSION_COOKIE_NAME = 'bankmock_session';
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 // In-memory / dynamic user store that mirrors the database
-// Changes made during admin operations (e.g. promoting a user) update here
+// Changes made during admin operations (e.g. approving/rejecting users or promoting roles) update here
 const liveUsers: StoredUser[] = [...INITIAL_USERS];
 
 export function getDatabaseUsers(): StoredUser[] {
@@ -33,13 +33,31 @@ export function updateDatabaseUserRole(userId: string, newRole: Role): StoredUse
   return liveUsers[index];
 }
 
-export function createDatabaseUser(data: { name: string; email: string; passwordHash: string; role?: Role }): StoredUser {
+export function updateDatabaseUserStatus(userId: string, newStatus: UserStatus): StoredUser | null {
+  const index = liveUsers.findIndex(u => u.id === userId);
+  if (index === -1) return null;
+
+  liveUsers[index] = {
+    ...liveUsers[index],
+    status: newStatus,
+  };
+  return liveUsers[index];
+}
+
+export function createDatabaseUser(data: {
+  name: string;
+  email: string;
+  passwordHash: string;
+  role?: Role;
+  status?: UserStatus;
+}): StoredUser {
   const newUser: StoredUser = {
     id: `user-${Date.now()}`,
     name: data.name,
     email: data.email.toLowerCase(),
     passwordHash: data.passwordHash,
     role: data.role || 'USER',
+    status: data.status || 'PENDING', // All registered candidates require admin approval
     createdAt: new Date().toISOString(),
     attemptCount: 0,
   };
@@ -53,6 +71,7 @@ export async function createSessionCookie(user: AuthUser): Promise<void> {
   const payload: SessionPayload = {
     userId: user.id,
     role: user.role,
+    status: user.status,
     email: user.email,
     name: user.name,
     exp,
@@ -86,7 +105,7 @@ export async function getSessionPayload(): Promise<SessionPayload | null> {
 /**
  * Server-side function to retrieve the currently authenticated user.
  * CRITICAL SECURITY FEATURE: It checks the database record for the user's true,
- * canonical role, preventing any client-side cookie forgery or role tampering.
+ * canonical role and approval status, preventing any client-side cookie forgery or role tampering.
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const session = await getSessionPayload();
@@ -101,6 +120,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     name: dbUser.name,
     email: dbUser.email,
     role: dbUser.role, // Canonical role from database
+    status: dbUser.status || 'APPROVED', // Canonical approval status
     createdAt: dbUser.createdAt,
     attemptCount: dbUser.attemptCount,
   };

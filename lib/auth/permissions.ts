@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { AuthUser, Role } from '@/types';
+import { AuthUser } from '@/types';
 import { getCurrentUser } from './session';
 
 /**
@@ -10,7 +10,7 @@ export function isAdmin(user: AuthUser | null | undefined): boolean {
 }
 
 /**
- * Server-side guard: Ensures the requester is logged in.
+ * Server-side guard: Ensures the requester is logged in and approved.
  * If not authenticated, redirects to /login with callbackUrl.
  */
 export async function requireUser(callbackUrl: string = '/dashboard'): Promise<AuthUser> {
@@ -18,12 +18,18 @@ export async function requireUser(callbackUrl: string = '/dashboard'): Promise<A
   if (!user) {
     redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
   }
+  if (user.status === 'PENDING') {
+    redirect(`/login?error=pending`);
+  }
+  if (user.status === 'REJECTED') {
+    redirect(`/login?error=rejected`);
+  }
   return user;
 }
 
 /**
  * Server-side guard: Ensures the requester is authenticated AND has ADMIN role in the database.
- * If not logged in, redirects to /login.
+ * If not logged in, redirects to the dedicated Admin Login portal /admin/login.
  * If logged in as normal USER, redirects to /unauthorized.
  */
 export async function requireAdmin(callbackUrl: string = '/admin'): Promise<AuthUser> {
@@ -33,6 +39,7 @@ export async function requireAdmin(callbackUrl: string = '/admin'): Promise<Auth
       name: 'Platform Admin',
       email: 'admin@bankmock.com',
       role: 'ADMIN',
+      status: 'APPROVED',
       createdAt: new Date().toISOString(),
       attemptCount: 0,
     };
@@ -40,7 +47,7 @@ export async function requireAdmin(callbackUrl: string = '/admin'): Promise<Auth
 
   const user = await getCurrentUser();
   if (!user) {
-    redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
+    redirect(`/admin/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
   }
   if (user.role !== 'ADMIN') {
     redirect('/unauthorized');

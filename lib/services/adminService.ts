@@ -2,7 +2,11 @@
 
 import { revalidatePath } from 'next/cache';
 import { requireAdmin } from '../auth/permissions';
-import { getDatabaseUsers, updateDatabaseUserRole, getCurrentUser } from '../auth/session';
+import {
+  getDatabaseUsers,
+  updateDatabaseUserRole,
+  updateDatabaseUserStatus,
+} from '../auth/session';
 import { EXAMS_DATA } from '../data/exams';
 import { MOCK_TESTS_DATA } from '../data/mockTests';
 import { SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
@@ -28,6 +32,7 @@ import {
   MockTest,
   Question,
   Role,
+  UserStatus,
   Difficulty,
 } from '@/types';
 
@@ -52,6 +57,7 @@ export async function getAdminStats(): Promise<AdminStats> {
 
   const users = getDatabaseUsers();
   const totalAdmins = users.filter(u => u.role === 'ADMIN').length;
+  const pendingApprovalsCount = users.filter(u => u.status === 'PENDING').length;
   const totalUsers = users.length;
   const totalExams = EXAMS_DATA.length;
   const totalQuestions = dynamicQuestions.length;
@@ -61,6 +67,7 @@ export async function getAdminStats(): Promise<AdminStats> {
   return {
     totalUsers,
     totalAdmins,
+    pendingApprovalsCount,
     totalExams,
     totalQuestions,
     totalMockTests,
@@ -77,7 +84,7 @@ export async function getAdminStats(): Promise<AdminStats> {
 }
 
 /**
- * Server-side User Management
+ * Server-side User Management & Approval Actions
  */
 export async function getAdminUsers(): Promise<AuthUser[]> {
   await requireAdmin();
@@ -87,9 +94,66 @@ export async function getAdminUsers(): Promise<AuthUser[]> {
     name: u.name,
     email: u.email,
     role: u.role,
+    status: u.status || 'APPROVED',
     createdAt: u.createdAt,
     attemptCount: u.attemptCount,
   }));
+}
+
+export async function approveUserAction(userId: string): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+
+  const updated = updateDatabaseUserStatus(userId, 'APPROVED');
+  if (!updated) {
+    return { success: false, error: 'User record not found.' };
+  }
+
+  safeRevalidatePath('/admin/users');
+  safeRevalidatePath('/admin');
+  return { success: true };
+}
+
+export async function rejectUserAction(userId: string): Promise<{ success: boolean; error?: string }> {
+  const currentAdmin = await requireAdmin();
+
+  if (currentAdmin.id === userId) {
+    return {
+      success: false,
+      error: 'Security Guard: You cannot reject or suspend your own account.',
+    };
+  }
+
+  const updated = updateDatabaseUserStatus(userId, 'REJECTED');
+  if (!updated) {
+    return { success: false, error: 'User record not found.' };
+  }
+
+  safeRevalidatePath('/admin/users');
+  safeRevalidatePath('/admin');
+  return { success: true };
+}
+
+export async function updateUserStatusAction(
+  userId: string,
+  newStatus: UserStatus
+): Promise<{ success: boolean; error?: string }> {
+  const currentAdmin = await requireAdmin();
+
+  if (currentAdmin.id === userId && newStatus !== 'APPROVED') {
+    return {
+      success: false,
+      error: 'Security Guard: You cannot revoke or suspend your own status.',
+    };
+  }
+
+  const updated = updateDatabaseUserStatus(userId, newStatus);
+  if (!updated) {
+    return { success: false, error: 'User record not found.' };
+  }
+
+  safeRevalidatePath('/admin/users');
+  safeRevalidatePath('/admin');
+  return { success: true };
 }
 
 export async function updateUserRoleAction(userId: string, newRole: Role): Promise<{ success: boolean; error?: string }> {

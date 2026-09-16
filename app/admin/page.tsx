@@ -59,6 +59,30 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
 
+        {/* Pending Approvals Alert Banner */}
+        {Boolean(stats.pendingApprovalsCount && stats.pendingApprovalsCount > 0) && (
+          <div className="bg-gradient-to-r from-amber-50 to-amber-100/80 border border-amber-300 rounded-2xl p-4.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs font-bold">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-amber-950">
+                  {stats.pendingApprovalsCount} Candidate Registration{stats.pendingApprovalsCount > 1 ? 's' : ''} Awaiting Approval
+                </h4>
+                <p className="text-xs text-amber-800">
+                  New candidates cannot access full-length mock tests until verified and approved by an administrator.
+                </p>
+              </div>
+            </div>
+            <Link href="/admin/users">
+              <Button variant="primary" size="sm" className="bg-amber-600 hover:bg-amber-700 text-white font-bold shrink-0 shadow-xs">
+                Review & Approve ({stats.pendingApprovalsCount}) <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </Link>
+          </div>
+        )}
+
         {/* 6 Metric Cards Grid */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           <Card>

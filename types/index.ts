@@ -1,12 +1,14 @@
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 export type ExamCategory = 'PO' | 'CLERK' | 'SO' | 'OTHER';
 export type Role = 'USER' | 'ADMIN';
+export type UserStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface AuthUser {
   id: string;
   name: string;
   email: string;
   role: Role;
+  status?: UserStatus;
   createdAt?: string;
   attemptCount?: number;
 }
@@ -14,6 +16,7 @@ export interface AuthUser {
 export interface SessionPayload {
   userId: string;
   role: Role;
+  status?: UserStatus;
   email: string;
   name: string;
   exp: number;
@@ -229,6 +232,7 @@ export interface DashboardStats {
 export interface AdminStats {
   totalUsers: number;
   totalAdmins: number;
+  pendingApprovalsCount: number;
   totalExams: number;
   totalQuestions: number;
   totalMockTests: number;

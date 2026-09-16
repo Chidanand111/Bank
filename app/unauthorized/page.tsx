@@ -4,7 +4,7 @@ import { getCurrentUser } from '@/lib/auth/session';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { ShieldAlert, ArrowLeft, LayoutDashboard, LogIn, Lock } from 'lucide-react';
+import { ShieldAlert, LayoutDashboard, LogIn } from 'lucide-react';
 
 export default async function UnauthorizedPage() {
   const user = await getCurrentUser();
@@ -56,9 +56,9 @@ export default async function UnauthorizedPage() {
                   <LayoutDashboard className="w-4 h-4" /> Go to Dashboard
                 </Button>
               </Link>
-              <Link href="/login" className="w-full">
-                <Button variant="primary" size="md" className="w-full flex items-center justify-center gap-1.5">
-                  <LogIn className="w-4 h-4" /> Sign In as Admin
+              <Link href="/admin/login" className="w-full">
+                <Button variant="primary" size="md" className="w-full flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700">
+                  <LogIn className="w-4 h-4" /> Admin Portal Login
                 </Button>
               </Link>
             </div>
