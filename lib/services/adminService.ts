@@ -16,6 +16,7 @@ import {
   addQuestionToJsonDb,
   updateQuestionInJsonDb,
   deleteQuestionFromJsonDb,
+  deleteExamQuestionsFromStore,
   syncQuestionsToStore,
   partitionQuestionsList,
 } from '../db/questionDb';
@@ -348,8 +349,8 @@ export async function getAdminQuestions(filters?: {
 export async function createQuestionAction(input: AdminQuestionInput): Promise<{ success: boolean; question?: Question; error?: string }> {
   await requireAdmin();
 
-  const exam = EXAMS_DATA.find(e => e.id === input.examId) || EXAMS_DATA[0];
-  const newQuestionId = `q-custom-${Date.now()}`;
+  const exam = EXAMS_DATA.find(e => e.id === input.examId || e.slug === input.examId) || EXAMS_DATA[0];
+  const newQuestionId = `q-custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
   const newQuestion: Question = {
     id: newQuestionId,
@@ -365,7 +366,7 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
     explanation: input.explanation,
     marks: input.marks,
     negativeMarks: input.negativeMarks,
-    examId: exam.id,
+    examId: input.examId || exam.id,
     sectionId: `sec-${input.sectionCode.toLowerCase()}`,
     sectionCode: input.sectionCode,
     sectionName: input.sectionCode === 'QUANT' ? 'Quantitative Aptitude' : input.sectionCode === 'ENGLISH' ? 'English Language' : 'Reasoning Ability',
@@ -384,7 +385,7 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
   dynamicQuestions.unshift(newQuestion);
   addQuestionToJsonDb({
     id: newQuestionId,
-    exam: input.isPyq ? (input.pyqExam || 'SBI Clerk Prelims 2024 PYQ') : exam.title,
+    exam: input.examId || (input.isPyq ? (input.pyqExam || 'SBI Clerk Prelims 2024 PYQ') : exam.title),
     section: newQuestion.sectionName,
     topic: input.topicName,
     question: input.text,
@@ -529,10 +530,17 @@ export async function bulkImportQuestionsAction(
   let importedCount = 0;
   for (const qInput of questions) {
     try {
-      // If a specific partition is provided, assign it to question
+      // If a specific partition is provided, assign it to question and associate target examId
       const inputToUse = { ...qInput };
       if (partitionId && partitionId !== 'ALL') {
         inputToUse.mockTestId = partitionId;
+        if (partitionId.toLowerCase().includes('sbi') || partitionId.toLowerCase().includes('clerk')) {
+          inputToUse.examId = 'exam-sbi-clerk';
+        } else if (partitionId.startsWith('exam-')) {
+          inputToUse.examId = partitionId;
+        } else if (!inputToUse.examId) {
+          inputToUse.examId = 'exam-ibps-po';
+        }
       }
 
       const res = await createQuestionAction(inputToUse);
@@ -930,6 +938,10 @@ export async function createExamAction(input: AdminExamInput): Promise<{ success
       ],
     };
 
+    if (!EXAMS_DATA.some(e => e.id === fullExam.id || e.slug === fullExam.slug)) {
+      EXAMS_DATA.push(fullExam);
+    }
+
     safeRevalidatePath('/admin/exams');
     safeRevalidatePath('/admin/tests');
     safeRevalidatePath('/admin/questions');
@@ -1001,6 +1013,93 @@ export async function updateExamTitleAction(
     return { success: true };
   } catch (err) {
     console.error('Failed to update exam title:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Permanently deletes an Exam and all its associated questions, options,
+ * mock tests, and attempts across Neon PostgreSQL and the in-memory store
+ * to optimize database storage.
+ */
+export async function deleteExamAction(
+  examIdOrSlug: string
+): Promise<{ success: boolean; count?: number; error?: string }> {
+  await requireAdmin();
+
+  if (!examIdOrSlug) {
+    return { success: false, error: 'Exam ID or slug is required.' };
+  }
+
+  let deletedQuestionsCount = 0;
+
+  try {
+    // 1. Locate Exam in Neon PostgreSQL
+    const dbExam = await prisma.exam.findFirst({
+      where: {
+        OR: [
+          { id: examIdOrSlug },
+          { slug: examIdOrSlug },
+          { slug: examIdOrSlug.replace(/^exam-/, '') },
+        ],
+      },
+      include: {
+        questions: { select: { id: true } },
+        mockTests: { select: { id: true } },
+      },
+    });
+
+    const targetExamId = dbExam ? dbExam.id : examIdOrSlug;
+    const targetSlug = dbExam ? dbExam.slug : examIdOrSlug.replace(/^exam-/, '');
+    const examTitle = dbExam ? dbExam.title : EXAMS_DATA.find(e => e.id === examIdOrSlug || e.slug === examIdOrSlug)?.title;
+
+    // 2. Cascade Delete from Neon PostgreSQL
+    // Because of onDelete: Cascade on Section, Topic, Question, Option, MockTest, MockTestQuestion, Attempt, Answer,
+    // deleting the Exam automatically cascades and purges all related child records in PostgreSQL!
+    if (dbExam) {
+      deletedQuestionsCount = dbExam.questions.length;
+      await prisma.exam.delete({
+        where: { id: dbExam.id },
+      });
+    }
+
+    // 3. Remove all matching questions from in-memory dynamicQuestions
+    const initialDynCount = dynamicQuestions.length;
+    dynamicQuestions = dynamicQuestions.filter(q => {
+      const qExam = String(q.examId || '').toLowerCase();
+      if (qExam === targetExamId.toLowerCase() || qExam === targetSlug.toLowerCase()) return false;
+      if (examTitle && q.sectionName && q.topicName && q.pyqExam === examTitle) return false;
+      return true;
+    });
+    deletedQuestionsCount += Math.max(0, initialDynCount - dynamicQuestions.length);
+
+    // 4. Remove all matching questions from questionStore (JSON database mirror)
+    deletedQuestionsCount += deleteExamQuestionsFromStore(targetExamId, examTitle);
+
+    // 5. Remove matching mock tests from dynamicMockTests
+    dynamicMockTests = dynamicMockTests.filter(mt => {
+      return mt.examId !== targetExamId && mt.examId !== targetSlug;
+    });
+
+    // 6. Remove exam from in-memory EXAMS_DATA
+    const staticIndex = EXAMS_DATA.findIndex(
+      e => e.id === targetExamId || e.slug === targetSlug || e.id === examIdOrSlug || e.slug === examIdOrSlug
+    );
+    if (staticIndex !== -1) {
+      EXAMS_DATA.splice(staticIndex, 1);
+    }
+
+    // 7. Revalidate Next.js cache paths
+    safeRevalidatePath('/admin/exams');
+    safeRevalidatePath('/admin/questions');
+    safeRevalidatePath('/admin/tests');
+    safeRevalidatePath('/exams');
+    safeRevalidatePath('/tests');
+    safeRevalidatePath('/dashboard');
+
+    return { success: true, count: deletedQuestionsCount };
+  } catch (err) {
+    console.error('Failed to delete exam and cascade questions:', err);
     return { success: false, error: err instanceof Error ? err.message : String(err) };
   }
 }

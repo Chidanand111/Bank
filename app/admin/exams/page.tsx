@@ -1,14 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
-import { getAdminExams, updateExamTitleAction, createExamAction } from '@/lib/services/adminService';
+import { getAdminExams, updateExamTitleAction, createExamAction, deleteExamAction } from '@/lib/services/adminService';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { Exam, ExamCategory } from '@/types';
-import { Edit2, PlusCircle, CheckCircle2, Layers, BookOpen } from 'lucide-react';
+import { Edit2, PlusCircle, CheckCircle2, Layers, Trash2, AlertTriangle } from 'lucide-react';
 
 export default function AdminExamsPage() {
   const [exams, setExams] = useState<Exam[]>([]);
@@ -26,6 +26,9 @@ export default function AdminExamsPage() {
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState<ExamCategory>('PO');
   const [newDescription, setNewDescription] = useState('');
+
+  // Delete Modal State
+  const [deletingExam, setDeletingExam] = useState<Exam | null>(null);
 
   const loadExams = async () => {
     try {
@@ -81,6 +84,24 @@ export default function AdminExamsPage() {
         await loadExams();
       } else {
         setFeedback({ type: 'error', text: res.error || 'Failed to create exam.' });
+      }
+    });
+  };
+
+  const handleDeleteExam = async () => {
+    if (!deletingExam) return;
+
+    startTransition(async () => {
+      const res = await deleteExamAction(deletingExam.id);
+      if (res.success) {
+        setFeedback({
+          type: 'success',
+          text: `Exam "${deletingExam.title}" and all its questions/tests were permanently deleted from the database to reclaim space.`,
+        });
+        setDeletingExam(null);
+        await loadExams();
+      } else {
+        setFeedback({ type: 'error', text: res.error || 'Failed to delete exam.' });
       }
     });
   };
@@ -150,7 +171,17 @@ export default function AdminExamsPage() {
                       title="Edit this exam title"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
-                      Edit Title
+                      Edit
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => setDeletingExam(exam)}
+                      className="flex items-center gap-1 text-xs font-bold shrink-0"
+                      title="Delete this exam and all its questions"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete
                     </Button>
                     <Badge variant="green" size="sm">Active</Badge>
                   </div>
@@ -284,6 +315,63 @@ export default function AdminExamsPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Delete Exam Confirmation Modal */}
+      {deletingExam && (
+        <Modal
+          isOpen={Boolean(deletingExam)}
+          onClose={() => !isPending && setDeletingExam(null)}
+          title="Delete Exam & Reclaim Database Storage"
+        >
+          <div className="space-y-4 text-xs">
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl space-y-2 text-red-900">
+              <div className="flex items-center gap-2 font-bold text-sm text-red-700">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                Permanent Cascade Deletion Warning
+              </div>
+              <p className="leading-relaxed">
+                Are you sure you want to permanently delete <strong className="font-extrabold underline">{deletingExam.title}</strong>?
+              </p>
+              <p className="leading-relaxed text-red-800 font-semibold">
+                To maximize database storage space, this action will automatically cascade and permanently delete:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 font-medium text-red-800">
+                <li>All questions, passages, and figure diagrams belonging to this exam</li>
+                <li>All MCQ options, answer keys, and solution explanations</li>
+                <li>All mock tests, test paper links, and section configurations</li>
+                <li>All candidate attempt records and score analytics under this exam</li>
+              </ul>
+            </div>
+
+            <p className="text-slate-500 text-[11px] italic">
+              This action is immediate and irreversible. Both Neon PostgreSQL and in-memory question stores will be updated to free database space.
+            </p>
+
+            <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+              <Button
+                variant="secondary"
+                size="md"
+                type="button"
+                disabled={isPending}
+                onClick={() => setDeletingExam(null)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="md"
+                type="button"
+                isLoading={isPending}
+                onClick={handleDeleteExam}
+                className="font-bold flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete Exam & All Questions
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

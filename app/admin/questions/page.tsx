@@ -18,6 +18,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { MathRenderer } from '@/components/ui/MathRenderer';
 import { BulkQuestionModal } from '@/components/admin/BulkQuestionModal';
 import {
   PlusCircle,
@@ -1026,7 +1027,7 @@ export default function AdminQuestionsPage() {
                       </div>
                       {q.passage && (
                         <div className="line-clamp-3 hover:line-clamp-none transition-all whitespace-pre-line text-slate-600 leading-relaxed font-normal">
-                          {q.passage}
+                          <MathRenderer content={q.passage} />
                         </div>
                       )}
                       {q.passageImageUrl && (
@@ -1045,7 +1046,7 @@ export default function AdminQuestionsPage() {
 
                   {/* Question Text */}
                   <div className="text-sm font-semibold text-slate-900 whitespace-pre-line leading-relaxed">
-                    {q.text}
+                    <MathRenderer content={q.text} />
                   </div>
 
                   {/* Question Image (if any) */}
@@ -1077,7 +1078,7 @@ export default function AdminQuestionsPage() {
                         <div className="flex items-start justify-between gap-2">
                           <span>
                             <strong className="mr-1.5 text-slate-500">{String.fromCharCode(65 + i)}.</strong>
-                            {opt.text || <span className="italic text-slate-400">[Image Option]</span>}
+                            {opt.text ? <MathRenderer content={opt.text} /> : <span className="italic text-slate-400">[Image Option]</span>}
                           </span>
                           {opt.isCorrect && (
                             <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded shrink-0">
@@ -1103,7 +1104,7 @@ export default function AdminQuestionsPage() {
                   {q.explanation && (
                     <div className="p-3 bg-slate-50 rounded-lg text-xs text-slate-600 border border-slate-100">
                       <span className="font-bold text-slate-700">Explanation: </span>
-                      {q.explanation}
+                      <MathRenderer content={q.explanation} />
                     </div>
                   )}
                 </CardContent>

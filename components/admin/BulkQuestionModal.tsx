@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { AdminQuestionInput, Difficulty } from '@/types';
 import { bulkImportQuestionsAction } from '@/lib/services/adminService';
+import { MathRenderer } from '../ui/MathRenderer';
 import {
   Download,
   Upload,
@@ -23,11 +24,11 @@ export interface BulkQuestionModalProps {
   currentPartitionId: string;
 }
 
-// Sample CSV content generator
+// Sample CSV content generator with realistic banking questions and LaTeX math formulas
 const SAMPLE_CSV_CONTENT = `sectionCode,topicName,text,optionA,optionB,optionC,optionD,optionE,correctOption,marks,negativeMarks,difficulty,explanation
 ENGLISH,Reading Comprehension,"According to banking liquidity norms, what is the primary regulatory objective of maintaining the Statutory Liquidity Ratio (SLR)?","To maximize foreign exchange reserves","To ensure solvency and control commercial credit expansion","To eliminate inter-bank lending rates","To finance public sector subsidies directly","None of the above",B,1,0.25,MEDIUM,"SLR enforces commercial banks to maintain liquid assets against Net Demand and Time Liabilities to ensure solvency and curb reckless credit expansion."
-QUANT,Simplification,"What is the value of: (45% of 840) + (14 * 25) - 210?","498","518","538","508","528",B,1,0.25,EASY,"45% of 840 = 378; 14 * 25 = 350; 378 + 350 - 210 = 518."
-QUANT,Number Series,"Find the missing number in the following sequence: 8, 14, 26, 50, 98, ?","186","194","192","198","184",B,1,0.25,MEDIUM,"Pattern: (x * 2) - 2. 8*2-2=14; 14*2-2=26; 26*2-2=50; 50*2-2=98; 98*2-2 = 194."
+QUANT,Simplification,"Solve the expression: $\\\\sqrt{625} + \\\\frac{15}{3} \\\\times 4 - 2^3 = ?$","37","42","45","39","40",A,1,0.25,EASY,"$\\\\sqrt{625} = 25$; $\\\\frac{15}{3} \\\\times 4 = 20$; $2^3 = 8$. Therefore: $25 + 20 - 8 = 37$."
+QUANT,Quadratic Equations,"Find the roots of the quadratic equation: $x^2 - 7x + 12 = 0$","$x = 2, 6$","$x = 3, 4$","$x = -3, -4$","$x = 1, 12$","None of these",B,1,0.25,MEDIUM,"Factorizing: $(x - 3)(x - 4) = 0 \\\\implies x = 3$ or $x = 4$."
 REASONING,Syllogism,"Statements: Some bankers are analysts. All analysts are auditors. Conclusions: I. Some auditors are bankers. II. All bankers are auditors.","Only conclusion I follows","Only conclusion II follows","Either I or II follows","Neither I nor II follows","Both conclusions follow",A,1,0.25,EASY,"Since some bankers are analysts and all analysts are auditors, it directly follows that some auditors are bankers. Conclusion I is valid."
 REASONING,Direction Sense,"A courier delivery agent walks 12 meters North, turns right and walks 5 meters, then turns South and walks 12 meters. How far and in what direction is he from his starting point?","5 meters East","5 meters West","12 meters North","7 meters East","None of these",A,1,0.25,EASY,"The North and South vertical displacements cancel out (12m - 12m = 0). The agent is exactly 5 meters East of the starting point."
 `;
@@ -203,8 +204,18 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
           const negativeMarks = parseFloat(rowData['negativemarks'] || '0.25') || 0.25;
           const explanation = rowData['explanation'] || '';
 
+          // Determine target exam ID from selected partition
+          let targetExamId = 'exam-ibps-po';
+          if (selectedPartition && selectedPartition !== 'ALL') {
+            if (selectedPartition.toLowerCase().includes('sbi') || selectedPartition.toLowerCase().includes('clerk')) {
+              targetExamId = 'exam-sbi-clerk';
+            } else if (selectedPartition.startsWith('exam-')) {
+              targetExamId = selectedPartition;
+            }
+          }
+
           questions.push({
-            examId: 'exam-sbi-clerk',
+            examId: targetExamId,
             sectionCode,
             topicName,
             text: qText,
@@ -367,7 +378,9 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                       Answer: Option {q.options.findIndex((o) => o.isCorrect) + 1}
                     </span>
                   </div>
-                  <p className="font-semibold text-slate-800 line-clamp-2 text-xs">{q.text}</p>
+                  <div className="font-semibold text-slate-800 line-clamp-2 text-xs">
+                    <MathRenderer content={q.text} />
+                  </div>
                 </div>
               ))}
               {parsedQuestions.length > 3 && (

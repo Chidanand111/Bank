@@ -49,6 +49,9 @@ let questionStore: RawJsonQuestion[] = initialStore;
  * Standardize Exam names to exam IDs and slugs
  */
 export function mapExamToId(examName: string): { examId: string; examSlug: string } {
+  if (examName && examName.startsWith('exam-')) {
+    return { examId: examName, examSlug: examName.replace(/^exam-/, '') };
+  }
   const norm = (examName || '').toLowerCase();
   if (norm.includes('sbi') || norm.includes('clerk')) {
     return { examId: 'exam-sbi-clerk', examSlug: 'sbi-clerk' };
@@ -698,6 +701,26 @@ export function deleteQuestionFromJsonDb(id: number | string): boolean {
   const initialLen = questionStore.length;
   questionStore = questionStore.filter(q => !matchesQuestionId(q.id, id));
   return questionStore.length < initialLen;
+}
+
+/**
+ * Permanently deletes all questions belonging to an Exam (or exam title) from the in-memory store.
+ * Frees up memory and synchronization storage.
+ */
+export function deleteExamQuestionsFromStore(examId: string, examTitle?: string): number {
+  const initialLen = questionStore.length;
+  const targetId = examId.toLowerCase();
+  const targetTitle = examTitle?.toLowerCase();
+
+  questionStore = questionStore.filter(q => {
+    const qExam = String(q.exam || '').toLowerCase();
+    if (qExam === targetId) return false;
+    if (qExam.replace(/^exam-/, '') === targetId.replace(/^exam-/, '')) return false;
+    if (targetTitle && qExam === targetTitle) return false;
+    return true;
+  });
+
+  return initialLen - questionStore.length;
 }
 
 /**

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Question } from '@/types';
 import { Badge } from '../ui/Badge';
+import { MathRenderer } from '../ui/MathRenderer';
 import { CheckCircle2, XCircle, HelpCircle, BookOpen } from 'lucide-react';
 
 export interface QuestionCardProps {
@@ -70,7 +71,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             </div>
             {question.passage && (
               <div className="text-sm sm:text-base leading-relaxed text-slate-700 font-normal whitespace-pre-line max-h-72 overflow-y-auto pr-2">
-                {question.passage}
+                <MathRenderer content={question.passage} />
               </div>
             )}
             {question.passageImageUrl && (
@@ -89,7 +90,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
         {/* Question Text */}
         <div className="text-slate-900 text-base leading-relaxed font-semibold whitespace-pre-line">
-          {question.text}
+          <MathRenderer content={question.text} />
         </div>
 
         {/* Optional Question Image */}
@@ -159,7 +160,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
                 <div className="flex-1 text-sm sm:text-base leading-snug pt-0.5 space-y-2">
                   {option.text ? (
-                    <div>{option.text}</div>
+                    <div><MathRenderer content={option.text} /></div>
                   ) : option.imageUrl ? (
                     <div className="text-xs text-slate-500 font-medium italic">[Figure / Diagram Option]</div>
                   ) : null}
@@ -192,9 +193,9 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               <HelpCircle className="w-4 h-4 text-blue-600" />
               Detailed Explanation & Solution
             </div>
-            <p className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">
-              {question.explanation}
-            </p>
+            <div className="text-sm leading-relaxed text-slate-700 whitespace-pre-line">
+              <MathRenderer content={question.explanation} />
+            </div>
           </div>
         )}
       </div>
