@@ -9,8 +9,10 @@ import { TestHeader } from '@/components/questions/TestHeader';
 import { QuestionCard } from '@/components/questions/QuestionCard';
 import { QuestionPalette } from '@/components/questions/QuestionPalette';
 import { SubmitConfirmModal } from '@/components/questions/SubmitConfirmModal';
+import { ProctoringGuard } from '@/components/questions/ProctoringGuard';
 import { Button } from '@/components/ui/Button';
-import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, Send } from 'lucide-react';
+import { Modal } from '@/components/ui/Modal';
+import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, CheckCircle2, ArrowRight } from 'lucide-react';
 import { getUserSeenQuestionIds, recordUserSeenQuestions } from '@/lib/services/userQuestionTracker';
 
 export interface TestPageProps {
@@ -27,7 +29,19 @@ export default function TestPage({ params }: TestPageProps) {
   const [currentQuestionId, setCurrentQuestionId] = useState<string>('');
   const [responses, setResponses] = useState<Record<string, UserResponseState>>({});
   const [visitedQuestions, setVisitedQuestions] = useState<string[]>([]);
-  const [remainingSeconds, setRemainingSeconds] = useState<number>(3600);
+  
+  // Sectional Timing State (20 minutes per section: 1200 seconds)
+  const [sectionTimers, setSectionTimers] = useState<Record<string, number>>({});
+  const [lockedSectionCodes, setLockedSectionCodes] = useState<string[]>([]);
+  const [sectionTransitionModal, setSectionTransitionModal] = useState<{
+    isOpen: boolean;
+    prevSectionName: string;
+    nextSectionName: string;
+  }>({ isOpen: false, prevSectionName: '', nextSectionName: '' });
+
+  // Proctoring strikes
+  const [proctoringStrikes, setProctoringStrikes] = useState<number>(0);
+
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -41,7 +55,11 @@ export default function TestPage({ params }: TestPageProps) {
       let inProgressQuestions: Question[] | null = null;
       let inProgressResponses: Record<string, UserResponseState> | null = null;
       let inProgressVisited: string[] | null = null;
-      let inProgressSeconds: number | null = null;
+      let inProgressSectionTimers: Record<string, number> | null = null;
+      let inProgressLockedSections: string[] | null = null;
+      let inProgressStrikes: number | null = null;
+      let inProgressSectionCode: string | null = null;
+      let inProgressQuestionId: string | null = null;
 
       try {
         const saved = localStorage.getItem(storageKey);
@@ -52,15 +70,17 @@ export default function TestPage({ params }: TestPageProps) {
           }
           if (parsed.responses) inProgressResponses = parsed.responses;
           if (parsed.visitedQuestions) inProgressVisited = parsed.visitedQuestions;
-          if (typeof parsed.remainingSeconds === 'number' && parsed.remainingSeconds > 0) {
-            inProgressSeconds = parsed.remainingSeconds;
-          }
+          if (parsed.sectionTimers) inProgressSectionTimers = parsed.sectionTimers;
+          if (parsed.lockedSectionCodes) inProgressLockedSections = parsed.lockedSectionCodes;
+          if (typeof parsed.proctoringStrikes === 'number') inProgressStrikes = parsed.proctoringStrikes;
+          if (parsed.currentSectionCode) inProgressSectionCode = parsed.currentSectionCode;
+          if (parsed.currentQuestionId) inProgressQuestionId = parsed.currentQuestionId;
         }
       } catch (err) {
         console.error('Error reading saved session:', err);
       }
 
-      // 2. If resuming an active session, preserve user answers but refresh any newly added diagrams
+      // 2. If resuming an active session
       if (inProgressQuestions && inProgressQuestions.length > 0) {
         const baseTest = await getMockTestById(testId);
         if (baseTest) {
@@ -84,27 +104,37 @@ export default function TestPage({ params }: TestPageProps) {
             questions: refreshedQuestions,
           };
           setTest(activeTest);
+
           if (inProgressResponses) setResponses(inProgressResponses);
           if (inProgressVisited) setVisitedQuestions(inProgressVisited);
-          if (inProgressSeconds) setRemainingSeconds(inProgressSeconds);
+          if (inProgressSectionTimers) setSectionTimers(inProgressSectionTimers);
+          if (inProgressLockedSections) setLockedSectionCodes(inProgressLockedSections);
+          if (inProgressStrikes) setProctoringStrikes(inProgressStrikes);
 
-          const initialSecCode = activeTest.sections[0]?.code || activeTest.questions[0]?.sectionCode || 'GENERAL';
-          const initialQId = activeTest.questions.find(q => q.sectionCode === initialSecCode)?.id || activeTest.questions[0]?.id || '';
-          setCurrentSectionCode(initialSecCode);
-          setCurrentQuestionId(initialQId);
+          const defaultSecCode = inProgressSectionCode || activeTest.sections[0]?.code || activeTest.questions[0]?.sectionCode || 'GENERAL';
+          const defaultQId = inProgressQuestionId || activeTest.questions.find(q => q.sectionCode === defaultSecCode)?.id || activeTest.questions[0]?.id || '';
+
+          setCurrentSectionCode(defaultSecCode);
+          setCurrentQuestionId(defaultQId);
         }
         setLoading(false);
         return;
       }
 
-      // 3. New exam start: Retrieve all questions previously seen by this user across past exams
+      // 3. New exam start: Retrieve all questions previously seen by this user
       const seenQuestionIds = getUserSeenQuestionIds();
-
-      // Pick randomly from the database excluding any question the user has already seen
       const freshTest = await getMockTestById(testId, seenQuestionIds);
+
       if (freshTest) {
         setTest(freshTest);
-        setRemainingSeconds(freshTest.durationMinutes * 60);
+
+        // Initialize 20 minutes (1200 seconds) per section
+        const initialTimers: Record<string, number> = {};
+        freshTest.sections.forEach((sec) => {
+          // Standard banking: 20 mins per section = 1200 seconds
+          initialTimers[sec.code] = (sec.durationMinutes || 20) * 60;
+        });
+        setSectionTimers(initialTimers);
 
         const initialSecCode = freshTest.sections[0]?.code || freshTest.questions[0]?.sectionCode || 'GENERAL';
         const initialQId = freshTest.questions.find(q => q.sectionCode === initialSecCode)?.id || freshTest.questions[0]?.id || '';
@@ -113,7 +143,7 @@ export default function TestPage({ params }: TestPageProps) {
         setCurrentQuestionId(initialQId);
         setVisitedQuestions(initialQId ? [initialQId] : []);
 
-        // Record these newly assigned questions immediately so they will not repeat in subsequent exams
+        // Record these newly assigned questions
         const newIds = freshTest.questions.map(q => q.id);
         recordUserSeenQuestions(undefined, newIds);
       }
@@ -122,7 +152,7 @@ export default function TestPage({ params }: TestPageProps) {
     loadTest();
   }, [testId, storageKey]);
 
-  // Autosave responses & timer to localStorage
+  // Autosave responses, timers, and locks to localStorage
   useEffect(() => {
     if (!test || loading) return;
     try {
@@ -133,7 +163,9 @@ export default function TestPage({ params }: TestPageProps) {
           questions: test.questions,
           responses,
           visitedQuestions,
-          remainingSeconds,
+          sectionTimers,
+          lockedSectionCodes,
+          proctoringStrikes,
           currentSectionCode,
           currentQuestionId,
         })
@@ -141,20 +173,114 @@ export default function TestPage({ params }: TestPageProps) {
     } catch (err) {
       console.error('Autosave error:', err);
     }
-  }, [responses, visitedQuestions, remainingSeconds, currentSectionCode, currentQuestionId, test, loading, storageKey]);
+  }, [
+    responses,
+    visitedQuestions,
+    sectionTimers,
+    lockedSectionCodes,
+    proctoringStrikes,
+    currentSectionCode,
+    currentQuestionId,
+    test,
+    loading,
+    storageKey,
+    testId,
+  ]);
+
+  // Submit Test logic
+  const executeSubmission = useCallback(() => {
+    if (!test || isSubmitting) return;
+    setIsSubmitting(true);
+
+    // Calculate total time taken across all sections
+    const totalAllocated = test.sections.reduce((acc, s) => acc + (s.durationMinutes || 20) * 60, 0);
+    const totalRemaining = Object.values(sectionTimers).reduce((acc, v) => acc + v, 0);
+    const totalTimeTaken = Math.max(1, totalAllocated - totalRemaining);
+
+    const attemptId = `att-${Date.now()}`;
+    const result = calculateAttemptResult(test, responses, totalTimeTaken, attemptId);
+
+    // Save result to localStorage
+    saveAttemptResult(result);
+
+    // Clear saved progress
+    try {
+      localStorage.removeItem(storageKey);
+    } catch (e) {
+      console.error(e);
+    }
+
+    router.push(`/result/${attemptId}`);
+  }, [test, isSubmitting, sectionTimers, responses, storageKey, router]);
+
+  // Active section remaining seconds
+  const activeSectionRemainingSeconds = sectionTimers[currentSectionCode] ?? 1200;
+
+  // Total remaining seconds across all unexpired sections
+  const totalRemainingSeconds = Object.values(sectionTimers).reduce((sum, secVal) => sum + secVal, 0);
+
+  // Handle active section timer tick (1 second decrease)
+  const handleSectionTimerTick = useCallback(() => {
+    setSectionTimers(prev => {
+      const current = prev[currentSectionCode];
+      if (typeof current !== 'number') return prev;
+      const updatedSec = Math.max(0, current - 1);
+      return {
+        ...prev,
+        [currentSectionCode]: updatedSec,
+      };
+    });
+  }, [currentSectionCode]);
+
+  // Handle Section Time Up -> Auto-transition to next section
+  const handleSectionTimeUp = useCallback(() => {
+    if (!test) return;
+
+    // Lock current section
+    setLockedSectionCodes(prev => (prev.includes(currentSectionCode) ? prev : [...prev, currentSectionCode]));
+
+    const currentIndex = test.sections.findIndex(s => s.code === currentSectionCode);
+    const hasNextSection = currentIndex >= 0 && currentIndex < test.sections.length - 1;
+
+    if (hasNextSection) {
+      const nextSec = test.sections[currentIndex + 1];
+      const prevSec = test.sections[currentIndex];
+
+      setSectionTransitionModal({
+        isOpen: true,
+        prevSectionName: prevSec.name,
+        nextSectionName: nextSec.name,
+      });
+
+      setCurrentSectionCode(nextSec.code);
+      const nextFirstQ = test.questions.find(q => q.sectionCode === nextSec.code);
+      if (nextFirstQ) {
+        setCurrentQuestionId(nextFirstQ.id);
+        setVisitedQuestions(prev => (prev.includes(nextFirstQ.id) ? prev : [...prev, nextFirstQ.id]));
+      }
+    } else {
+      // Final section finished -> auto-submit full test
+      executeSubmission();
+    }
+  }, [test, currentSectionCode, executeSubmission]);
 
   // Mark question as visited when changing question
   const selectQuestion = useCallback((qId: string) => {
-    setCurrentQuestionId(qId);
-    setVisitedQuestions(prev => (prev.includes(qId) ? prev : [...prev, qId]));
-
+    // If target question belongs to a locked section, disallow navigation
     if (test) {
-      const q = test.questions.find(item => item.id === qId);
-      if (q && q.sectionCode !== currentSectionCode) {
-        setCurrentSectionCode(q.sectionCode);
+      const targetQ = test.questions.find(item => item.id === qId);
+      if (targetQ && lockedSectionCodes.includes(targetQ.sectionCode)) {
+        return;
+      }
+      if (targetQ && targetQ.sectionCode !== currentSectionCode) {
+        // Enforce staying within active section during strict sectional timing
+        return;
       }
     }
-  }, [test, currentSectionCode]);
+
+    setCurrentQuestionId(qId);
+    setVisitedQuestions(prev => (prev.includes(qId) ? prev : [...prev, qId]));
+  }, [test, currentSectionCode, lockedSectionCodes]);
 
   // Handle Option Select
   const handleSelectOption = (optionId: string) => {
@@ -167,7 +293,6 @@ export default function TestPage({ params }: TestPageProps) {
         timeSpentSeconds: 0,
       };
 
-      // Toggle off if clicking the already selected option
       const newSelectedOptionId = existing.selectedOptionId === optionId ? null : optionId;
       const isAnswered = Boolean(newSelectedOptionId);
       const isMarked = existing.isMarkedForReview;
@@ -219,46 +344,62 @@ export default function TestPage({ params }: TestPageProps) {
         timeSpentSeconds: 0,
       };
 
-      const newIsMarked = !existing.isMarkedForReview;
       const isAnswered = Boolean(existing.selectedOptionId);
+      const newMarked = !existing.isMarkedForReview;
 
       let newStatus: QuestionStatus = 'NOT_ANSWERED';
-      if (isAnswered && newIsMarked) newStatus = 'ANSWERED_AND_MARKED';
-      else if (newIsMarked) newStatus = 'MARKED_FOR_REVIEW';
+      if (isAnswered && newMarked) newStatus = 'ANSWERED_AND_MARKED';
+      else if (newMarked) newStatus = 'MARKED_FOR_REVIEW';
       else if (isAnswered) newStatus = 'ANSWERED';
 
       return {
         ...prev,
         [currentQuestionId]: {
           ...existing,
-          isMarkedForReview: newIsMarked,
+          isMarkedForReview: newMarked,
           status: newStatus,
         },
       };
     });
 
-    // Automatically navigate to next question
     handleNextQuestion();
   };
 
-  // Navigation Helpers
-  const questionsInCurrentSection = test?.questions.filter(q => q.sectionCode === currentSectionCode) || [];
-  const currentSectionQuestions = questionsInCurrentSection.length > 0 ? questionsInCurrentSection : (test?.questions || []);
+  // Save & Next
+  const handleSaveAndNext = () => {
+    setResponses(prev => {
+      const existing = prev[currentQuestionId] || {
+        questionId: currentQuestionId,
+        selectedOptionId: null,
+        isMarkedForReview: false,
+        status: 'NOT_ANSWERED',
+        timeSpentSeconds: 0,
+      };
+
+      const isAnswered = Boolean(existing.selectedOptionId);
+      let newStatus: QuestionStatus = isAnswered ? 'ANSWERED' : 'NOT_ANSWERED';
+      if (isAnswered && existing.isMarkedForReview) newStatus = 'ANSWERED_AND_MARKED';
+
+      return {
+        ...prev,
+        [currentQuestionId]: {
+          ...existing,
+          status: newStatus,
+        },
+      };
+    });
+
+    handleNextQuestion();
+  };
+
+  // Navigation Helpers (Constrained within current section)
+  const currentSectionQuestions = test?.questions.filter(q => q.sectionCode === currentSectionCode) || [];
   const currentQuestionIndex = currentSectionQuestions.findIndex(q => q.id === currentQuestionId);
 
   const handleNextQuestion = () => {
     if (currentQuestionIndex < currentSectionQuestions.length - 1) {
       const nextQ = currentSectionQuestions[currentQuestionIndex + 1];
       selectQuestion(nextQ.id);
-    } else {
-      // Find next section if at end of section
-      const secIdx = test?.sections.findIndex(s => s.code === currentSectionCode) ?? -1;
-      if (test && secIdx >= 0 && secIdx < test.sections.length - 1) {
-        const nextSec = test.sections[secIdx + 1];
-        setCurrentSectionCode(nextSec.code);
-        const nextSecFirstQ = test.questions.find(q => q.sectionCode === nextSec.code);
-        if (nextSecFirstQ) selectQuestion(nextSecFirstQ.id);
-      }
     }
   };
 
@@ -266,50 +407,8 @@ export default function TestPage({ params }: TestPageProps) {
     if (currentQuestionIndex > 0) {
       const prevQ = currentSectionQuestions[currentQuestionIndex - 1];
       selectQuestion(prevQ.id);
-    } else {
-      // Find prev section
-      const secIdx = test?.sections.findIndex(s => s.code === currentSectionCode) ?? -1;
-      if (test && secIdx > 0) {
-        const prevSec = test.sections[secIdx - 1];
-        setCurrentSectionCode(prevSec.code);
-        const prevSecQuestions = test.questions.filter(q => q.sectionCode === prevSec.code);
-        const lastQ = prevSecQuestions[prevSecQuestions.length - 1];
-        if (lastQ) selectQuestion(lastQ.id);
-      }
     }
   };
-
-  // Timer Tick
-  const handleTimerTick = useCallback(() => {
-    setRemainingSeconds(prev => Math.max(0, prev - 1));
-  }, []);
-
-  // Submit Test logic
-  const executeSubmission = useCallback(() => {
-    if (!test || isSubmitting) return;
-    setIsSubmitting(true);
-
-    const totalTimeTaken = test.durationMinutes * 60 - remainingSeconds;
-    const attemptId = `att-${Date.now()}`;
-    const result = calculateAttemptResult(test, responses, totalTimeTaken, attemptId);
-
-    // Save result to localStorage
-    saveAttemptResult(result);
-
-    // Clear saved progress
-    try {
-      localStorage.removeItem(storageKey);
-    } catch (e) {
-      console.error(e);
-    }
-
-    router.push(`/result/${attemptId}`);
-  }, [test, isSubmitting, remainingSeconds, responses, storageKey, router]);
-
-  // Handle Time Up Auto-Submit
-  const handleTimeUp = useCallback(() => {
-    executeSubmission();
-  }, [executeSubmission]);
 
   if (loading) {
     return (
@@ -337,6 +436,7 @@ export default function TestPage({ params }: TestPageProps) {
   const currentQuestion = test.questions.find(q => q.id === currentQuestionId) || currentSectionQuestions[0] || test.questions[0];
   const currentResponse = responses[currentQuestion?.id || ''];
   const isMarkedForReview = Boolean(currentResponse?.isMarkedForReview);
+  const activeSectionObj = test.sections.find(s => s.code === currentSectionCode);
 
   // Compute metrics for modal
   const allQuestions = test.questions;
@@ -350,91 +450,121 @@ export default function TestPage({ params }: TestPageProps) {
   const unansweredCount = allQuestions.length - answeredCount;
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col font-sans select-none pb-16 lg:pb-0">
-      {/* Test Header Console */}
+    <div className="min-h-screen bg-slate-100 flex flex-col font-sans select-none pb-16 lg:pb-0 relative">
+      {/* 1. Exam Anti-Cheating & Proctoring Suite */}
+      <ProctoringGuard
+        testId={testId}
+        initialStrikes={proctoringStrikes}
+        onStrikesChange={(newStrikes) => setProctoringStrikes(newStrikes)}
+        onMaxStrikesReached={executeSubmission}
+      />
+
+      {/* 2. Header Console with 20-Minute Sectional Timer */}
       <TestHeader
         testTitle={test.title}
         sections={test.sections}
         currentSectionCode={currentSectionCode}
+        lockedSectionCodes={lockedSectionCodes}
+        remainingSeconds={activeSectionRemainingSeconds}
+        totalRemainingSeconds={totalRemainingSeconds}
+        timerLabel={`${activeSectionObj?.name || 'Section'} Time`}
+        isSectionalTimer={true}
         onSelectSection={(code) => {
-          setCurrentSectionCode(code);
-          const firstQ = test.questions.find(q => q.sectionCode === code);
-          if (firstQ) selectQuestion(firstQ.id);
+          if (!lockedSectionCodes.includes(code)) {
+            setCurrentSectionCode(code);
+            const firstQ = test.questions.find(q => q.sectionCode === code);
+            if (firstQ) selectQuestion(firstQ.id);
+          }
         }}
-        remainingSeconds={remainingSeconds}
-        onTickTimer={handleTimerTick}
-        onTimeUp={handleTimeUp}
+        onTickTimer={handleSectionTimerTick}
+        onTimeUp={handleSectionTimeUp}
         onSubmitClick={() => setIsSubmitModalOpen(true)}
       />
 
-      {/* Main Examination Workspace */}
-      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col lg:flex-row gap-6">
-        {/* Question Panel */}
-        <div className="flex-1 flex flex-col min-h-[500px]">
+      {/* Main Examination Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start mt-2">
+        {/* Left Column: Active Question Card & Actions */}
+        <div className="lg:col-span-8 flex flex-col space-y-4">
+          <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-600">
+            <span className="font-bold text-slate-900">
+              Active Section: <span className="text-blue-600">{activeSectionObj?.name}</span>
+            </span>
+            <span className="font-mono text-slate-500">
+              Question {currentQuestionIndex + 1} of {currentSectionQuestions.length}
+            </span>
+          </div>
+
           <QuestionCard
             question={currentQuestion}
-            questionIndex={currentQuestionIndex >= 0 ? currentQuestionIndex : 0}
+            questionIndex={currentQuestionIndex + 1}
             totalQuestionsInSection={currentSectionQuestions.length}
             selectedOptionId={currentResponse?.selectedOptionId || null}
             onSelectOption={handleSelectOption}
           />
 
-          {/* Controls Bar */}
-          <div className="bg-white border-t border-slate-200 p-4 rounded-b-xl mt-px shadow-xs flex flex-wrap items-center justify-between gap-3">
+          {/* Action Control Bar */}
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleMarkForReview}
+                className={`flex items-center gap-1.5 ${
+                  isMarkedForReview ? 'bg-purple-50 text-purple-700 border-purple-300' : ''
+                }`}
+              >
+                <Bookmark className="w-4 h-4" />
+                <span>{isMarkedForReview ? 'Marked' : 'Mark for Review'}</span>
+              </Button>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleClearResponse}
+                className="flex items-center gap-1.5 text-slate-600"
+              >
+                <RotateCcw className="w-4 h-4" />
+                <span>Clear Response</span>
+              </Button>
+            </div>
+
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handlePrevQuestion}
+                disabled={currentQuestionIndex <= 0}
                 className="flex items-center gap-1"
               >
-                <ChevronLeft className="w-4 h-4" /> Previous
-              </Button>
-
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleClearResponse}
-                className="text-slate-600 hover:text-slate-900"
-              >
-                <RotateCcw className="w-3.5 h-3.5 mr-1" /> Clear Response
-              </Button>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant={isMarkedForReview ? 'warning' : 'outline'}
-                size="sm"
-                onClick={handleMarkForReview}
-                className="flex items-center gap-1.5"
-              >
-                <Bookmark className="w-4 h-4" />
-                {isMarkedForReview ? 'Marked for Review' : 'Mark for Review & Next'}
+                <ChevronLeft className="w-4 h-4" /> Prev
               </Button>
 
               <Button
                 variant="primary"
                 size="sm"
-                onClick={handleNextQuestion}
-                className="flex items-center gap-1 shadow-xs"
+                onClick={handleSaveAndNext}
+                className="flex items-center gap-1.5 shadow-xs"
               >
-                Save & Next <ChevronRight className="w-4 h-4" />
+                <span>Save & Next</span>
+                <ChevronRight className="w-4 h-4" />
               </Button>
             </div>
           </div>
         </div>
 
-        {/* Right Palette Panel */}
-        <QuestionPalette
-          questions={currentSectionQuestions.map(q => ({ id: q.id, sectionCode: q.sectionCode }))}
-          currentQuestionId={currentQuestionId}
-          responses={responses}
-          visitedQuestions={visitedQuestions}
-          onSelectQuestion={selectQuestion}
-        />
-      </div>
+        {/* Right Column: Question Palette Navigation */}
+        <div className="lg:col-span-4 w-full">
+          <QuestionPalette
+            questions={currentSectionQuestions}
+            responses={responses}
+            visitedQuestions={visitedQuestions}
+            currentQuestionId={currentQuestionId}
+            onSelectQuestion={selectQuestion}
+          />
+        </div>
+      </main>
 
-      {/* Confirmation Modal */}
+      {/* Submit Confirmation Modal */}
       <SubmitConfirmModal
         isOpen={isSubmitModalOpen}
         onClose={() => setIsSubmitModalOpen(false)}
@@ -443,8 +573,49 @@ export default function TestPage({ params }: TestPageProps) {
         answeredCount={answeredCount}
         unansweredCount={unansweredCount}
         markedCount={markedCount}
-        remainingSeconds={remainingSeconds}
+        remainingSeconds={totalRemainingSeconds}
       />
+
+      {/* Section Transition Modal */}
+      <Modal
+        isOpen={sectionTransitionModal.isOpen}
+        onClose={() => setSectionTransitionModal({ isOpen: false, prevSectionName: '', nextSectionName: '' })}
+        title="Section Time Expired — Auto Transition"
+      >
+        <div className="space-y-4">
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-xl text-blue-900 text-xs flex items-start gap-3">
+            <CheckCircle2 className="w-6 h-6 text-blue-600 shrink-0 mt-0.5" />
+            <div>
+              <h4 className="font-extrabold text-sm">
+                {sectionTransitionModal.prevSectionName} Completed
+              </h4>
+              <p className="mt-1 leading-relaxed text-blue-800">
+                The 20-minute time limit for <strong>{sectionTransitionModal.prevSectionName}</strong> has concluded and the section is now locked.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-bold">Next Section:</span>
+              <span className="font-bold text-indigo-700">{sectionTransitionModal.nextSectionName}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-bold">Allocated Time:</span>
+              <span className="font-mono font-bold text-slate-900">20 Minutes (1200s)</span>
+            </div>
+          </div>
+
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => setSectionTransitionModal({ isOpen: false, prevSectionName: '', nextSectionName: '' })}
+            className="w-full justify-center bg-blue-600 hover:bg-blue-700 font-bold"
+          >
+            Start {sectionTransitionModal.nextSectionName} (20:00) <ArrowRight className="w-4 h-4 ml-1.5" />
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

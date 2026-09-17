@@ -117,6 +117,8 @@ export interface MockTest {
   isFixed?: boolean;
   isPyq?: boolean;
   year?: number;
+  enableSectionalTimer?: boolean;
+  sectionDurationMinutes?: number;
   sections: {
     id: string;
     code: string;
@@ -126,6 +128,17 @@ export interface MockTest {
     marks: number;
   }[];
   questions: Question[];
+}
+
+export interface ProctoringState {
+  isFullscreen: boolean;
+  strikes: number;
+  maxStrikes: number;
+  violations: {
+    type: 'TAB_SWITCH' | 'WINDOW_BLUR' | 'FULLSCREEN_EXIT';
+    timestamp: string;
+    details: string;
+  }[];
 }
 
 export interface UserResponseState {
@@ -291,6 +304,8 @@ export interface AdminMockTestInput {
   isFree: boolean;
   isPyq?: boolean;
   year?: number;
+  enableSectionalTimer?: boolean;
+  sectionDurationMinutes?: number;
   sections: {
     code: string;
     name: string;

@@ -10,7 +10,6 @@ import {
   getAdminExams,
   createMockTestAction,
   updateMockTestTitleAction,
-  updateExamTitleAction,
   AdminPartitionInfo,
 } from '@/lib/services/adminService';
 import { AdminNav } from '@/components/admin/AdminNav';
@@ -19,6 +18,7 @@ import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { BulkQuestionModal } from '@/components/admin/BulkQuestionModal';
 import {
   PlusCircle,
   Search,
@@ -34,7 +34,6 @@ import {
   Calendar,
   X,
   Upload,
-  Plus,
 } from 'lucide-react';
 
 export type ExamPartition = AdminPartitionInfo;
@@ -272,6 +271,7 @@ export default function AdminQuestionsPage() {
   const [editPartitionTitle, setEditPartitionTitle] = useState('');
   const [editPartitionDesc, setEditPartitionDesc] = useState('');
   const [isEditPartitionModalOpen, setIsEditPartitionModalOpen] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
 
   const activePartition = partitions.find(p => p.id === activePartitionId) || partitions[0] || PARTITIONS[0];
 
@@ -575,6 +575,16 @@ export default function AdminQuestionsPage() {
           </div>
 
           <div className="flex items-center gap-2 self-stretch sm:self-auto">
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => setIsBulkModalOpen(true)}
+              className="flex items-center gap-1.5 shadow-xs w-full sm:w-auto justify-center bg-white border-blue-200 text-blue-700 hover:bg-blue-50 font-bold"
+            >
+              <Upload className="w-4 h-4" />
+              Bulk Import (CSV/JSON)
+            </Button>
+
             <Button
               variant="primary"
               size="md"
@@ -1770,6 +1780,21 @@ export default function AdminQuestionsPage() {
           </form>
         </Modal>
       )}
+
+      {/* Bulk Question Importer Modal with Downloadable Sample CSV */}
+      <BulkQuestionModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        onSuccess={(count) => {
+          setFeedback({
+            text: `Successfully bulk imported ${count} questions into the question repository.`,
+            type: 'success',
+          });
+          loadQuestions();
+        }}
+        partitions={partitions}
+        currentPartitionId={activePartitionId}
+      />
     </div>
   );
 }

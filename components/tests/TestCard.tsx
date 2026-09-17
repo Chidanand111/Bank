@@ -27,7 +27,11 @@ export const TestCard: React.FC<TestCardProps> = ({ test }) => {
               <Badge variant="green" size="sm">
                 FREE MOCK
               </Badge>
-            ) : null}
+            ) : (
+              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
+                20m/Section
+              </span>
+            )}
           </div>
 
           <h3 className="text-lg font-bold text-slate-900 group-hover:text-blue-600 transition-colors">
