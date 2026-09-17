@@ -68,13 +68,18 @@ export default function ResultPage({ params }: ResultPageProps) {
 
         {/* Primary Action Buttons */}
         <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <Link href={`/test/${encodeURIComponent(result.mockTestId || 'mock-ibps-po-1')}?reattempt=true`}>
+            <Button variant="primary" size="md" className="flex items-center gap-1.5 shadow-xs bg-indigo-600 hover:bg-indigo-700">
+              <RotateCcw className="w-4 h-4" /> Re-attempt Test
+            </Button>
+          </Link>
           <Link href={`/review/${result.id}`}>
-            <Button variant="primary" size="md" className="flex items-center gap-1.5 shadow-xs">
-              <FileText className="w-4 h-4" /> Review Answers & Solutions
+            <Button variant="outline" size="md" className="flex items-center gap-1.5">
+              <FileText className="w-4 h-4" /> Review Solutions
             </Button>
           </Link>
           <Link href="/tests">
-            <Button variant="outline" size="md" className="flex items-center gap-1.5">
+            <Button variant="secondary" size="md" className="flex items-center gap-1.5">
               <RotateCcw className="w-4 h-4" /> Try Another Test
             </Button>
           </Link>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import { Clock, Hourglass } from 'lucide-react';
 import { formatSecondsToMMSS } from '@/lib/utils/formatters';
 
@@ -8,31 +8,20 @@ export interface TimerProps {
   remainingSeconds: number;
   label?: string;
   totalRemainingSeconds?: number;
-  onTick: () => void;
-  onTimeUp: () => void;
+  onTick?: () => void;
+  onTimeUp?: () => void;
 }
 
+/**
+ * Pure display component for exam section countdown and total test time.
+ * Decoupled from interval creation to prevent timer lag, freezing, or stutter.
+ */
 export const Timer: React.FC<TimerProps> = ({
   remainingSeconds,
   label = 'Section Time',
   totalRemainingSeconds,
-  onTick,
-  onTimeUp,
 }) => {
-  useEffect(() => {
-    if (remainingSeconds <= 0) {
-      onTimeUp();
-      return;
-    }
-
-    const timerId = setInterval(() => {
-      onTick();
-    }, 1000);
-
-    return () => clearInterval(timerId);
-  }, [remainingSeconds, onTick, onTimeUp]);
-
-  const isUrgent = remainingSeconds < 180; // less than 3 minutes
+  const isUrgent = remainingSeconds > 0 && remainingSeconds < 180; // less than 3 minutes
 
   return (
     <div className="flex items-center gap-2">

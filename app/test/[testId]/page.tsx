@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, use, useCallback } from 'react';
+import React, { useState, useEffect, use, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getMockTestById, saveAttemptResult } from '@/lib/services/testService';
 import { calculateAttemptResult } from '@/lib/scoring/scoreCalculator';
@@ -12,7 +12,7 @@ import { SubmitConfirmModal } from '@/components/questions/SubmitConfirmModal';
 import { ProctoringGuard } from '@/components/questions/ProctoringGuard';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, CheckCircle2, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, CheckCircle2, ArrowRight, AlertTriangle, LogOut } from 'lucide-react';
 import { getUserSeenQuestionIds, recordUserSeenQuestions } from '@/lib/services/userQuestionTracker';
 
 export interface TestPageProps {
@@ -44,6 +44,8 @@ export default function TestPage({ params }: TestPageProps) {
 
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+  const isSubmittedRef = useRef(false);
 
   // Storage key for test state persistence
   const storageKey = `bankmock_test_progress_${testId}`;
@@ -51,7 +53,22 @@ export default function TestPage({ params }: TestPageProps) {
   // Fetch test details at start of exam
   useEffect(() => {
     async function loadTest() {
-      // 1. Check if there's an in-progress session already saved
+      // Check if candidate requested a clean restart or re-attempt
+      const isReattemptOrRestart = typeof window !== 'undefined' && (
+        window.location.search.includes('reattempt=true') ||
+        window.location.search.includes('restart=true')
+      );
+
+      if (isReattemptOrRestart) {
+        try {
+          localStorage.removeItem(storageKey);
+          localStorage.removeItem(`bankmock_proctoring_strikes_${testId}`);
+        } catch {
+          // ignore
+        }
+      }
+
+      // 1. Check if there's an in-progress session already saved (only if NOT re-attempt)
       let inProgressQuestions: Question[] | null = null;
       let inProgressResponses: Record<string, UserResponseState> | null = null;
       let inProgressVisited: string[] | null = null;
@@ -61,23 +78,25 @@ export default function TestPage({ params }: TestPageProps) {
       let inProgressSectionCode: string | null = null;
       let inProgressQuestionId: string | null = null;
 
-      try {
-        const saved = localStorage.getItem(storageKey);
-        if (saved) {
-          const parsed = JSON.parse(saved);
-          if (parsed.questions && parsed.questions.length > 0) {
-            inProgressQuestions = parsed.questions;
+      if (!isReattemptOrRestart) {
+        try {
+          const saved = localStorage.getItem(storageKey);
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed.questions && parsed.questions.length > 0) {
+              inProgressQuestions = parsed.questions;
+            }
+            if (parsed.responses) inProgressResponses = parsed.responses;
+            if (parsed.visitedQuestions) inProgressVisited = parsed.visitedQuestions;
+            if (parsed.sectionTimers) inProgressSectionTimers = parsed.sectionTimers;
+            if (parsed.lockedSectionCodes) inProgressLockedSections = parsed.lockedSectionCodes;
+            if (typeof parsed.proctoringStrikes === 'number') inProgressStrikes = parsed.proctoringStrikes;
+            if (parsed.currentSectionCode) inProgressSectionCode = parsed.currentSectionCode;
+            if (parsed.currentQuestionId) inProgressQuestionId = parsed.currentQuestionId;
           }
-          if (parsed.responses) inProgressResponses = parsed.responses;
-          if (parsed.visitedQuestions) inProgressVisited = parsed.visitedQuestions;
-          if (parsed.sectionTimers) inProgressSectionTimers = parsed.sectionTimers;
-          if (parsed.lockedSectionCodes) inProgressLockedSections = parsed.lockedSectionCodes;
-          if (typeof parsed.proctoringStrikes === 'number') inProgressStrikes = parsed.proctoringStrikes;
-          if (parsed.currentSectionCode) inProgressSectionCode = parsed.currentSectionCode;
-          if (parsed.currentQuestionId) inProgressQuestionId = parsed.currentQuestionId;
+        } catch (err) {
+          console.error('Error reading saved session:', err);
         }
-      } catch (err) {
-        console.error('Error reading saved session:', err);
       }
 
       // 2. If resuming an active session
@@ -152,9 +171,30 @@ export default function TestPage({ params }: TestPageProps) {
     loadTest();
   }, [testId, storageKey]);
 
+  // Clean up in-progress answers on exit without submitting
+  useEffect(() => {
+    const handleUnloadExit = () => {
+      if (!isSubmittedRef.current) {
+        try {
+          localStorage.removeItem(storageKey);
+          localStorage.removeItem(`bankmock_proctoring_strikes_${testId}`);
+        } catch {
+          // ignore
+        }
+      }
+    };
+
+    window.addEventListener('beforeunload', handleUnloadExit);
+    window.addEventListener('pagehide', handleUnloadExit);
+    return () => {
+      window.removeEventListener('beforeunload', handleUnloadExit);
+      window.removeEventListener('pagehide', handleUnloadExit);
+    };
+  }, [storageKey, testId]);
+
   // Autosave responses, timers, and locks to localStorage
   useEffect(() => {
-    if (!test || loading) return;
+    if (!test || loading || isSubmittedRef.current) return;
     try {
       localStorage.setItem(
         storageKey,
@@ -190,6 +230,7 @@ export default function TestPage({ params }: TestPageProps) {
   // Submit Test logic
   const executeSubmission = useCallback(() => {
     if (!test || isSubmitting) return;
+    isSubmittedRef.current = true;
     setIsSubmitting(true);
 
     // Calculate total time taken across all sections
@@ -206,12 +247,13 @@ export default function TestPage({ params }: TestPageProps) {
     // Clear saved progress
     try {
       localStorage.removeItem(storageKey);
+      localStorage.removeItem(`bankmock_proctoring_strikes_${testId}`);
     } catch (e) {
       console.error(e);
     }
 
     router.push(`/result/${attemptId}`);
-  }, [test, isSubmitting, sectionTimers, responses, storageKey, router]);
+  }, [test, isSubmitting, sectionTimers, responses, storageKey, testId, router]);
 
   // Active section remaining seconds
   const activeSectionRemainingSeconds = sectionTimers[currentSectionCode] ?? 1200;
@@ -219,24 +261,11 @@ export default function TestPage({ params }: TestPageProps) {
   // Total remaining seconds across all unexpired sections
   const totalRemainingSeconds = Object.values(sectionTimers).reduce((sum, secVal) => sum + secVal, 0);
 
-  // Handle active section timer tick (1 second decrease)
-  const handleSectionTimerTick = useCallback(() => {
-    setSectionTimers(prev => {
-      const current = prev[currentSectionCode];
-      if (typeof current !== 'number') return prev;
-      const updatedSec = Math.max(0, current - 1);
-      return {
-        ...prev,
-        [currentSectionCode]: updatedSec,
-      };
-    });
-  }, [currentSectionCode]);
-
   // Handle Section Time Up -> Auto-transition to next section
   const handleSectionTimeUp = useCallback(() => {
-    if (!test) return;
+    if (!test || !currentSectionCode) return;
 
-    // Lock current section
+    // Lock current section permanently
     setLockedSectionCodes(prev => (prev.includes(currentSectionCode) ? prev : [...prev, currentSectionCode]));
 
     const currentIndex = test.sections.findIndex(s => s.code === currentSectionCode);
@@ -264,16 +293,51 @@ export default function TestPage({ params }: TestPageProps) {
     }
   }, [test, currentSectionCode, executeSubmission]);
 
-  // Mark question as visited when changing question
+  // Master 1-Second Sectional Countdown Clock (decoupled from component re-renders)
+  useEffect(() => {
+    if (loading || isSubmitting || isSubmittedRef.current || !test || !currentSectionCode) return;
+
+    const timerId = setInterval(() => {
+      setSectionTimers(prev => {
+        const currentSecTime = prev[currentSectionCode];
+        if (typeof currentSecTime !== 'number') return prev;
+
+        if (currentSecTime <= 1) {
+          setTimeout(() => {
+            handleSectionTimeUp();
+          }, 0);
+          return {
+            ...prev,
+            [currentSectionCode]: 0,
+          };
+        }
+
+        return {
+          ...prev,
+          [currentSectionCode]: currentSecTime - 1,
+        };
+      });
+    }, 1000);
+
+    return () => clearInterval(timerId);
+  }, [loading, isSubmitting, test, currentSectionCode, handleSectionTimeUp]);
+
+  // Handle active section timer tick (no-op retained for backwards compatibility)
+  const handleSectionTimerTick = useCallback(() => {
+    // Clock is now handled by the master interval above
+  }, []);
+
+  // Mark question as visited when changing question (constrained to active section)
   const selectQuestion = useCallback((qId: string) => {
-    // If target question belongs to a locked section, disallow navigation
     if (test) {
       const targetQ = test.questions.find(item => item.id === qId);
-      if (targetQ && lockedSectionCodes.includes(targetQ.sectionCode)) {
+      if (!targetQ) return;
+      // Disallow navigating to locked sections
+      if (lockedSectionCodes.includes(targetQ.sectionCode)) {
         return;
       }
-      if (targetQ && targetQ.sectionCode !== currentSectionCode) {
-        // Enforce staying within active section during strict sectional timing
+      // Strict sectional timing prevents selecting questions outside active 20-minute section!
+      if (targetQ.sectionCode !== currentSectionCode) {
         return;
       }
     }
@@ -459,7 +523,7 @@ export default function TestPage({ params }: TestPageProps) {
         onMaxStrikesReached={executeSubmission}
       />
 
-      {/* 2. Header Console with 20-Minute Sectional Timer */}
+      {/* 2. Header Console with 20-Minute Sectional Timer and Strict Section Lock */}
       <TestHeader
         testTitle={test.title}
         sections={test.sections}
@@ -469,16 +533,13 @@ export default function TestPage({ params }: TestPageProps) {
         totalRemainingSeconds={totalRemainingSeconds}
         timerLabel={`${activeSectionObj?.name || 'Section'} Time`}
         isSectionalTimer={true}
-        onSelectSection={(code) => {
-          if (!lockedSectionCodes.includes(code)) {
-            setCurrentSectionCode(code);
-            const firstQ = test.questions.find(q => q.sectionCode === code);
-            if (firstQ) selectQuestion(firstQ.id);
-          }
+        onSelectSection={() => {
+          // Strictly disabled: candidate cannot move to next section until active section 20-minute timer expires!
         }}
         onTickTimer={handleSectionTimerTick}
         onTimeUp={handleSectionTimeUp}
         onSubmitClick={() => setIsSubmitModalOpen(true)}
+        onExitClick={() => setIsExitModalOpen(true)}
       />
 
       {/* Main Examination Area */}
@@ -614,6 +675,58 @@ export default function TestPage({ params }: TestPageProps) {
           >
             Start {sectionTransitionModal.nextSectionName} (20:00) <ArrowRight className="w-4 h-4 ml-1.5" />
           </Button>
+        </div>
+      </Modal>
+
+      {/* Exit Exam Without Submitting Confirmation Modal */}
+      <Modal
+        isOpen={isExitModalOpen}
+        onClose={() => setIsExitModalOpen(false)}
+        title="Exit Exam Without Submitting?"
+      >
+        <div className="space-y-4 text-xs">
+          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl space-y-2 text-amber-900">
+            <div className="flex items-center gap-2 font-bold text-sm text-amber-800">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              All In-Progress Answers Will Be Erased
+            </div>
+            <p className="leading-relaxed">
+              If you leave this exam session now without clicking <strong>Submit Test</strong>, all your selected answers and progress will be permanently erased.
+            </p>
+            <p className="leading-relaxed font-semibold text-amber-800">
+              When you restart or re-enter this exam, it will begin as a brand new test with a full 60-minute countdown timer (20 minutes per section).
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
+            <Button
+              variant="secondary"
+              size="md"
+              type="button"
+              onClick={() => setIsExitModalOpen(false)}
+            >
+              Resume Test
+            </Button>
+            <Button
+              variant="danger"
+              size="md"
+              type="button"
+              onClick={() => {
+                isSubmittedRef.current = true;
+                try {
+                  localStorage.removeItem(storageKey);
+                  localStorage.removeItem(`bankmock_proctoring_strikes_${testId}`);
+                } catch {
+                  // ignore
+                }
+                router.push('/tests');
+              }}
+              className="font-bold flex items-center gap-1.5"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Erase Answers & Exit
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
