@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { MathRenderer } from '@/components/ui/MathRenderer';
 import { BulkQuestionModal } from '@/components/admin/BulkQuestionModal';
+import { compressImageFile, formatByteSize } from '@/lib/utils/imageCompressor';
 import {
   PlusCircle,
   Search,
@@ -195,8 +196,8 @@ export default function AdminQuestionsPage() {
     { text: '', imageUrl: '', isCorrect: false },
   ]);
 
-  // Image file to compressed Base64 converter for direct database storage
-  const handleImageFileChange = (
+  // High-performance image file to compressed Base64 converter for direct PostgreSQL database storage
+  const handleImageFileChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
     onSuccess: (dataUrl: string) => void
   ) => {
@@ -206,45 +207,22 @@ export default function AdminQuestionsPage() {
     // Reset input value so same file can be re-selected if needed
     e.target.value = '';
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const rawUrl = event.target?.result as string;
-      if (!rawUrl) return;
-
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxDim = 850;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > maxDim || height > maxDim) {
-          if (width > height) {
-            height = Math.round((height * maxDim) / width);
-            width = maxDim;
-          } else {
-            width = Math.round((width * maxDim) / height);
-            height = maxDim;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          // Fill crisp white background so transparent diagram PNGs don't turn black
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/jpeg', 0.78);
-          onSuccess(compressed);
-        } else {
-          onSuccess(rawUrl);
-        }
+    try {
+      const res = await compressImageFile(file, 900, 0.76);
+      onSuccess(res.compressedDataUrl);
+      setFeedback({
+        text: `DI Image compressed: ${formatByteSize(res.originalSizeBytes)} → ${formatByteSize(res.compressedSizeBytes)} (${res.compressionRatioPercent}% saved). White background applied for transparent diagrams.`,
+        type: 'success',
+      });
+    } catch (err) {
+      console.error('Image compression failed, falling back:', err);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const rawUrl = event.target?.result as string;
+        if (rawUrl) onSuccess(rawUrl);
       };
-      img.src = rawUrl;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    }
   };
 
   const [isPending, startTransition] = useTransition();
@@ -1118,6 +1096,11 @@ export default function AdminQuestionsPage() {
                           <ImageIcon className="w-3 h-3" /> Has Images
                         </span>
                       )}
+                      {q.groupId && (
+                        <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded flex items-center gap-1">
+                          <BookOpen className="w-3 h-3 text-indigo-600" /> Group: {q.groupId}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -1410,15 +1393,36 @@ export default function AdminQuestionsPage() {
                   </Button>
                 )}
               </div>
-              <div className="pt-1">
-                <label className="font-semibold text-slate-700 block mb-1">Context Group ID (Optional)</label>
+              <div className="pt-1 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-semibold text-slate-700 block text-xs">Context Group ID (Shared Passage / DI Diagram)</label>
+                  <span className="text-[10px] text-indigo-600 font-semibold">Stores once in DB</span>
+                </div>
                 <input
                   type="text"
                   value={formGroupId}
                   onChange={(e) => setFormGroupId(e.target.value)}
-                  placeholder="e.g. Directions (Q. 1-5)"
-                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs"
+                  placeholder="e.g. RC-SET-01, DI-BAR-01, PUZZLE-1"
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono"
                 />
+                {formGroupId.trim() && (() => {
+                  const existingGroupParent = questions.find(
+                    q => q.groupId?.trim().toLowerCase() === formGroupId.trim().toLowerCase() &&
+                         (Boolean(q.passage?.trim()) || Boolean(q.passageImageUrl?.trim())) &&
+                         q.id !== editingQuestionId
+                  );
+                  if (existingGroupParent) {
+                    return (
+                      <div className="flex items-start gap-1.5 p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>
+                          <strong>Shared Group Active:</strong> Group <code>{formGroupId}</code> already stores the passage/DI diagram in Question #{existingGroupParent.id.slice(-6)}. You can leave this blank or unchanged — it will reuse the parent's data during tests and save database storage!
+                        </span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
             </div>
 

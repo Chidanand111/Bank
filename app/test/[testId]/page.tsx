@@ -110,7 +110,9 @@ export default function TestPage({ params }: TestPageProps) {
             return {
               ...oldQ,
               imageUrl: fresh.imageUrl || oldQ.imageUrl,
+              passage: fresh.passage || oldQ.passage,
               passageImageUrl: fresh.passageImageUrl || oldQ.passageImageUrl,
+              groupId: fresh.groupId || oldQ.groupId,
               options: oldQ.options.map((opt, idx) => ({
                 ...opt,
                 imageUrl: fresh.options[idx]?.imageUrl || opt.imageUrl,

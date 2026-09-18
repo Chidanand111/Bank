@@ -7,6 +7,7 @@ import { Badge } from '../ui/Badge';
 import { AdminQuestionInput, Difficulty } from '@/types';
 import { bulkImportQuestionsAction } from '@/lib/services/adminService';
 import { MathRenderer } from '../ui/MathRenderer';
+import { compressDataUrl } from '@/lib/utils/imageCompressor';
 import {
   Download,
   Upload,
@@ -14,6 +15,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
+  BookOpen,
 } from 'lucide-react';
 
 export interface BulkQuestionModalProps {
@@ -24,13 +26,15 @@ export interface BulkQuestionModalProps {
   currentPartitionId: string;
 }
 
-// Sample CSV content generator with realistic banking questions and LaTeX math formulas
-const SAMPLE_CSV_CONTENT = `sectionCode,topicName,text,optionA,optionB,optionC,optionD,optionE,correctOption,marks,negativeMarks,difficulty,explanation
-ENGLISH,Reading Comprehension,"According to banking liquidity norms, what is the primary regulatory objective of maintaining the Statutory Liquidity Ratio (SLR)?","To maximize foreign exchange reserves","To ensure solvency and control commercial credit expansion","To eliminate inter-bank lending rates","To finance public sector subsidies directly","None of the above",B,1,0.25,MEDIUM,"SLR enforces commercial banks to maintain liquid assets against Net Demand and Time Liabilities to ensure solvency and curb reckless credit expansion."
-QUANT,Simplification,"Solve the expression: $\\\\sqrt{625} + \\\\frac{15}{3} \\\\times 4 - 2^3 = ?$","37","42","45","39","40",A,1,0.25,EASY,"$\\\\sqrt{625} = 25$; $\\\\frac{15}{3} \\\\times 4 = 20$; $2^3 = 8$. Therefore: $25 + 20 - 8 = 37$."
-QUANT,Quadratic Equations,"Find the roots of the quadratic equation: $x^2 - 7x + 12 = 0$","$x = 2, 6$","$x = 3, 4$","$x = -3, -4$","$x = 1, 12$","None of these",B,1,0.25,MEDIUM,"Factorizing: $(x - 3)(x - 4) = 0 \\\\implies x = 3$ or $x = 4$."
-REASONING,Syllogism,"Statements: Some bankers are analysts. All analysts are auditors. Conclusions: I. Some auditors are bankers. II. All bankers are auditors.","Only conclusion I follows","Only conclusion II follows","Either I or II follows","Neither I nor II follows","Both conclusions follow",A,1,0.25,EASY,"Since some bankers are analysts and all analysts are auditors, it directly follows that some auditors are bankers. Conclusion I is valid."
-REASONING,Direction Sense,"A courier delivery agent walks 12 meters North, turns right and walks 5 meters, then turns South and walks 12 meters. How far and in what direction is he from his starting point?","5 meters East","5 meters West","12 meters North","7 meters East","None of these",A,1,0.25,EASY,"The North and South vertical displacements cancel out (12m - 12m = 0). The agent is exactly 5 meters East of the starting point."
+// Sample CSV content with Reading Comprehension (RC) and Data Interpretation (DI) sets sharing passages/images
+const SAMPLE_CSV_CONTENT = `groupId,passage,passageImageUrl,imageUrl,sectionCode,topicName,text,optionA,optionB,optionC,optionD,optionE,correctOption,marks,negativeMarks,difficulty,explanation
+RC-SET-01,"The Reserve Bank of India (RBI) operates as the nation's central monetary authority, tasked with maintaining price stability while fostering sustainable economic growth. In response to fluctuating global inflationary pressures, the Monetary Policy Committee (MPC) meticulously regulates the policy Repo Rate and the Cash Reserve Ratio (CRR). By fine-tuning these policy tools, the central bank directly influences domestic liquidity, commercial lending trajectories, and corporate capital expenditure cycles. Financial inclusion drives and digital banking innovations further amplify the transmission of monetary policy across rural and semi-urban banking sectors.","","",ENGLISH,Reading Comprehension,"What is the primary dual mandate of the Reserve Bank of India highlighted in the passage?","Maximizing export revenue and foreign exchange","Maintaining price stability while supporting economic growth","Eliminating inter-bank lending rates completely","Providing direct subsidies to commercial institutions","None of the above",B,1,0.25,MEDIUM,"As explicitly stated in the first sentence, the RBI's dual mandate focuses on maintaining price stability while fostering sustainable economic growth."
+RC-SET-01,"","","",ENGLISH,Reading Comprehension,"Which policy tool mentioned directly impacts commercial bank reserves without interest compensation?","Statutory Liquidity Ratio (SLR)","Cash Reserve Ratio (CRR)","Marginal Standing Facility (MSF)","Open Market Operations (OMO)","Reverse Repo Rate",B,1,0.25,EASY,"The passage highlights the Cash Reserve Ratio (CRR), which requires commercial banks to maintain cash balances with the central bank."
+RC-SET-01,"","","",ENGLISH,Reading Comprehension,"According to the context, what role do digital banking innovations play in monetary economics?","They bypass central banking authority entirely","They amplify the transmission of monetary policy across wider sectors","They eliminate all credit risks in retail lending","They reduce corporate capital expenditures to zero","None of the above",B,1,0.25,MEDIUM,"The passage notes that digital banking innovations amplify the transmission of monetary policy across rural and semi-urban banking sectors."
+DI-SET-01,"Directions (Questions 4-5): The following Data Interpretation set assesses branch unit manufacturing across 4 quarterly periods. Total production across Q1 to Q4 stood at 2400 units with percentage distribution: Q1 (20%), Q2 (30%), Q3 (25%), Q4 (25%). Study the data and answer the questions.","","",QUANT,Data Interpretation,"What is the difference between total units produced in Q2 and Q1?","240 units","300 units","200 units","180 units","150 units",A,1,0.25,EASY,"Total production = 2400. Q2 = 30% of 2400 = 720. Q1 = 20% of 2400 = 480. Difference = 720 - 480 = 240 units."
+DI-SET-01,"","","",QUANT,Data Interpretation,"What is the ratio of combined production in (Q1 + Q3) to (Q2 + Q4)?","$9 : 11$","$1 : 1$","$3 : 4$","$5 : 6$","None of these",A,1,0.25,MEDIUM,"Q1 + Q3 = 20% + 25% = 45%. Q2 + Q4 = 30% + 25% = 55%. Ratio = 45 : 55 = 9 : 11."
+,,"","",QUANT,Simplification,"Solve the expression: $\\\\sqrt{625} + \\\\frac{15}{3} \\\\times 4 - 2^3 = ?$","37","42","45","39","40",A,1,0.25,EASY,"$\\\\sqrt{625} = 25$; $\\\\frac{15}{3} \\\\times 4 = 20$; $2^3 = 8$. Therefore: $25 + 20 - 8 = 37$."
+,,"","",REASONING,Syllogism,"Statements: Some bankers are analysts. All analysts are auditors. Conclusions: I. Some auditors are bankers. II. All bankers are auditors.","Only conclusion I follows","Only conclusion II follows","Either I or II follows","Neither I nor II follows","Both conclusions follow",A,1,0.25,EASY,"Since some bankers are analysts and all analysts are auditors, it directly follows that some auditors are bankers. Conclusion I is valid."
 `;
 
 export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
@@ -99,11 +103,29 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     const reader = new FileReader();
 
     if (file.name.endsWith('.json')) {
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const json = JSON.parse(event.target?.result as string);
           if (Array.isArray(json)) {
-            setParsedQuestions(json);
+            const processedList: AdminQuestionInput[] = [];
+            for (const item of json) {
+              let pImg = item.passageImageUrl;
+              let qImg = item.imageUrl;
+              if (pImg && pImg.startsWith('data:image')) {
+                const comp = await compressDataUrl(pImg, 900, 0.76);
+                pImg = comp.compressedDataUrl;
+              }
+              if (qImg && qImg.startsWith('data:image')) {
+                const comp = await compressDataUrl(qImg, 900, 0.76);
+                qImg = comp.compressedDataUrl;
+              }
+              processedList.push({
+                ...item,
+                passageImageUrl: pImg,
+                imageUrl: qImg,
+              });
+            }
+            setParsedQuestions(processedList);
           } else {
             setParseErrors(['JSON file must contain an array of question objects.']);
           }
@@ -114,7 +136,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
       reader.readAsText(file);
     } else {
       // CSV Parsing
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         const text = event.target?.result as string;
         if (!text) return;
 
@@ -204,6 +226,21 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
           const negativeMarks = parseFloat(rowData['negativemarks'] || '0.25') || 0.25;
           const explanation = rowData['explanation'] || '';
 
+          const groupId = (rowData['groupid'] || rowData['group'] || rowData['setid'] || '').trim() || undefined;
+          const passage = (rowData['passage'] || rowData['directions'] || rowData['context'] || '').trim() || undefined;
+          let passageImageUrl = (rowData['passageimageurl'] || rowData['passageimage'] || rowData['chartimageurl'] || rowData['diimage'] || '').trim() || undefined;
+          let imageUrl = (rowData['imageurl'] || rowData['image'] || rowData['diagram'] || '').trim() || undefined;
+
+          // Auto-compress base64 images if present in CSV
+          if (passageImageUrl && passageImageUrl.startsWith('data:image')) {
+            const comp = await compressDataUrl(passageImageUrl, 900, 0.76);
+            passageImageUrl = comp.compressedDataUrl;
+          }
+          if (imageUrl && imageUrl.startsWith('data:image')) {
+            const comp = await compressDataUrl(imageUrl, 900, 0.76);
+            imageUrl = comp.compressedDataUrl;
+          }
+
           // Determine target exam ID from selected partition
           let targetExamId = 'exam-ibps-po';
           if (selectedPartition && selectedPartition !== 'ALL') {
@@ -219,6 +256,10 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
             sectionCode,
             topicName,
             text: qText,
+            imageUrl,
+            passage,
+            passageImageUrl,
+            groupId,
             difficulty,
             marks,
             negativeMarks,
@@ -262,7 +303,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
               <div>
                 <h4 className="text-xs font-bold text-slate-900">Required CSV Format Template</h4>
                 <p className="text-[11px] text-slate-600">
-                  Download our pre-configured CSV template containing authentic banking questions and correct headers.
+                  Download our pre-configured CSV template containing RC passages, DI charts, and LaTeX math formatting.
                 </p>
               </div>
             </div>
@@ -279,8 +320,15 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
             </Button>
           </div>
 
-          <div className="text-[10px] text-slate-500 font-mono bg-white/80 p-2 rounded-lg border border-blue-100 overflow-x-auto">
-            Columns: sectionCode, topicName, text, optionA, optionB, optionC, optionD, optionE, correctOption, marks, negativeMarks, difficulty, explanation
+          <div className="flex items-start gap-2 p-2.5 rounded-xl bg-emerald-50/90 border border-emerald-200 text-xs text-emerald-900">
+            <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+            <span className="leading-relaxed">
+              <strong>Smart Storage Optimization:</strong> For Reading Comprehension (RC) sets and Data Interpretation (DI) chart sets, enter a common <code>groupId</code> (e.g. <code>RC-SET-01</code>) and provide the passage or chart image once on the first question. The system will store it only once in the database to save storage, while rendering it automatically across all 4-8 questions in that set!
+            </span>
+          </div>
+
+          <div className="text-[10px] text-slate-600 font-mono bg-white/90 p-2.5 rounded-xl border border-blue-100 overflow-x-auto whitespace-nowrap">
+            Columns: groupId, passage, passageImageUrl, imageUrl, sectionCode, topicName, text, optionA, optionB, optionC, optionD, optionE, correctOption, marks, negativeMarks, difficulty, explanation
           </div>
         </div>
 
@@ -366,14 +414,32 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
               </div>
             </div>
 
-            {/* Quick Preview of first 3 questions */}
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1 text-xs">
-              {parsedQuestions.slice(0, 3).map((q, idx) => (
-                <div key={idx} className="p-2.5 bg-white rounded-lg border border-slate-200 space-y-1">
-                  <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold">
-                    <span>
-                      {q.sectionCode} • {q.topicName}
-                    </span>
+            {/* Quick Preview of parsed questions */}
+            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1 text-xs">
+              {parsedQuestions.slice(0, 5).map((q, idx) => (
+                <div key={idx} className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
+                  <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-500 font-bold">
+                    <div className="flex items-center gap-1.5">
+                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                        {q.sectionCode} • {q.topicName}
+                      </span>
+                      {q.groupId && (
+                        <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-bold">
+                          Group: {q.groupId}
+                        </span>
+                      )}
+                      {(q.passage || q.passageImageUrl) && (
+                        <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                          <BookOpen className="w-3 h-3" />
+                          Passage / DI Attached
+                        </span>
+                      )}
+                      {q.groupId && !q.passage && !q.passageImageUrl && (
+                        <span className="bg-slate-50 text-slate-500 border border-slate-200 px-2 py-0.5 rounded">
+                          Reuses Group Passage
+                        </span>
+                      )}
+                    </div>
                     <span className="text-emerald-700">
                       Answer: Option {q.options.findIndex((o) => o.isCorrect) + 1}
                     </span>
@@ -383,9 +449,9 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                   </div>
                 </div>
               ))}
-              {parsedQuestions.length > 3 && (
+              {parsedQuestions.length > 5 && (
                 <div className="text-[11px] text-slate-400 text-center pt-1 font-mono">
-                  + {parsedQuestions.length - 3} more questions in file
+                  + {parsedQuestions.length - 5} more questions in file
                 </div>
               )}
             </div>

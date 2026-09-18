@@ -148,10 +148,76 @@ export function getRawQuestions(): RawJsonQuestion[] {
 }
 
 /**
- * Get all normalized questions from the JSON database
+ * Resolves shared passages and DI images across questions with the same groupId.
+ * Enables storing a passage or DI image once in the database, while rendering
+ * it seamlessly across all 4-8 questions in that group during tests and review.
+ */
+export function resolveGroupPassages<T extends { groupId?: string | null; passage?: string | null; passageImageUrl?: string | null }>(
+  questions: T[]
+): T[] {
+  if (!questions || questions.length === 0) return questions;
+
+  // 1. First pass: Map existing passages and images from the questions array
+  const groupContextMap = new Map<string, { passage?: string; passageImageUrl?: string }>();
+
+  for (const q of questions) {
+    if (q.groupId) {
+      const gId = q.groupId.trim();
+      const existing = groupContextMap.get(gId);
+      const passage = q.passage?.trim() || existing?.passage;
+      const passageImageUrl = q.passageImageUrl?.trim() || existing?.passageImageUrl;
+
+      if (passage || passageImageUrl) {
+        groupContextMap.set(gId, { passage, passageImageUrl });
+      }
+    }
+  }
+
+  // 2. Check in-memory questionStore if any group's passage was defined in another stored question
+  for (const q of questions) {
+    if (q.groupId) {
+      const gId = q.groupId.trim();
+      if (!groupContextMap.has(gId) || (!groupContextMap.get(gId)?.passage && !groupContextMap.get(gId)?.passageImageUrl)) {
+        const storedParent = questionStore.find(
+          sq => sq.groupId?.trim() === gId && (sq.passage?.trim() || sq.passageImageUrl?.trim())
+        );
+        if (storedParent) {
+          groupContextMap.set(gId, {
+            passage: storedParent.passage?.trim() || undefined,
+            passageImageUrl: storedParent.passageImageUrl?.trim() || undefined,
+          });
+        }
+      }
+    }
+  }
+
+  // 3. Second pass: Hydrate any questions missing passage or DI image from their group
+  return questions.map(q => {
+    if (!q.groupId) return q;
+    const gId = q.groupId.trim();
+    const groupData = groupContextMap.get(gId);
+    if (!groupData) return q;
+
+    const resolvedPassage = q.passage?.trim() || groupData.passage || undefined;
+    const resolvedPassageImg = q.passageImageUrl?.trim() || groupData.passageImageUrl || undefined;
+
+    if (q.passage === resolvedPassage && q.passageImageUrl === resolvedPassageImg) {
+      return q;
+    }
+
+    return {
+      ...q,
+      passage: resolvedPassage,
+      passageImageUrl: resolvedPassageImg,
+    };
+  });
+}
+
+/**
+ * Get all normalized questions from the JSON database with group passages resolved
  */
 export function getAllQuestions(): Question[] {
-  return questionStore.map(normalizeQuestion);
+  return resolveGroupPassages(questionStore.map(normalizeQuestion));
 }
 
 /**
@@ -255,7 +321,7 @@ export function pickRandomQuestions(params: {
  * PYQ exams (2024 and 2023) remain strictly authentic and unchanged.
  */
 export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
-  const allQuestions = questionStore.map(normalizeQuestion);
+  const allQuestions = getAllQuestions();
   const norm = (testIdOrSlug || '').toLowerCase().trim();
 
   // 1. IBPS PO Mains 2025 PYQ (Authentic 155 official questions)
@@ -436,8 +502,9 @@ export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
 /**
  * Partition questions list deterministically for any exam or partition key
  */
-export function partitionQuestionsList(all: Question[], partitionKey: string): Question[] {
+export function partitionQuestionsList(rawAll: Question[], partitionKey: string): Question[] {
   const normKey = (partitionKey || 'ALL').toLowerCase().trim();
+  const all = resolveGroupPassages(rawAll);
   if (normKey === 'all') return all;
 
   // 1. IBPS PO Mains 2025 PYQ (155 Authentic Questions)

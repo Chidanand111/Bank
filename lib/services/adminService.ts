@@ -13,6 +13,7 @@ import { SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
 import { prisma } from '../prisma';
 import {
   getAllQuestions,
+  resolveGroupPassages,
   addQuestionToJsonDb,
   updateQuestionInJsonDb,
   deleteQuestionFromJsonDb,
@@ -22,7 +23,7 @@ import {
   partitionQuestionsList,
 } from '../db/questionDb';
 
-export { partitionQuestionsList };
+export { partitionQuestionsList, resolveGroupPassages };
 import {
   AdminExamInput,
   AdminMockTestInput,
@@ -224,15 +225,17 @@ export async function loadFreshQuestionsFromDb(): Promise<Question[]> {
         })),
       }));
 
-      dynamicQuestions = mapped;
-      syncQuestionsToStore(mapped);
-      return mapped;
+      // Resolve and hydrate shared passages across groups
+      const resolved = resolveGroupPassages(mapped);
+      dynamicQuestions = resolved;
+      syncQuestionsToStore(resolved);
+      return resolved;
     }
   } catch (err) {
     console.warn('Neon DB query in adminService:', err);
   }
 
-  return dynamicQuestions;
+  return resolveGroupPassages(dynamicQuestions);
 }
 
 /**
@@ -345,7 +348,7 @@ export async function getAdminQuestions(filters?: {
     list = list.filter(item => item.difficulty === filters.difficulty);
   }
 
-  return list;
+  return resolveGroupPassages(list);
 }
 
 export async function createQuestionAction(input: AdminQuestionInput): Promise<{ success: boolean; question?: Question; error?: string }> {
@@ -354,13 +357,34 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
   const exam = EXAMS_DATA.find(e => e.id === input.examId || e.slug === input.examId) || EXAMS_DATA[0];
   const newQuestionId = `q-custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
-  const newQuestion: Question = {
+  // Determine whether this question should persist passage/passageImageUrl to DB or reuse an existing group's
+  let dbPassage: string | null = input.passage?.trim() || null;
+  let dbPassageImageUrl: string | null = input.passageImageUrl?.trim() || null;
+  const gId = input.groupId?.trim();
+
+  if (gId) {
+    const existingInGroup = dynamicQuestions.find(
+      q => q.groupId?.trim().toLowerCase() === gId.toLowerCase() &&
+           (Boolean(q.passage?.trim()) || Boolean(q.passageImageUrl?.trim()))
+    );
+
+    if (existingInGroup) {
+      if (existingInGroup.passage && (!dbPassage || dbPassage === existingInGroup.passage.trim())) {
+        dbPassage = null;
+      }
+      if (existingInGroup.passageImageUrl && (!dbPassageImageUrl || dbPassageImageUrl === existingInGroup.passageImageUrl.trim())) {
+        dbPassageImageUrl = null;
+      }
+    }
+  }
+
+  const rawQuestion: Question = {
     id: newQuestionId,
     text: input.text,
     imageUrl: input.imageUrl,
-    passage: input.passage,
-    passageImageUrl: input.passageImageUrl,
-    groupId: input.groupId,
+    passage: dbPassage || input.passage || undefined,
+    passageImageUrl: dbPassageImageUrl || input.passageImageUrl || undefined,
+    groupId: gId || undefined,
     isPyq: Boolean(input.isPyq),
     pyqYear: input.pyqYear,
     pyqExam: input.pyqExam || (input.isPyq ? (input.pyqYear === 2023 ? 'SBI Clerk Prelims 2023-24' : 'SBI Clerk Prelims 2024') : undefined),
@@ -384,7 +408,10 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
     })),
   };
 
-  dynamicQuestions.unshift(newQuestion);
+  const hydratedList = resolveGroupPassages([rawQuestion, ...dynamicQuestions]);
+  dynamicQuestions = hydratedList;
+  const newQuestion = hydratedList[0];
+
   addQuestionToJsonDb({
     id: newQuestionId,
     exam: input.examId || (input.isPyq ? (input.pyqExam || 'SBI Clerk Prelims 2024 PYQ') : exam.title),
@@ -392,9 +419,9 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
     topic: input.topicName,
     question: input.text,
     imageUrl: input.imageUrl,
-    passage: input.passage,
-    passageImageUrl: input.passageImageUrl,
-    groupId: input.groupId,
+    passage: dbPassage || undefined,
+    passageImageUrl: dbPassageImageUrl || undefined,
+    groupId: gId || undefined,
     isPyq: input.isPyq,
     pyqYear: input.pyqYear,
     pyqExam: input.pyqExam,
@@ -444,9 +471,9 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
         id: newQuestionId,
         text: input.text,
         imageUrl: input.imageUrl || null,
-        passage: input.passage || null,
-        passageImageUrl: input.passageImageUrl || null,
-        groupId: input.groupId || null,
+        passage: dbPassage,
+        passageImageUrl: dbPassageImageUrl,
+        groupId: gId || null,
         isPyq: Boolean(input.isPyq),
         pyqYear: input.pyqYear ? Number(input.pyqYear) : null,
         pyqExam: input.pyqExam || null,
@@ -479,25 +506,13 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
             ...(input.pyqExam ? [{ title: input.pyqExam }, { slug: input.pyqExam.toLowerCase().replace(/[^a-z0-9]+/g, '-') }] : []),
           ],
         },
+        include: { mockTestQuestions: true },
       });
 
       if (dbMockTest) {
-        const orderCount = await prisma.mockTestQuestion.count({
-          where: { mockTestId: dbMockTest.id },
-        });
-
-        await prisma.mockTestQuestion.upsert({
-          where: {
-            mockTestId_questionId: {
-              mockTestId: dbMockTest.id,
-              questionId: newQuestionId,
-            },
-          },
-          update: {
-            order: orderCount + 1,
-            sectionId: finalSecId,
-          },
-          create: {
+        const orderCount = dbMockTest.mockTestQuestions.length;
+        await prisma.mockTestQuestion.create({
+          data: {
             mockTestId: dbMockTest.id,
             questionId: newQuestionId,
             sectionId: finalSecId,
@@ -529,11 +544,53 @@ export async function bulkImportQuestionsAction(
     return { success: false, count: 0, error: 'No questions provided for import.' };
   }
 
+  // Registry to track group passages across the imported batch so they are saved only once
+  const batchGroupRegistry = new Map<string, { passage?: string; passageImageUrl?: string }>();
+
   let importedCount = 0;
   for (const qInput of questions) {
     try {
-      // If a specific partition is provided, assign it to question and associate target examId
       const inputToUse = { ...qInput };
+
+      // De-duplicate group passages and DI images in batch
+      if (inputToUse.groupId && inputToUse.groupId.trim()) {
+        const gid = inputToUse.groupId.trim().toLowerCase();
+        const existingInBatch = batchGroupRegistry.get(gid);
+
+        if (!existingInBatch) {
+          const existingInSys = dynamicQuestions.find(
+            q => q.groupId?.trim().toLowerCase() === gid && (Boolean(q.passage?.trim()) || Boolean(q.passageImageUrl?.trim()))
+          );
+
+          if (existingInSys) {
+            batchGroupRegistry.set(gid, {
+              passage: existingInSys.passage?.trim() || undefined,
+              passageImageUrl: existingInSys.passageImageUrl?.trim() || undefined,
+            });
+            if (existingInSys.passage && (!inputToUse.passage || inputToUse.passage.trim() === existingInSys.passage.trim())) {
+              inputToUse.passage = undefined;
+            }
+            if (existingInSys.passageImageUrl && (!inputToUse.passageImageUrl || inputToUse.passageImageUrl.trim() === existingInSys.passageImageUrl.trim())) {
+              inputToUse.passageImageUrl = undefined;
+            }
+          } else {
+            batchGroupRegistry.set(gid, {
+              passage: inputToUse.passage?.trim() || undefined,
+              passageImageUrl: inputToUse.passageImageUrl?.trim() || undefined,
+            });
+          }
+        } else {
+          // Clear duplicate passage and DI image on subsequent questions
+          if (existingInBatch.passage && (!inputToUse.passage || inputToUse.passage.trim() === existingInBatch.passage.trim())) {
+            inputToUse.passage = undefined;
+          }
+          if (existingInBatch.passageImageUrl && (!inputToUse.passageImageUrl || inputToUse.passageImageUrl.trim() === existingInBatch.passageImageUrl.trim())) {
+            inputToUse.passageImageUrl = undefined;
+          }
+        }
+      }
+
+      // If a specific partition is provided, assign it to question and associate target examId
       if (partitionId && partitionId !== 'ALL') {
         inputToUse.mockTestId = partitionId;
         if (partitionId.toLowerCase().includes('sbi') || partitionId.toLowerCase().includes('clerk')) {
@@ -554,6 +611,7 @@ export async function bulkImportQuestionsAction(
     }
   }
 
+  dynamicQuestions = resolveGroupPassages(dynamicQuestions);
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/admin/tests');
   safeRevalidatePath('/admin');
@@ -746,7 +804,7 @@ export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<
     });
 
     if (dbMockTest && dbMockTest.mockTestQuestions.length > 0) {
-      return dbMockTest.mockTestQuestions.map(mtq => {
+      const mapped: Question[] = dbMockTest.mockTestQuestions.map(mtq => {
         const q = mtq.question;
         return {
           id: q.id,
@@ -778,13 +836,45 @@ export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<
           })),
         };
       });
+
+      // Hydrate missing group passages from parent questions in DB if not in mock test
+      const missingGroupIds = mapped
+        .filter(q => q.groupId && !q.passage && !q.passageImageUrl)
+        .map(q => q.groupId as string);
+
+      if (missingGroupIds.length > 0) {
+        try {
+          const groupParents = await prisma.question.findMany({
+            where: {
+              groupId: { in: missingGroupIds },
+              OR: [{ passage: { not: null } }, { passageImageUrl: { not: null } }],
+            },
+            select: { groupId: true, passage: true, passageImageUrl: true },
+          });
+
+          const groupParentMap = new Map(groupParents.map(gp => [gp.groupId!, gp]));
+          for (const q of mapped) {
+            if (q.groupId && (!q.passage && !q.passageImageUrl)) {
+              const parent = groupParentMap.get(q.groupId);
+              if (parent) {
+                if (parent.passage) q.passage = parent.passage;
+                if (parent.passageImageUrl) q.passageImageUrl = parent.passageImageUrl;
+              }
+            }
+          }
+        } catch (gpErr) {
+          console.warn('Error fetching group parents in getLiveExamQuestionsAction:', gpErr);
+        }
+      }
+
+      return resolveGroupPassages(mapped);
     }
   } catch (err) {
     console.warn('getLiveExamQuestionsAction DB mockTest query fallback:', err);
   }
 
   const freshQuestions = await loadFreshQuestionsFromDb();
-  return partitionQuestionsList(freshQuestions, testIdOrSlug);
+  return resolveGroupPassages(partitionQuestionsList(freshQuestions, testIdOrSlug));
 }
 
 export async function deleteQuestionAction(questionId: string): Promise<{ success: boolean; error?: string }> {
