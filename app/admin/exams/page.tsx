@@ -94,9 +94,10 @@ export default function AdminExamsPage() {
     startTransition(async () => {
       const res = await deleteExamAction(deletingExam.id);
       if (res.success) {
+        const countMsg = res.count ? ` (${res.count} question(s) purged)` : '';
         setFeedback({
           type: 'success',
-          text: `Exam "${deletingExam.title}" and all its questions/tests were permanently deleted from the database to reclaim space.`,
+          text: `Exam "${deletingExam.title}" and all its questions/tests${countMsg} were permanently deleted from the database to reclaim space.`,
         });
         setDeletingExam(null);
         await loadExams();

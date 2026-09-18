@@ -704,6 +704,25 @@ export function deleteQuestionFromJsonDb(id: number | string): boolean {
 }
 
 /**
+ * Permanently deletes questions by specific IDs from the in-memory questionStore.
+ */
+export function deleteQuestionsByIdsFromStore(questionIds: string[]): number {
+  if (!questionIds || questionIds.length === 0) return 0;
+  const initialLen = questionStore.length;
+  const idSet = new Set(questionIds.map(id => String(id).toLowerCase()));
+
+  questionStore = questionStore.filter(q => {
+    const qId = String(q.id).toLowerCase();
+    if (idSet.has(qId)) return false;
+    if (idSet.has(qId.replace(/^q-json-/, ''))) return false;
+    if (idSet.has(qId.replace(/^q-/, ''))) return false;
+    return true;
+  });
+
+  return initialLen - questionStore.length;
+}
+
+/**
  * Permanently deletes all questions belonging to an Exam (or exam title) from the in-memory store.
  * Frees up memory and synchronization storage.
  */
@@ -714,9 +733,10 @@ export function deleteExamQuestionsFromStore(examId: string, examTitle?: string)
 
   questionStore = questionStore.filter(q => {
     const qExam = String(q.exam || '').toLowerCase();
+    const qPyq = String(q.pyqExam || '').toLowerCase();
     if (qExam === targetId) return false;
     if (qExam.replace(/^exam-/, '') === targetId.replace(/^exam-/, '')) return false;
-    if (targetTitle && qExam === targetTitle) return false;
+    if (targetTitle && (qExam === targetTitle || qPyq === targetTitle)) return false;
     return true;
   });
 

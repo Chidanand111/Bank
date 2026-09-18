@@ -161,7 +161,11 @@ export default function AdminTestsPage() {
     startTransition(async () => {
       const res = await deleteMockTestAction(deletingTest.id);
       if (res.success) {
-        setFeedback({ text: 'Exam paper deleted successfully.', type: 'success' });
+        const countMsg = res.count ? ` and ${res.count} associated question(s)` : '';
+        setFeedback({
+          text: `Exam paper "${deletingTest.title}"${countMsg} were permanently deleted from the database to save storage space.`,
+          type: 'success',
+        });
         setIsDeleteModalOpen(false);
         setDeletingTest(null);
         await loadData();
@@ -522,24 +526,35 @@ export default function AdminTestsPage() {
         <Modal
           isOpen={isDeleteModalOpen}
           onClose={() => setIsDeleteModalOpen(false)}
-          title="Confirm Exam Paper Deletion"
+          title="Delete Exam Paper & Reclaim Database Storage"
           footer={
             <>
               <Button variant="secondary" size="md" onClick={() => setIsDeleteModalOpen(false)}>
                 Cancel
               </Button>
-              <Button variant="danger" size="md" isLoading={isPending} onClick={handleDeleteTest}>
-                Delete Paper
+              <Button variant="danger" size="md" isLoading={isPending} onClick={handleDeleteTest} className="font-bold">
+                Delete Exam & All Questions
               </Button>
             </>
           }
         >
           <div className="space-y-3 text-xs text-slate-600">
-            <div className="p-3 bg-red-50 text-red-800 border border-red-200 rounded-xl flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
-              <span>Are you sure you want to permanently delete this exam paper? All linked test records will be removed.</span>
+            <div className="p-3.5 bg-red-50 text-red-800 border border-red-200 rounded-xl space-y-2">
+              <div className="flex items-center gap-2 font-bold text-red-900">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                <span>Confirm Permanent Deletion to Save DB Storage</span>
+              </div>
+              <p>
+                Are you sure you want to permanently delete <strong className="font-extrabold underline">{deletingTest.title}</strong>?
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-slate-700 pl-1">
+                <li>All questions and options in this exam paper will be deleted to save space</li>
+                <li>All student attempts and score analytics for this paper will be cleared</li>
+              </ul>
             </div>
-            <p className="font-bold text-slate-900">{deletingTest.title}</p>
+            <p className="text-slate-500 text-[11px] italic">
+              Questions and associated data will be removed from Neon PostgreSQL and caches to free database space.
+            </p>
           </div>
         </Modal>
       )}

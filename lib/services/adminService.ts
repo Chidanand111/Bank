@@ -17,6 +17,7 @@ import {
   updateQuestionInJsonDb,
   deleteQuestionFromJsonDb,
   deleteExamQuestionsFromStore,
+  deleteQuestionsByIdsFromStore,
   syncQuestionsToStore,
   partitionQuestionsList,
 } from '../db/questionDb';
@@ -790,8 +791,11 @@ export async function deleteQuestionAction(questionId: string): Promise<{ succes
 
   dynamicQuestions = dynamicQuestions.filter(q => q.id !== questionId);
   deleteQuestionFromJsonDb(questionId);
+  deleteQuestionsByIdsFromStore([questionId]);
 
   try {
+    await prisma.answer.deleteMany({ where: { questionId } });
+    await prisma.mockTestQuestion.deleteMany({ where: { questionId } });
     await prisma.option.deleteMany({ where: { questionId } });
     await prisma.question.delete({ where: { id: questionId } });
   } catch (dbErr) {
@@ -1054,10 +1058,102 @@ export async function deleteExamAction(
     const examTitle = dbExam ? dbExam.title : EXAMS_DATA.find(e => e.id === examIdOrSlug || e.slug === examIdOrSlug)?.title;
 
     // 2. Cascade Delete from Neon PostgreSQL
-    // Because of onDelete: Cascade on Section, Topic, Question, Option, MockTest, MockTestQuestion, Attempt, Answer,
-    // deleting the Exam automatically cascades and purges all related child records in PostgreSQL!
     if (dbExam) {
-      deletedQuestionsCount = dbExam.questions.length;
+      // Find all mock tests under this exam
+      const mockTests = await prisma.mockTest.findMany({
+        where: {
+          OR: [{ examId: dbExam.id }, { examId: targetExamId }, { examId: targetSlug }],
+        },
+        select: { id: true },
+      });
+      const mockTestIds = mockTests.map(m => m.id);
+
+      // Find all questions associated with this exam (direct or via mock tests or pyqExam)
+      const examQuestions = await prisma.question.findMany({
+        where: {
+          OR: [
+            { examId: dbExam.id },
+            { examId: targetExamId },
+            { examId: targetSlug },
+            ...(examTitle ? [{ pyqExam: examTitle }] : []),
+            ...(mockTestIds.length > 0
+              ? [{ mockTestQuestions: { some: { mockTestId: { in: mockTestIds } } } }]
+              : []),
+          ],
+        },
+        select: { id: true },
+      });
+      const questionIds = Array.from(new Set(examQuestions.map(q => q.id)));
+      deletedQuestionsCount = questionIds.length;
+
+      // Delete student answers for these questions or attempts of these mock tests
+      if (questionIds.length > 0 || mockTestIds.length > 0) {
+        await prisma.answer.deleteMany({
+          where: {
+            OR: [
+              ...(questionIds.length > 0 ? [{ questionId: { in: questionIds } }] : []),
+              ...(mockTestIds.length > 0 ? [{ attempt: { mockTestId: { in: mockTestIds } } }] : []),
+            ],
+          },
+        });
+      }
+
+      // Delete candidate attempts
+      if (mockTestIds.length > 0) {
+        await prisma.attempt.deleteMany({
+          where: { mockTestId: { in: mockTestIds } },
+        });
+      }
+
+      // Delete mockTestQuestions junction links
+      if (mockTestIds.length > 0 || questionIds.length > 0) {
+        await prisma.mockTestQuestion.deleteMany({
+          where: {
+            OR: [
+              ...(mockTestIds.length > 0 ? [{ mockTestId: { in: mockTestIds } }] : []),
+              ...(questionIds.length > 0 ? [{ questionId: { in: questionIds } }] : []),
+            ],
+          },
+        });
+      }
+
+      // Delete question options to reclaim DB space
+      if (questionIds.length > 0) {
+        await prisma.option.deleteMany({
+          where: { questionId: { in: questionIds } },
+        });
+      }
+
+      // Permanently delete questions to reclaim DB space
+      if (questionIds.length > 0) {
+        await prisma.question.deleteMany({
+          where: { id: { in: questionIds } },
+        });
+      }
+
+      // Delete mock tests
+      if (mockTestIds.length > 0) {
+        await prisma.mockTest.deleteMany({
+          where: { id: { in: mockTestIds } },
+        });
+      }
+
+      // Delete topics under sections
+      const sections = await prisma.section.findMany({
+        where: { examId: dbExam.id },
+        select: { id: true },
+      });
+      const sectionIds = sections.map(s => s.id);
+      if (sectionIds.length > 0) {
+        await prisma.topic.deleteMany({
+          where: { sectionId: { in: sectionIds } },
+        });
+        await prisma.section.deleteMany({
+          where: { id: { in: sectionIds } },
+        });
+      }
+
+      // Delete the exam record itself
       await prisma.exam.delete({
         where: { id: dbExam.id },
       });
@@ -1323,7 +1419,13 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
 
   const isPyq = Boolean(input.isPyq);
   const year = input.year ? Number(input.year) : (isPyq ? new Date().getFullYear() : undefined);
-  const totalQuestions = input.sections?.reduce((acc, s) => acc + (s.questionCount || 0), 0) || 100;
+  const defaultSections = [
+    { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30 },
+    { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35 },
+    { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35 },
+  ];
+  const targetSections = input.sections && input.sections.length > 0 ? input.sections : defaultSections;
+  const totalQuestions = targetSections.reduce((acc, s) => acc + (s.questionCount || 0), 0);
 
   const newTest: MockTest = {
     id: newId,
@@ -1341,7 +1443,7 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
     isFixed: true,
     isPyq,
     year,
-    sections: input.sections.map(s => ({
+    sections: targetSections.map(s => ({
       id: `sec-${s.code.toLowerCase()}`,
       code: s.code,
       name: s.name,
@@ -1398,19 +1500,104 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
   return { success: true, test: newTest };
 }
 
-export async function deleteMockTestAction(testId: string): Promise<{ success: boolean; error?: string }> {
+export async function deleteMockTestAction(
+  testId: string
+): Promise<{ success: boolean; count?: number; error?: string }> {
   await requireAdmin();
 
+  let deletedQuestionsCount = 0;
   dynamicMockTests = dynamicMockTests.filter(t => t.id !== testId && t.slug !== testId);
 
   try {
     const dbTest = await prisma.mockTest.findFirst({
-      where: { OR: [{ id: testId }, { slug: testId }] },
+      where: {
+        OR: [
+          { id: testId },
+          { slug: testId },
+          { slug: testId.replace(/^mock-/, '') },
+        ],
+      },
+      include: {
+        mockTestQuestions: { select: { questionId: true } },
+      },
     });
+
     if (dbTest) {
-      await prisma.mockTestQuestion.deleteMany({ where: { mockTestId: dbTest.id } });
-      await prisma.attempt.deleteMany({ where: { mockTestId: dbTest.id } });
+      // 1. Gather all question IDs linked to this mock test
+      const directQIds = dbTest.mockTestQuestions.map(mtq => mtq.questionId);
+
+      // Also gather any questions whose pyqExam matches dbTest.title or groupId matches dbTest.id/slug
+      const relatedQuestions = await prisma.question.findMany({
+        where: {
+          OR: [
+            ...(directQIds.length > 0 ? [{ id: { in: directQIds } }] : []),
+            ...(dbTest.title ? [{ pyqExam: dbTest.title }] : []),
+            { groupId: dbTest.id },
+            { groupId: dbTest.slug },
+          ],
+        },
+        select: { id: true },
+      });
+
+      const questionIds = Array.from(new Set(relatedQuestions.map(q => q.id)));
+      deletedQuestionsCount = questionIds.length;
+
+      // 2. Cascade delete from Neon DB in proper foreign key order
+      if (questionIds.length > 0) {
+        // Delete all student answers for these questions or for attempts of this mock test
+        await prisma.answer.deleteMany({
+          where: {
+            OR: [
+              { questionId: { in: questionIds } },
+              { attempt: { mockTestId: dbTest.id } },
+            ],
+          },
+        });
+
+        // Delete options for these questions
+        await prisma.option.deleteMany({
+          where: { questionId: { in: questionIds } },
+        });
+
+        // Delete mock test question junction links
+        await prisma.mockTestQuestion.deleteMany({
+          where: {
+            OR: [
+              { mockTestId: dbTest.id },
+              { questionId: { in: questionIds } },
+            ],
+          },
+        });
+
+        // Delete candidate attempts for this mock test
+        await prisma.attempt.deleteMany({
+          where: { mockTestId: dbTest.id },
+        });
+
+        // Permanently delete the questions to save DB space
+        await prisma.question.deleteMany({
+          where: { id: { in: questionIds } },
+        });
+      } else {
+        // Just delete mock test junction and attempts if no questions found
+        await prisma.mockTestQuestion.deleteMany({ where: { mockTestId: dbTest.id } });
+        await prisma.attempt.deleteMany({ where: { mockTestId: dbTest.id } });
+      }
+
+      // Delete the mock test record itself
       await prisma.mockTest.delete({ where: { id: dbTest.id } });
+
+      // 3. Purge from in-memory and local store
+      const deletedIdsSet = new Set(questionIds);
+      dynamicQuestions = dynamicQuestions.filter(q => {
+        if (deletedIdsSet.has(q.id)) return false;
+        if (dbTest.title && q.pyqExam === dbTest.title) return false;
+        if (q.groupId === dbTest.id || q.groupId === dbTest.slug) return false;
+        return true;
+      });
+
+      deletedQuestionsCount += deleteQuestionsByIdsFromStore(questionIds);
+      deletedQuestionsCount += deleteExamQuestionsFromStore(dbTest.id, dbTest.title);
     }
   } catch (dbErr) {
     console.warn('Neon DB async sync on deleteMockTest:', dbErr);
@@ -1419,7 +1606,7 @@ export async function deleteMockTestAction(testId: string): Promise<{ success: b
   safeRevalidatePath('/admin/tests');
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/tests');
-  return { success: true };
+  return { success: true, count: deletedQuestionsCount };
 }
 
 export interface AdminPartitionInfo {
