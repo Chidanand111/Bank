@@ -49,6 +49,7 @@ function safeRevalidatePath(path: string) {
 let dynamicQuestions: Question[] = getAllQuestions();
 
 let dynamicMockTests: MockTest[] = [...MOCK_TESTS_DATA];
+const deletedMockTestIds = new Set<string>();
 
 /**
  * Server-side Admin Statistics
@@ -1359,8 +1360,9 @@ export async function loadFreshMockTestsFromDb(): Promise<MockTest[]> {
         };
       });
 
-      const merged: MockTest[] = [...mapped];
+      const merged: MockTest[] = mapped.filter(m => !deletedMockTestIds.has(m.id) && !deletedMockTestIds.has(m.slug));
       for (const st of MOCK_TESTS_DATA) {
+        if (deletedMockTestIds.has(st.id) || deletedMockTestIds.has(st.slug)) continue;
         if (!merged.some(m => m.id === st.id || m.slug === st.slug)) {
           merged.push(st);
         }
@@ -1371,7 +1373,7 @@ export async function loadFreshMockTestsFromDb(): Promise<MockTest[]> {
   } catch (err) {
     console.warn('Neon DB query in loadFreshMockTestsFromDb:', err);
   }
-  return dynamicMockTests;
+  return dynamicMockTests.filter(m => !deletedMockTestIds.has(m.id) && !deletedMockTestIds.has(m.slug));
 }
 
 /**
@@ -1504,6 +1506,9 @@ export async function deleteMockTestAction(
   testId: string
 ): Promise<{ success: boolean; count?: number; error?: string }> {
   await requireAdmin();
+
+  deletedMockTestIds.add(testId);
+  deletedMockTestIds.add(testId.replace(/^mock-/, ''));
 
   let deletedQuestionsCount = 0;
   dynamicMockTests = dynamicMockTests.filter(t => t.id !== testId && t.slug !== testId);

@@ -10,6 +10,8 @@ import {
   getAdminExams,
   createMockTestAction,
   updateMockTestTitleAction,
+  deleteMockTestAction,
+  deleteExamAction,
   AdminPartitionInfo,
 } from '@/lib/services/adminService';
 import { AdminNav } from '@/components/admin/AdminNav';
@@ -272,6 +274,8 @@ export default function AdminQuestionsPage() {
   const [editPartitionTitle, setEditPartitionTitle] = useState('');
   const [editPartitionDesc, setEditPartitionDesc] = useState('');
   const [isEditPartitionModalOpen, setIsEditPartitionModalOpen] = useState(false);
+  const [deletingPartition, setDeletingPartition] = useState<ExamPartition | null>(null);
+  const [isDeletePartitionModalOpen, setIsDeletePartitionModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
 
   const activePartition = partitions.find(p => p.id === activePartitionId) || partitions[0] || PARTITIONS[0];
@@ -401,6 +405,55 @@ export default function AdminQuestionsPage() {
       } else {
         setFeedback({
           text: res.error || 'Failed to update exam title.',
+          type: 'error',
+        });
+      }
+    });
+  };
+
+  const handleDeletePartition = () => {
+    if (!deletingPartition || deletingPartition.id === 'ALL') return;
+
+    startTransition(async () => {
+      try {
+        let res = await deleteMockTestAction(deletingPartition.id);
+        if (!res.success || deletingPartition.id.startsWith('exam-')) {
+          const examRes = await deleteExamAction(deletingPartition.id);
+          if (examRes.success) res = examRes;
+        }
+
+        if (res.success) {
+          const countMsg = res.count ? ` and ${res.count} associated question(s)` : '';
+          setFeedback({
+            text: `Exam "${deletingPartition.label}"${countMsg} were permanently deleted from the database to save space.`,
+            type: 'success',
+          });
+          const targetDeletedId = deletingPartition.id;
+          setIsDeletePartitionModalOpen(false);
+          setDeletingPartition(null);
+
+          // Update local state immediately
+          setPartitions(prev => prev.filter(p => p.id !== targetDeletedId));
+
+          // Refresh partitions from server
+          const freshParts = await getAdminPartitions();
+          if (freshParts) setPartitions(freshParts);
+
+          // Reset active partition if needed
+          if (activePartitionId === targetDeletedId) {
+            setActivePartitionId('ALL');
+          } else {
+            await loadQuestions();
+          }
+        } else {
+          setFeedback({
+            text: res.error || 'Failed to delete exam.',
+            type: 'error',
+          });
+        }
+      } catch (err: any) {
+        setFeedback({
+          text: err?.message || 'Failed to delete exam.',
           type: 'error',
         });
       }
@@ -732,22 +785,42 @@ export default function AdminQuestionsPage() {
                   {partitions.filter(p => p.category === 'PYQ').map(partition => {
                     const isActive = activePartitionId === partition.id;
                     return (
-                      <button
+                      <div
                         key={partition.id}
-                        type="button"
-                        onClick={() => setActivePartitionId(partition.id)}
-                        className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border ${
+                        className={`inline-flex items-center rounded-xl text-xs font-semibold transition-all border shadow-2xs ${
                           isActive
                             ? 'bg-purple-700 text-white border-purple-700 shadow-xs ring-2 ring-purple-300'
-                            : 'bg-purple-50/60 hover:bg-purple-100 text-purple-900 border-purple-200'
+                            : 'bg-purple-50/60 hover:bg-purple-100/90 text-purple-900 border-purple-200'
                         }`}
                       >
-                        <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-amber-300' : 'bg-purple-600'}`} />
-                        <span>{partition.label}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${isActive ? 'bg-purple-800 text-purple-100' : 'bg-purple-200/80 text-purple-800'}`}>
-                          {partition.badge}
-                        </span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => setActivePartitionId(partition.id)}
+                          className="px-3 py-2 flex items-center gap-2 text-left cursor-pointer"
+                        >
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : 'bg-purple-600'}`} />
+                          <span>{partition.label}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isActive ? 'bg-purple-800 text-purple-100' : 'bg-purple-200/80 text-purple-800'}`}>
+                            {partition.badge}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingPartition(partition);
+                            setIsDeletePartitionModalOpen(true);
+                          }}
+                          className={`pr-2.5 pl-1.5 py-2 transition-colors cursor-pointer border-l ${
+                            isActive
+                              ? 'border-purple-600/60 text-purple-200 hover:text-red-200 hover:bg-purple-800/50'
+                              : 'border-purple-200/70 text-purple-400 hover:text-red-600 hover:bg-red-50/60'
+                          }`}
+                          title={`Delete ${partition.label} and all questions in it`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -763,22 +836,42 @@ export default function AdminQuestionsPage() {
                   {partitions.filter(p => p.category === 'MOCK').map(partition => {
                     const isActive = activePartitionId === partition.id;
                     return (
-                      <button
+                      <div
                         key={partition.id}
-                        type="button"
-                        onClick={() => setActivePartitionId(partition.id)}
-                        className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border ${
+                        className={`inline-flex items-center rounded-xl text-xs font-semibold transition-all border shadow-2xs ${
                           isActive
                             ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-300'
                             : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
                         }`}
                       >
-                        <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-amber-300' : 'bg-blue-500'}`} />
-                        <span>{partition.label}</span>
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${isActive ? 'bg-blue-700 text-blue-100' : 'bg-slate-200 text-slate-700'}`}>
-                          {partition.badge}
-                        </span>
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => setActivePartitionId(partition.id)}
+                          className="px-3 py-2 flex items-center gap-2 text-left cursor-pointer"
+                        >
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : 'bg-blue-500'}`} />
+                          <span>{partition.label}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isActive ? 'bg-blue-700 text-blue-100' : 'bg-slate-200 text-slate-700'}`}>
+                            {partition.badge}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingPartition(partition);
+                            setIsDeletePartitionModalOpen(true);
+                          }}
+                          className={`pr-2.5 pl-1.5 py-2 transition-colors cursor-pointer border-l ${
+                            isActive
+                              ? 'border-blue-500/60 text-blue-200 hover:text-red-200 hover:bg-blue-700/50'
+                              : 'border-slate-200 text-slate-400 hover:text-red-600 hover:bg-red-50/60'
+                          }`}
+                          title={`Delete ${partition.label} and all questions in it`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -801,31 +894,53 @@ export default function AdminQuestionsPage() {
                 .map(partition => {
                   const isActive = activePartitionId === partition.id;
                   return (
-                    <button
+                    <div
                       key={partition.id}
-                      type="button"
-                      onClick={() => setActivePartitionId(partition.id)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 border ${
+                      className={`inline-flex items-center rounded-xl text-xs font-semibold transition-all border shadow-2xs ${
                         isActive
                           ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-300'
                           : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
                       }`}
                     >
-                      {partition.category === 'PYQ' && (
-                        <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-amber-300' : 'bg-purple-600'}`} />
-                      )}
-                      {partition.category === 'MOCK' && (
-                        <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-amber-300' : 'bg-blue-500'}`} />
-                      )}
-                      <span>{partition.label}</span>
-                      <span
-                        className={`text-[10px] px-1.5 py-0.5 rounded ${
-                          isActive ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-200 text-slate-700'
-                        }`}
+                      <button
+                        type="button"
+                        onClick={() => setActivePartitionId(partition.id)}
+                        className="px-3.5 py-2 flex items-center gap-2 text-left cursor-pointer"
                       >
-                        {partition.badge}
-                      </span>
-                    </button>
+                        {partition.category === 'PYQ' && (
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : 'bg-purple-600'}`} />
+                        )}
+                        {partition.category === 'MOCK' && (
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : 'bg-blue-500'}`} />
+                        )}
+                        <span>{partition.label}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                            isActive ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {partition.badge}
+                        </span>
+                      </button>
+                      {partition.id !== 'ALL' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingPartition(partition);
+                            setIsDeletePartitionModalOpen(true);
+                          }}
+                          className={`pr-2.5 pl-1.5 py-2 transition-colors cursor-pointer border-l ${
+                            isActive
+                              ? 'border-indigo-500/60 text-indigo-200 hover:text-red-200 hover:bg-indigo-700/50'
+                              : 'border-slate-200 text-slate-400 hover:text-red-600 hover:bg-red-50/60'
+                          }`}
+                          title={`Delete ${partition.label} and all questions in it`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   );
                 })}
             </div>
@@ -870,20 +985,32 @@ export default function AdminQuestionsPage() {
               </p>
             </div>
 
-            <div className="shrink-0 flex items-center gap-2.5">
+            <div className="shrink-0 flex items-center gap-2.5 flex-wrap">
               <Button
                 variant="outline"
                 size="md"
                 onClick={() => openEditPartitionModal(activePartition)}
-                className="bg-white/10 hover:bg-white/20 text-white border-white/30 font-bold flex items-center gap-1.5 shadow-sm"
+                className="bg-white/10 hover:bg-white/20 text-white border-white/30 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <Edit2 className="w-4 h-4 text-amber-300" /> Edit Title
+              </Button>
+              <Button
+                variant="danger"
+                size="md"
+                onClick={() => {
+                  setDeletingPartition(activePartition);
+                  setIsDeletePartitionModalOpen(true);
+                }}
+                className="bg-red-600 hover:bg-red-700 text-white font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                title="Delete this exam and all its questions from the database to save space"
+              >
+                <Trash2 className="w-4 h-4" /> Delete Exam
               </Button>
               <Button
                 variant="primary"
                 size="md"
                 onClick={() => openCreateModal(activePartition)}
-                className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold border-none shadow-sm flex items-center gap-1.5"
+                className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold border-none shadow-sm flex items-center gap-1.5 cursor-pointer"
               >
                 <PlusCircle className="w-4 h-4" /> Add Question
               </Button>
@@ -1796,6 +1923,59 @@ export default function AdminQuestionsPage() {
         partitions={partitions}
         currentPartitionId={activePartitionId}
       />
+
+      {/* Delete Exam Partition Confirmation Modal */}
+      {deletingPartition && (
+        <Modal
+          isOpen={isDeletePartitionModalOpen}
+          onClose={() => setIsDeletePartitionModalOpen(false)}
+          title="Delete Exam & Reclaim Database Storage"
+          footer={
+            <>
+              <Button
+                variant="secondary"
+                size="md"
+                type="button"
+                disabled={isPending}
+                onClick={() => setIsDeletePartitionModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                size="md"
+                type="button"
+                isLoading={isPending}
+                onClick={handleDeletePartition}
+                className="font-bold flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                Delete Exam & All Questions
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-3 text-xs text-slate-600">
+            <div className="p-3.5 bg-red-50 text-red-800 border border-red-200 rounded-xl space-y-2">
+              <div className="flex items-center gap-2 font-bold text-red-900">
+                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                <span>Confirm Permanent Deletion to Save DB Storage</span>
+              </div>
+              <p>
+                Are you sure you want to permanently delete <strong className="font-extrabold underline">{deletingPartition.title || deletingPartition.label}</strong>?
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-slate-700 pl-1">
+                <li>All questions and diagrams associated with this exam will be permanently deleted</li>
+                <li>All MCQ options, answer keys, and solution explanations will be removed</li>
+                <li>All student attempts and score analytics will be cleared</li>
+              </ul>
+            </div>
+            <p className="text-slate-500 text-[11px] italic">
+              All questions and associated data will be permanently removed from Neon PostgreSQL and caches to free database space.
+            </p>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
