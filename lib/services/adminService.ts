@@ -21,6 +21,7 @@ import {
   deleteQuestionsByIdsFromStore,
   syncQuestionsToStore,
   partitionQuestionsList,
+  getFixedQuestionsForMockTest,
 } from '../db/questionDb';
 
 export { partitionQuestionsList, resolveGroupPassages };
@@ -226,8 +227,14 @@ export async function loadFreshQuestionsFromDb(): Promise<Question[]> {
         })),
       }));
 
+      // CRITICAL: Merge static questions from JSON store whose IDs are not in DB
+      // Ensures newly added exam questions (e.g. IBPS PO 2025 Prelims PYQ) are immediately available
+      const dbIds = new Set(mapped.map(q => String(q.id)));
+      const staticQuestions = getAllQuestions().filter(q => !dbIds.has(String(q.id)));
+      const combined = [...mapped, ...staticQuestions];
+
       // Resolve and hydrate shared passages across groups
-      const resolved = resolveGroupPassages(mapped);
+      const resolved = resolveGroupPassages(combined);
       dynamicQuestions = resolved;
       syncQuestionsToStore(resolved);
       return resolved;
@@ -236,7 +243,8 @@ export async function loadFreshQuestionsFromDb(): Promise<Question[]> {
     console.warn('Neon DB query in adminService:', err);
   }
 
-  return resolveGroupPassages(dynamicQuestions);
+  const fallback = dynamicQuestions && dynamicQuestions.length > 0 ? dynamicQuestions : getAllQuestions();
+  return resolveGroupPassages(fallback);
 }
 
 /**
@@ -872,7 +880,18 @@ export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<
   }
 
   const freshQuestions = await loadFreshQuestionsFromDb();
-  return resolveGroupPassages(partitionQuestionsList(freshQuestions, testIdOrSlug));
+  const partitioned = partitionQuestionsList(freshQuestions, testIdOrSlug);
+  if (partitioned && partitioned.length > 0) {
+    return resolveGroupPassages(partitioned);
+  }
+
+  // Robust fallback to static getFixedQuestionsForMockTest
+  const fixed = getFixedQuestionsForMockTest(testIdOrSlug);
+  if (fixed && fixed.length > 0) {
+    return resolveGroupPassages(fixed);
+  }
+
+  return resolveGroupPassages(partitioned);
 }
 
 export async function deleteQuestionAction(questionId: string): Promise<{ success: boolean; error?: string }> {

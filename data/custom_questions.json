@@ -1,1 +1,386 @@
-[]
+[
+  {
+    "id": "q-custom-1789664976575",
+    "exam": "39d6e545-50ee-4b48-8e21-cf5c8fcd3fd1",
+    "section": "English Language",
+    "topic": "Reading Comprehension",
+    "question": "According to banking liquidity norms, what is the primary regulatory objective of maintaining the Statutory Liquidity Ratio (SLR)?",
+    "isPyq": false,
+    "options": {
+      "A": "To maximize foreign exchange reserves",
+      "B": "To ensure solvency and control commercial credit expansion",
+      "C": "To eliminate inter-bank lending rates",
+      "D": "To finance public sector subsidies directly",
+      "E": "None of the above"
+    },
+    "answer": "A",
+    "explanation": "SLR enforces commercial banks to maintain liquid assets against Net Demand and Time Liabilities to ensure solvency and curb reckless credit expansion.",
+    "difficulty": "MEDIUM",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789664989424",
+    "exam": "39d6e545-50ee-4b48-8e21-cf5c8fcd3fd1",
+    "section": "Numerical Ability",
+    "topic": "Simplification",
+    "question": "What is the value of: (45% of 840) + (14 * 25) - 210?",
+    "isPyq": false,
+    "options": {
+      "A": "498",
+      "B": "518",
+      "C": "538",
+      "D": "508",
+      "E": "528"
+    },
+    "answer": "A",
+    "explanation": "45% of 840 = 378; 14 * 25 = 350; 378 + 350 - 210 = 518.",
+    "difficulty": "EASY",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789664994484",
+    "exam": "39d6e545-50ee-4b48-8e21-cf5c8fcd3fd1",
+    "section": "Numerical Ability",
+    "topic": "Number Series",
+    "question": "Find the missing number in the following sequence: 8, 14, 26, 50, 98, ?",
+    "isPyq": false,
+    "options": {
+      "A": "186",
+      "B": "194",
+      "C": "192",
+      "D": "198",
+      "E": "184"
+    },
+    "answer": "A",
+    "explanation": "Pattern: (x * 2) - 2. 8*2-2=14; 14*2-2=26; 26*2-2=50; 50*2-2=98; 98*2-2 = 194.",
+    "difficulty": "MEDIUM",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789665002296",
+    "exam": "39d6e545-50ee-4b48-8e21-cf5c8fcd3fd1",
+    "section": "Reasoning Ability",
+    "topic": "Syllogism",
+    "question": "Statements: Some bankers are analysts. All analysts are auditors. Conclusions: I. Some auditors are bankers. II. All bankers are auditors.",
+    "isPyq": false,
+    "options": {
+      "A": "Only conclusion I follows",
+      "B": "Only conclusion II follows",
+      "C": "Either I or II follows",
+      "D": "Neither I nor II follows",
+      "E": "Both conclusions follow"
+    },
+    "answer": "A",
+    "explanation": "Since some bankers are analysts and all analysts are auditors, it directly follows that some auditors are bankers. Conclusion I is valid.",
+    "difficulty": "EASY",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789665007019",
+    "exam": "39d6e545-50ee-4b48-8e21-cf5c8fcd3fd1",
+    "section": "Reasoning Ability",
+    "topic": "Puzzles",
+    "question": "A courier delivery agent walks 12 meters North, turns right and walks 5 meters, then turns South and walks 12 meters. How far and in what direction is he from his starting point?",
+    "isPyq": false,
+    "options": {
+      "A": "5 meters East",
+      "B": "5 meters West",
+      "C": "12 meters North",
+      "D": "7 meters East",
+      "E": "None of these"
+    },
+    "answer": "A",
+    "explanation": "The North and South vertical displacements cancel out (12m - 12m = 0). The agent is exactly 5 meters East of the starting point.",
+    "difficulty": "EASY",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789669369610-7idd",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "English Language",
+    "topic": "Reading Comprehension",
+    "question": "According to banking liquidity norms, what is the primary regulatory objective of maintaining the Statutory Liquidity Ratio (SLR)?",
+    "isPyq": false,
+    "options": {
+      "A": "To maximize foreign exchange reserves",
+      "B": "To ensure solvency and control commercial credit expansion",
+      "C": "To eliminate inter-bank lending rates",
+      "D": "To finance public sector subsidies directly",
+      "E": "None of the above"
+    },
+    "answer": "B",
+    "explanation": "SLR enforces commercial banks to maintain liquid assets against Net Demand and Time Liabilities to ensure solvency and curb reckless credit expansion.",
+    "difficulty": "MEDIUM",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789669379018-frkg",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "Quantitative Aptitude",
+    "topic": "Simplification",
+    "question": "What is the value of: (45% of 840) + (14 * 25) - 210?",
+    "isPyq": false,
+    "options": {
+      "A": "498",
+      "B": "518",
+      "C": "538",
+      "D": "508",
+      "E": "528"
+    },
+    "answer": "B",
+    "explanation": "45% of 840 = 378; 14 * 25 = 350; 378 + 350 - 210 = 518.",
+    "difficulty": "EASY",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789669381625-6bpn",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "Quantitative Aptitude",
+    "topic": "Number Series",
+    "question": "Find the missing number in the following sequence: 8, 14, 26, 50, 98, ?",
+    "isPyq": false,
+    "options": {
+      "A": "186",
+      "B": "194",
+      "C": "192",
+      "D": "198",
+      "E": "184"
+    },
+    "answer": "B",
+    "explanation": "Pattern: (x * 2) - 2. 8*2-2=14; 14*2-2=26; 26*2-2=50; 50*2-2=98; 98*2-2 = 194.",
+    "difficulty": "MEDIUM",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789669385154-0aon",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "Reasoning Ability",
+    "topic": "Syllogism",
+    "question": "Statements: Some bankers are analysts. All analysts are auditors. Conclusions: I. Some auditors are bankers. II. All bankers are auditors.",
+    "isPyq": false,
+    "options": {
+      "A": "Only conclusion I follows",
+      "B": "Only conclusion II follows",
+      "C": "Either I or II follows",
+      "D": "Neither I nor II follows",
+      "E": "Both conclusions follow"
+    },
+    "answer": "A",
+    "explanation": "Since some bankers are analysts and all analysts are auditors, it directly follows that some auditors are bankers. Conclusion I is valid.",
+    "difficulty": "EASY",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789669388024-ar2p",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "Reasoning Ability",
+    "topic": "Direction Sense",
+    "question": "A courier delivery agent walks 12 meters North, turns right and walks 5 meters, then turns South and walks 12 meters. How far and in what direction is he from his starting point?",
+    "isPyq": false,
+    "options": {
+      "A": "5 meters East",
+      "B": "5 meters West",
+      "C": "12 meters North",
+      "D": "7 meters East",
+      "E": "None of these"
+    },
+    "answer": "A",
+    "explanation": "The North and South vertical displacements cancel out (12m - 12m = 0). The agent is exactly 5 meters East of the starting point.",
+    "difficulty": "EASY",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789670451280-xdy8",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "English Language",
+    "topic": "Reading Comprehension",
+    "question": "According to banking liquidity norms, what is the primary regulatory objective of maintaining the Statutory Liquidity Ratio (SLR)?",
+    "isPyq": false,
+    "options": {
+      "A": "To maximize foreign exchange reserves",
+      "B": "To ensure solvency and control commercial credit expansion",
+      "C": "To eliminate inter-bank lending rates",
+      "D": "To finance public sector subsidies directly",
+      "E": "None of the above"
+    },
+    "answer": "B",
+    "explanation": "SLR enforces commercial banks to maintain liquid assets against Net Demand and Time Liabilities to ensure solvency and curb reckless credit expansion.",
+    "difficulty": "MEDIUM",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789670461889-052n",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "Quantitative Aptitude",
+    "topic": "Simplification",
+    "question": "What is the value of: (45% of 840) + (14 * 25) - 210?",
+    "isPyq": false,
+    "options": {
+      "A": "498",
+      "B": "518",
+      "C": "538",
+      "D": "508",
+      "E": "528"
+    },
+    "answer": "B",
+    "explanation": "45% of 840 = 378; 14 * 25 = 350; 378 + 350 - 210 = 518.",
+    "difficulty": "EASY",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789670467445-9feh",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "Quantitative Aptitude",
+    "topic": "Number Series",
+    "question": "Find the missing number in the following sequence: 8, 14, 26, 50, 98, ?",
+    "isPyq": false,
+    "options": {
+      "A": "186",
+      "B": "194",
+      "C": "192",
+      "D": "198",
+      "E": "184"
+    },
+    "answer": "B",
+    "explanation": "Pattern: (x * 2) - 2. 8*2-2=14; 14*2-2=26; 26*2-2=50; 50*2-2=98; 98*2-2 = 194.",
+    "difficulty": "MEDIUM",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789670480118-c4g5",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "Reasoning Ability",
+    "topic": "Syllogism",
+    "question": "Statements: Some bankers are analysts. All analysts are auditors. Conclusions: I. Some auditors are bankers. II. All bankers are auditors.",
+    "isPyq": false,
+    "options": {
+      "A": "Only conclusion I follows",
+      "B": "Only conclusion II follows",
+      "C": "Either I or II follows",
+      "D": "Neither I nor II follows",
+      "E": "Both conclusions follow"
+    },
+    "answer": "A",
+    "explanation": "Since some bankers are analysts and all analysts are auditors, it directly follows that some auditors are bankers. Conclusion I is valid.",
+    "difficulty": "EASY",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1789670498446-tkty",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "Reasoning Ability",
+    "topic": "Direction Sense",
+    "question": "A courier delivery agent walks 12 meters North, turns right and walks 5 meters, then turns South and walks 12 meters. How far and in what direction is he from his starting point?",
+    "isPyq": false,
+    "options": {
+      "A": "5 meters East",
+      "B": "5 meters West",
+      "C": "12 meters North",
+      "D": "7 meters East",
+      "E": "None of these"
+    },
+    "answer": "A",
+    "explanation": "The North and South vertical displacements cancel out (12m - 12m = 0). The agent is exactly 5 meters East of the starting point.",
+    "difficulty": "EASY",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1791565487231-elaq",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "English Language",
+    "topic": "Reading Comprehension",
+    "question": "RC Group Test Question #2 regarding monetary framework?",
+    "groupId": "VERIFY-RC-1791565484055",
+    "isPyq": false,
+    "options": {
+      "A": "Option A for Q2",
+      "B": "Option B for Q2",
+      "C": "Option C for Q2",
+      "D": "Option D for Q2",
+      "E": "Option E for Q2"
+    },
+    "answer": "A",
+    "explanation": "Explanation for question #2.",
+    "difficulty": "MEDIUM",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1791565496988-rmy0",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "English Language",
+    "topic": "Reading Comprehension",
+    "question": "RC Group Test Question #3 regarding monetary framework?",
+    "groupId": "VERIFY-RC-1791565484055",
+    "isPyq": false,
+    "options": {
+      "A": "Option A for Q3",
+      "B": "Option B for Q3",
+      "C": "Option C for Q3",
+      "D": "Option D for Q3",
+      "E": "Option E for Q3"
+    },
+    "answer": "A",
+    "explanation": "Explanation for question #3.",
+    "difficulty": "MEDIUM",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1791565500166-8k6i",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "English Language",
+    "topic": "Reading Comprehension",
+    "question": "RC Group Test Question #4 regarding monetary framework?",
+    "groupId": "VERIFY-RC-1791565484055",
+    "isPyq": false,
+    "options": {
+      "A": "Option A for Q4",
+      "B": "Option B for Q4",
+      "C": "Option C for Q4",
+      "D": "Option D for Q4",
+      "E": "Option E for Q4"
+    },
+    "answer": "A",
+    "explanation": "Explanation for question #4.",
+    "difficulty": "MEDIUM",
+    "marks": 1,
+    "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1791565503491-jb2l",
+    "exam": "dc79a997-71ff-4f31-ac2c-a415fe63354a",
+    "section": "English Language",
+    "topic": "Reading Comprehension",
+    "question": "RC Group Test Question #5 regarding monetary framework?",
+    "groupId": "VERIFY-RC-1791565484055",
+    "isPyq": false,
+    "options": {
+      "A": "Option A for Q5",
+      "B": "Option B for Q5",
+      "C": "Option C for Q5",
+      "D": "Option D for Q5",
+      "E": "Option E for Q5"
+    },
+    "answer": "A",
+    "explanation": "Explanation for question #5.",
+    "difficulty": "MEDIUM",
+    "marks": 1,
+    "negativeMarks": 0.25
+  }
+]

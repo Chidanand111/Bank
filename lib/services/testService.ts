@@ -2,7 +2,7 @@ import { AttemptResult, DashboardStats, Exam, MockTest, Question } from '@/types
 import { EXAMS_DATA } from '../data/exams';
 import { MOCK_TESTS_DATA } from '../data/mockTests';
 import { INITIAL_DASHBOARD_STATS, SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
-import { generateRandomizedMockTest } from '../db/questionDb';
+import { generateRandomizedMockTest, getFixedQuestionsForMockTest } from '../db/questionDb';
 
 import { recordUserSeenQuestions } from './userQuestionTracker';
 
@@ -41,7 +41,7 @@ export async function getMockTests(examSlug?: string): Promise<MockTest[]> {
   }
 
   if (examSlug) {
-    return list.filter(m => m.examSlug === examSlug);
+    return list.filter(m => m.examSlug === examSlug || (examSlug === 'ibps-po' && m.examSlug.includes('ibps-po')));
   }
   return list;
 }
@@ -140,9 +140,29 @@ export async function getMockTestById(
     return test;
   }
 
-  // 4. If this is an authentic PYQ paper or dedicated fixed mock test with 0 questions yet,
-  // do NOT fall back to random practice questions pool
+  // 4. If this is an authentic PYQ paper or dedicated fixed mock test,
+  // ensure fixed questions are deterministically retrieved if not preloaded
   if (test.isPyq || test.isFixed) {
+    const fixed = getFixedQuestionsForMockTest(targetKey);
+    if (fixed && fixed.length > 0) {
+      const updatedSections = test.sections.map(sec => {
+        const count = fixed.filter(q => q.sectionCode === sec.code).length;
+        return {
+          ...sec,
+          questionCount: count || sec.questionCount,
+          marks: count || sec.marks,
+        };
+      });
+      return {
+        ...test,
+        isFixed: true,
+        durationMinutes: test.durationMinutes || 60,
+        totalQuestions: fixed.length,
+        totalMarks: fixed.reduce((acc, q) => acc + (q.marks || 1), 0) || test.totalMarks,
+        sections: updatedSections,
+        questions: fixed,
+      };
+    }
     return {
       ...test,
       questions: [],

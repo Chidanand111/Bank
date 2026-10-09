@@ -21,7 +21,7 @@ export default async function TestsPage({ searchParams }: TestsPageProps) {
     ? allTests
     : examFilter === 'pyq'
     ? allTests.filter(t => t.isPyq)
-    : allTests.filter(t => t.examSlug === examFilter);
+    : allTests.filter(t => t.examSlug === examFilter || (examFilter === 'ibps-po' && t.examSlug.includes('ibps-po')));
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">

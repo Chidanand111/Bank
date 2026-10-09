@@ -1,1 +1,64 @@
-[]
+[
+  {
+    "id": "exam-ibps-po-2025-pyq",
+    "slug": "ibps-po-2025-pyq",
+    "title": "IBPS PO 2025 PYQ",
+    "category": "PO",
+    "description": "Authentic 2025 IBPS PO examination papers featuring official prelims questions, 20-minute sectional timers, and comprehensive explanations.",
+    "shortDescription": "Official IBPS PO 2025 Prelims & Mains actual exam question papers with real exam scoring.",
+    "totalMockTests": 1,
+    "status": "published",
+    "patterns": [
+      {
+        "stage": "Prelims",
+        "totalQuestions": 100,
+        "totalMarks": 100,
+        "totalDurationMinutes": 60,
+        "sections": [
+          {
+            "id": "sec-ibps-po-2025-p-eng",
+            "name": "English Language",
+            "code": "ENGLISH",
+            "numQuestions": 30,
+            "maxMarks": 30,
+            "durationMinutes": 20,
+            "topics": [
+              "Reading Comprehension",
+              "Cloze Test",
+              "Error Detection",
+              "Para Jumbles"
+            ]
+          },
+          {
+            "id": "sec-ibps-po-2025-p-quant",
+            "name": "Quantitative Aptitude",
+            "code": "QUANT",
+            "numQuestions": 35,
+            "maxMarks": 35,
+            "durationMinutes": 20,
+            "topics": [
+              "Data Interpretation (DI)",
+              "Arithmetic Problems",
+              "Number Series",
+              "Quadratic Equations"
+            ]
+          },
+          {
+            "id": "sec-ibps-po-2025-p-reason",
+            "name": "Reasoning Ability",
+            "code": "REASONING",
+            "numQuestions": 35,
+            "maxMarks": 35,
+            "durationMinutes": 20,
+            "topics": [
+              "Puzzles & Seating Arrangement",
+              "Syllogisms",
+              "Inequalities",
+              "Blood Relations"
+            ]
+          }
+        ]
+      }
+    ]
+  }
+]
