@@ -82,6 +82,17 @@ const PARTITIONS: ExamPartition[] = [
     description: 'Authentic 100-question paper from SBI Clerk Prelims 2023-24 (Held on Jan 5, 2024). Fixed in exact official paper order.',
   },
   {
+    id: 'mock-ibps-po-2025-pyq',
+    label: 'IBPS PO 2025 PYQ',
+    badge: 'Official Paper (100 Qs)',
+    title: 'IBPS PO Prelims 2025 - Previous Year Question Paper',
+    isPyq: true,
+    pyqYear: 2025,
+    examId: 'exam-ibps-po',
+    category: 'PYQ',
+    description: 'Authentic 100-question paper from IBPS PO Prelims 2025: Reasoning Ability (35 Qs), Quantitative Aptitude (35 Qs), and English Language (30 Qs).',
+  },
+  {
     id: 'mock-ibps-po-2025-mains-pyq',
     label: 'IBPS PO 2025 Mains PYQ',
     badge: 'Official Paper (155 Qs)',

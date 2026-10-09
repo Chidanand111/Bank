@@ -4,6 +4,7 @@ import pyqQuestionsData from '@/data/sbi_clerk_2024_pyq.json';
 import ibpsPo2024Data from '@/data/ibps_po_2024_prelims_pyq.json';
 import ibpsPo2023Data from '@/data/ibps_po_2023_prelims_pyq.json';
 import ibpsPo2025MainsData from '@/data/ibps_po_2025_mains_pyq.json';
+import ibpsPo2025PrelimsData from '@/data/ibps_po_2025_prelims_pyq.json';
 import { EXAMS_DATA } from '../data/exams';
 
 export interface RawJsonQuestion {
@@ -34,6 +35,7 @@ const combinedRaw = [
   ...(ibpsPo2024Data as RawJsonQuestion[]),
   ...(ibpsPo2023Data as RawJsonQuestion[]),
   ...(ibpsPo2025MainsData as RawJsonQuestion[]),
+  ...(ibpsPo2025PrelimsData as RawJsonQuestion[]),
 ];
 const initialStore: RawJsonQuestion[] = [];
 const seenStoreIds = new Set<string>();
@@ -373,9 +375,9 @@ export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
   const norm = (testIdOrSlug || '').toLowerCase().trim();
 
   // 1. IBPS PO Mains 2025 PYQ (Authentic 155 official questions)
-  if ((norm.includes('ibps') && norm.includes('2025')) || norm === 'mock-ibps-po-2025-mains-pyq' || norm === 'ibps-po-mains-2025-pyq') {
+  if (norm.includes('mains') && (norm.includes('2025') || norm === 'mock-ibps-po-2025-mains-pyq' || norm === 'ibps-po-mains-2025-pyq')) {
     const pyq2025Mains = allQuestions
-      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Mains 2025') || String(q.id).toLowerCase().includes('ibps-po-2025')))
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Mains 2025') || String(q.id).toLowerCase().includes('ibps-po-2025-mains')))
       .sort((a, b) => {
         const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
         const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
@@ -384,6 +386,20 @@ export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
         return numA - numB;
       });
     if (pyq2025Mains.length > 0) return pyq2025Mains;
+  }
+
+  // 1b. IBPS PO Prelims 2025 PYQ (Authentic 100 official questions)
+  if (norm === 'mock-ibps-po-2025-pyq' || norm === 'ibps-po-prelims-2025-pyq' || (norm.includes('ibps') && norm.includes('2025') && !norm.includes('mains'))) {
+    const pyq2025Prelims = allQuestions
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2025') || String(q.id).toLowerCase().includes('ibps-po-2025-prelims')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+    if (pyq2025Prelims.length > 0) return pyq2025Prelims;
   }
 
   // 2. IBPS PO Prelims 2024 PYQ (Authentic 100 official questions)
@@ -556,9 +572,22 @@ export function partitionQuestionsList(rawAll: Question[], partitionKey: string)
   if (normKey === 'all') return all;
 
   // 1. IBPS PO Mains 2025 PYQ (155 Authentic Questions)
-  if ((normKey.includes('ibps') && normKey.includes('2025')) || normKey === 'mock-ibps-po-2025-mains-pyq' || normKey === 'ibps-po-mains-2025-pyq') {
+  if (normKey.includes('mains') && (normKey.includes('2025') || normKey === 'mock-ibps-po-2025-mains-pyq' || normKey === 'ibps-po-mains-2025-pyq')) {
     return all
-      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Mains 2025') || String(q.id).toLowerCase().includes('ibps-po-2025')))
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Mains 2025') || String(q.id).toLowerCase().includes('ibps-po-2025-mains')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+  }
+
+  // 1b. IBPS PO Prelims 2025 PYQ (100 Authentic Questions)
+  if (normKey === 'mock-ibps-po-2025-pyq' || normKey === 'ibps-po-prelims-2025-pyq' || (normKey.includes('ibps') && normKey.includes('2025') && !normKey.includes('mains'))) {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2025') || String(q.id).toLowerCase().includes('ibps-po-2025-prelims')))
       .sort((a, b) => {
         const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
         const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);

@@ -175,6 +175,32 @@ export const MOCK_TESTS_DATA: MockTest[] = [
     questions: [],
   },
 
+  // --- IBPS PO 2025 PRELIMS PYQ (PREVIOUS YEAR PAPER) ---
+  {
+    id: 'mock-ibps-po-2025-pyq',
+    slug: 'ibps-po-prelims-2025-pyq',
+    title: 'IBPS PO Prelims 2025 - Previous Year Question Paper',
+    description: 'Authentic 100-question actual exam paper from IBPS PO Prelims 2025. Features Reasoning Ability (35 Qs), Quantitative Aptitude (35 Qs), and English Language (30 Qs) with 20-minute sectional timings.',
+    examId: 'exam-ibps-po',
+    examSlug: 'ibps-po',
+    examTitle: 'IBPS PO (Probationary Officer)',
+    durationMinutes: 60,
+    totalMarks: 100,
+    totalQuestions: 100,
+    cutoffMarks: 55.0,
+    isFree: true,
+    isFixed: true,
+    isPyq: true,
+    year: 2025,
+    status: 'published',
+    sections: [
+      { id: 'sec-ibps-p-reason', code: 'REASONING', name: 'Reasoning Ability', durationMinutes: 20, questionCount: 35, marks: 35 },
+      { id: 'sec-ibps-p-quant', code: 'QUANT', name: 'Quantitative Aptitude', durationMinutes: 20, questionCount: 35, marks: 35 },
+      { id: 'sec-ibps-p-eng', code: 'ENGLISH', name: 'English Language', durationMinutes: 20, questionCount: 30, marks: 30 },
+    ],
+    questions: [],
+  },
+
   // --- IBPS PO 2024 PRELIMS PYQ (PREVIOUS YEAR PAPER) ---
   {
     id: 'mock-ibps-po-2024-pyq',
@@ -266,7 +292,7 @@ export function saveCustomMockTestsToFile(tests: MockTest[]): void {
       const builtinIds = new Set([
         'mock-ibps-po-1', 'mock-ibps-po-2', 'mock-sbi-clerk-1', 'mock-sbi-clerk-2',
         'mock-sbi-clerk-2024-pyq', 'mock-sbi-clerk-2023-pyq', 'mock-ibps-po-2025-mains-pyq',
-        'mock-ibps-po-2024-pyq', 'mock-ibps-po-2023-pyq'
+        'mock-ibps-po-2024-pyq', 'mock-ibps-po-2023-pyq', 'mock-ibps-po-2025-pyq'
       ]);
       const customOnly = tests.filter(t => !builtinIds.has(t.id));
       fs.writeFileSync(customTestsPath, JSON.stringify(customOnly, null, 2), 'utf8');
