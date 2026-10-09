@@ -1,20 +1,49 @@
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
-import { getAdminExams, updateExamTitleAction, createExamAction, deleteExamAction } from '@/lib/services/adminService';
+import { useRouter } from 'next/navigation';
+import {
+  getAdminExams,
+  updateExamTitleAction,
+  createExamAction,
+  deleteExamAction,
+  toggleExamPublishAction,
+} from '@/lib/services/adminService';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
+import { AddQuestionsPromptModal } from '@/components/admin/AddQuestionsPromptModal';
+import { BulkQuestionModal } from '@/components/admin/BulkQuestionModal';
 import { Exam, ExamCategory } from '@/types';
-import { Edit2, PlusCircle, CheckCircle2, Layers, Trash2, AlertTriangle } from 'lucide-react';
+import {
+  Edit2,
+  PlusCircle,
+  CheckCircle2,
+  Layers,
+  Trash2,
+  AlertTriangle,
+  Globe,
+  EyeOff,
+  Upload,
+} from 'lucide-react';
 
 export default function AdminExamsPage() {
+  const router = useRouter();
   const [exams, setExams] = useState<Exam[]>([]);
   const [loading, setLoading] = useState(true);
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Post-Create Add Questions Choice Modal
+  const [isPromptOpen, setIsPromptOpen] = useState(false);
+  const [promptExamId, setPromptExamId] = useState('');
+  const [promptExamTitle, setPromptExamTitle] = useState('');
+
+  // Bulk Import Modal State
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkModalExamId, setBulkModalExamId] = useState('');
 
   // Edit Modal State
   const [editingExam, setEditingExam] = useState<Exam | null>(null);
@@ -71,19 +100,38 @@ export default function AdminExamsPage() {
   const handleCreateExam = async (e: React.FormEvent) => {
     e.preventDefault();
     startTransition(async () => {
+      const createdTitle = newTitle.trim();
       const res = await createExamAction({
-        title: newTitle.trim(),
+        title: createdTitle,
         category: newCategory,
-        description: newDescription.trim() || `${newTitle.trim()} Recruitment Examination`,
+        description: newDescription.trim() || `${createdTitle} Recruitment Examination`,
+        status: 'created',
       });
-      if (res.success) {
-        setFeedback({ type: 'success', text: `Exam "${newTitle}" created successfully.` });
+      if (res.success && res.exam) {
         setIsCreateModalOpen(false);
         setNewTitle('');
         setNewDescription('');
         await loadExams();
+        setPromptExamId(res.exam.id);
+        setPromptExamTitle(res.exam.title);
+        setIsPromptOpen(true);
       } else {
         setFeedback({ type: 'error', text: res.error || 'Failed to create exam.' });
+      }
+    });
+  };
+
+  const handleTogglePublish = (examId: string, targetStatus: 'created' | 'published') => {
+    startTransition(async () => {
+      const res = await toggleExamPublishAction(examId, targetStatus);
+      if (res.success) {
+        setFeedback({
+          type: 'success',
+          text: `Exam status updated to "${targetStatus === 'published' ? 'Published (Visible to Students)' : 'Created (Draft - Hidden from Students)'}" successfully.`,
+        });
+        await loadExams();
+      } else {
+        setFeedback({ type: 'error', text: res.error || 'Failed to update exam status.' });
       }
     });
   };
@@ -184,7 +232,42 @@ export default function AdminExamsPage() {
                       <Trash2 className="w-3.5 h-3.5" />
                       Delete
                     </Button>
-                    <Badge variant="green" size="sm">Active</Badge>
+                    {exam.status === 'created' ? (
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="amber" size="sm" className="bg-amber-50 text-amber-800 border-amber-300 font-bold flex items-center gap-1">
+                          <EyeOff className="w-3 h-3 text-amber-600" />
+                          Created (Draft)
+                        </Badge>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          disabled={isPending}
+                          onClick={() => handleTogglePublish(exam.id, 'published')}
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold flex items-center gap-1 text-xs py-1 px-2.5 shadow-2xs cursor-pointer"
+                          title="Publish this exam so it appears for students"
+                        >
+                          <Globe className="w-3 h-3" />
+                          Publish
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="green" size="sm" className="font-bold flex items-center gap-1">
+                          <Globe className="w-3 h-3" />
+                          Published
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={isPending}
+                          onClick={() => handleTogglePublish(exam.id, 'created')}
+                          className="text-slate-500 hover:text-slate-800 text-[11px] py-0.5 px-2 font-medium"
+                          title="Unpublish this exam to hide from students"
+                        >
+                          Unpublish
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4 text-xs">
@@ -204,6 +287,36 @@ export default function AdminExamsPage() {
                         </span>
                       </div>
                     ))}
+                  </div>
+
+                  {/* Quick Question Curation Shortcuts */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
+                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Add Questions:</span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/admin/questions?partition=${exam.id}&openAdd=true`)}
+                        className="text-xs font-bold text-indigo-700 border-indigo-200 hover:bg-indigo-50 flex items-center gap-1.5"
+                        title="Open interactive question editor to add 1 by 1 question"
+                      >
+                        <PlusCircle className="w-3.5 h-3.5" />
+                        1 by 1
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setBulkModalExamId(exam.id);
+                          setIsBulkModalOpen(true);
+                        }}
+                        className="text-xs font-bold text-blue-700 border-blue-200 hover:bg-blue-50 flex items-center gap-1.5"
+                        title="Bulk upload questions via CSV or JSON spreadsheet"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        Bulk Upload
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -373,6 +486,38 @@ export default function AdminExamsPage() {
           </div>
         </Modal>
       )}
+
+      {/* Post-Create Add Questions Choice Prompt Modal */}
+      <AddQuestionsPromptModal
+        isOpen={isPromptOpen}
+        onClose={() => setIsPromptOpen(false)}
+        examTitle={promptExamTitle}
+        onAddSingle={() => {
+          setIsPromptOpen(false);
+          router.push(`/admin/questions?partition=${promptExamId}&openAdd=true`);
+        }}
+        onAddBulk={() => {
+          setIsPromptOpen(false);
+          setBulkModalExamId(promptExamId);
+          setIsBulkModalOpen(true);
+        }}
+      />
+
+      {/* Direct Bulk Upload Modal on Exams Page */}
+      <BulkQuestionModal
+        isOpen={isBulkModalOpen}
+        onClose={() => setIsBulkModalOpen(false)}
+        onSuccess={async (count) => {
+          setFeedback({
+            type: 'success',
+            text: `Successfully bulk imported ${count} question(s) into the exam!`,
+          });
+          await loadExams();
+        }}
+        partitions={exams.map((e) => ({ id: e.id, label: e.title }))}
+        currentPartitionId={bulkModalExamId || exams[0]?.id || 'ALL'}
+        exams={exams.map((e) => ({ id: e.id, title: e.title, category: e.category }))}
+      />
     </div>
   );
 }

@@ -9,6 +9,7 @@ export const EXAMS_DATA: Exam[] = [
     description: 'Institute of Banking Personnel Selection Probationary Officer examination for recruitment in 11 participating public sector banks across India.',
     shortDescription: 'Comprehensive preparation for IBPS PO Prelims & Mains exams with realistic full-length mock tests.',
     totalMockTests: 5,
+    status: 'published',
     patterns: [
       {
         stage: 'Prelims',
@@ -99,6 +100,7 @@ export const EXAMS_DATA: Exam[] = [
     description: 'State Bank of India Junior Associate (Customer Support & Sales) recruitment exam conducted annually across India.',
     shortDescription: 'Boost your speed and accuracy for SBI Clerk Prelims & Mains with speed drills and full mock tests.',
     totalMockTests: 4,
+    status: 'published',
     patterns: [
       {
         stage: 'Prelims',
@@ -193,6 +195,7 @@ if (typeof window === 'undefined') {
       const data = JSON.parse(fs.readFileSync(customExamsPath, 'utf8'));
       if (Array.isArray(data)) {
         for (const ex of data) {
+          ex.status = ex.status || 'published';
           if (!EXAMS_DATA.some(e => e.id === ex.id || e.slug === ex.slug)) {
             EXAMS_DATA.push(ex);
           }

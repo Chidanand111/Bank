@@ -36,6 +36,7 @@ import {
   Role,
   UserStatus,
   Difficulty,
+  ExamStatus,
 } from '@/types';
 
 function safeRevalidatePath(path: string) {
@@ -910,6 +911,7 @@ export async function getAdminExams(): Promise<Exam[]> {
     if (dbExams && dbExams.length > 0) {
       const mapped: Exam[] = dbExams.map(e => {
         const existing = EXAMS_DATA.find(ex => ex.id === e.id || ex.slug === e.slug);
+        const status = existing?.status || (e.isActive ? 'published' : 'created');
         return {
           id: e.id,
           slug: e.slug,
@@ -918,6 +920,7 @@ export async function getAdminExams(): Promise<Exam[]> {
           description: e.description,
           shortDescription: existing?.shortDescription || e.description,
           totalMockTests: e.mockTests?.length || existing?.totalMockTests || 0,
+          status,
           patterns: existing?.patterns || [
             {
               stage: 'Prelims',
@@ -965,6 +968,7 @@ export async function createExamAction(input: AdminExamInput): Promise<{ success
   const description = input.description?.trim() || `${title} Recruitment Examination for Banking Aspirants`;
 
   const newExamId = `exam-${slug}`;
+  const status: ExamStatus = input.status || 'created';
 
   // Safe Neon PostgreSQL Database sync
   try {
@@ -974,7 +978,7 @@ export async function createExamAction(input: AdminExamInput): Promise<{ success
         title,
         category,
         description,
-        isActive: true,
+        isActive: status === 'published',
       },
       create: {
         id: newExamId,
@@ -982,7 +986,7 @@ export async function createExamAction(input: AdminExamInput): Promise<{ success
         title,
         category,
         description,
-        isActive: true,
+        isActive: status === 'published',
       },
     });
 
@@ -1021,6 +1025,7 @@ export async function createExamAction(input: AdminExamInput): Promise<{ success
     description,
     shortDescription: description,
     totalMockTests: 1,
+    status,
     patterns: [
       {
         stage: 'Prelims',
@@ -1072,6 +1077,7 @@ export async function createExamAction(input: AdminExamInput): Promise<{ success
     isFree: true,
     isFixed: true,
     isPyq: false,
+    status,
     sections: [
       { id: `sec-${slug}-eng`, code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30, durationMinutes: 20 },
       { id: `sec-${slug}-quant`, code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35, durationMinutes: 20 },
@@ -1587,6 +1593,9 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
   const targetSections = input.sections && input.sections.length > 0 ? input.sections : defaultSections;
   const totalQuestions = targetSections.reduce((acc, s) => acc + (s.questionCount || 0), 0);
 
+  const parentExam = EXAMS_DATA.find(e => e.id === exam.id || e.slug === exam.slug);
+  const status: ExamStatus = input.status || (parentExam?.status === 'published' ? 'created' : (parentExam?.status || 'created'));
+
   const newTest: MockTest = {
     id: newId,
     slug,
@@ -1603,6 +1612,7 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
     isFixed: true,
     isPyq,
     year,
+    status,
     sections: targetSections.map(s => ({
       id: `sec-${s.code.toLowerCase()}`,
       code: s.code,
@@ -1626,7 +1636,7 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
         totalQuestions: newTest.totalQuestions,
         cutoffMarks: newTest.cutoffMarks,
         isFree: newTest.isFree,
-        isPublished: true,
+        isPublished: status === 'published',
         isFixed: true,
         isPyq,
         year,
@@ -1642,7 +1652,7 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
         totalQuestions: newTest.totalQuestions,
         cutoffMarks: newTest.cutoffMarks,
         isFree: newTest.isFree,
-        isPublished: true,
+        isPublished: status === 'published',
         isFixed: true,
         isPyq,
         year,
@@ -1784,6 +1794,112 @@ export interface AdminPartitionInfo {
   examId: string;
   category: 'ALL' | 'PYQ' | 'MOCK';
   description: string;
+  status?: ExamStatus;
+}
+
+/**
+ * Toggle or explicitly update Exam Published / Created (Draft) State
+ */
+export async function toggleExamPublishAction(
+  examIdOrSlug: string,
+  targetStatus?: ExamStatus
+): Promise<{ success: boolean; status?: ExamStatus; error?: string }> {
+  await requireAdmin();
+
+  const exam = EXAMS_DATA.find(
+    e => e.id === examIdOrSlug || e.slug === examIdOrSlug || e.slug === examIdOrSlug.replace(/^exam-/, '')
+  );
+  if (!exam) {
+    return { success: false, error: 'Exam not found.' };
+  }
+
+  const newStatus: ExamStatus = targetStatus || (exam.status === 'published' ? 'created' : 'published');
+  exam.status = newStatus;
+  saveCustomExamsToFile(EXAMS_DATA);
+
+  // Sync associated mock tests to match exam state
+  for (const t of dynamicMockTests) {
+    if (t.examId === exam.id || t.examSlug === exam.slug) {
+      t.status = newStatus;
+    }
+  }
+  for (const t of MOCK_TESTS_DATA) {
+    if (t.examId === exam.id || t.examSlug === exam.slug) {
+      t.status = newStatus;
+    }
+  }
+  saveCustomMockTestsToFile(dynamicMockTests);
+
+  try {
+    await prisma.exam.updateMany({
+      where: {
+        OR: [{ id: exam.id }, { slug: exam.slug }],
+      },
+      data: {
+        isActive: newStatus === 'published',
+      },
+    });
+    await prisma.mockTest.updateMany({
+      where: {
+        OR: [{ examId: exam.id }, { exam: { slug: exam.slug } }],
+      },
+      data: {
+        isPublished: newStatus === 'published',
+      },
+    });
+  } catch (err) {
+    console.warn('Neon DB async sync on toggleExamPublishAction:', err);
+  }
+
+  safeRevalidatePath('/admin/exams');
+  safeRevalidatePath('/admin/questions');
+  safeRevalidatePath('/admin/tests');
+  safeRevalidatePath('/exams');
+  safeRevalidatePath('/tests');
+  safeRevalidatePath('/dashboard');
+
+  return { success: true, status: newStatus };
+}
+
+/**
+ * Toggle or update Mock Test / Partition Published State
+ */
+export async function toggleMockTestPublishAction(
+  testIdOrSlug: string,
+  targetStatus?: ExamStatus
+): Promise<{ success: boolean; status?: ExamStatus; error?: string }> {
+  await requireAdmin();
+
+  const test =
+    dynamicMockTests.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug) ||
+    MOCK_TESTS_DATA.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug);
+  if (!test) {
+    return { success: false, error: 'Mock test not found.' };
+  }
+
+  const newStatus: ExamStatus = targetStatus || (test.status === 'published' ? 'created' : 'published');
+  test.status = newStatus;
+  saveCustomMockTestsToFile(dynamicMockTests);
+
+  try {
+    await prisma.mockTest.updateMany({
+      where: {
+        OR: [{ id: test.id }, { slug: test.slug }],
+      },
+      data: {
+        isPublished: newStatus === 'published',
+      },
+    });
+  } catch (err) {
+    console.warn('Neon DB async sync on toggleMockTestPublishAction:', err);
+  }
+
+  safeRevalidatePath('/admin/tests');
+  safeRevalidatePath('/admin/questions');
+  safeRevalidatePath('/tests');
+  safeRevalidatePath('/dashboard');
+
+  return { success: true, status: newStatus };
 }
 
 /**
@@ -1801,6 +1917,7 @@ export async function getAdminPartitions(): Promise<AdminPartitionInfo[]> {
       isPyq: false,
       examId: 'ALL',
       category: 'ALL',
+      status: 'published',
       description: 'Browse, search, and manage all questions across all exams and subjects in the database.',
     },
   ];
@@ -1813,6 +1930,7 @@ export async function getAdminPartitions(): Promise<AdminPartitionInfo[]> {
     isPyq: false,
     examId: e.id,
     category: e.category as any,
+    status: e.status || 'published',
     description: `All practice and previous year questions mapped to ${e.title}.`,
   }));
 
@@ -1825,6 +1943,7 @@ export async function getAdminPartitions(): Promise<AdminPartitionInfo[]> {
     pyqYear: t.year,
     examId: t.examId,
     category: t.isPyq ? 'PYQ' : 'MOCK',
+    status: t.status || 'published',
     description: t.description || `${t.title} with dedicated questions.`,
   }));
 

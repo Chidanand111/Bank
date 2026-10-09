@@ -11,9 +11,10 @@ const ATTEMPTS_STORAGE_KEY = 'bankmock_attempts';
 export async function getExams(): Promise<Exam[]> {
   try {
     const { getAdminExams } = await import('./adminService');
-    return await getAdminExams();
+    const all = await getAdminExams();
+    return all.filter(e => e.status !== 'created');
   } catch {
-    return EXAMS_DATA;
+    return EXAMS_DATA.filter(e => e.status !== 'created');
   }
 }
 
@@ -26,9 +27,18 @@ export async function getExamBySlug(slug: string): Promise<Exam | null> {
 export async function getMockTests(examSlug?: string): Promise<MockTest[]> {
   let list = MOCK_TESTS_DATA;
   try {
-    const { loadFreshMockTestsFromDb } = await import('./adminService');
-    list = await loadFreshMockTestsFromDb();
-  } catch {}
+    const { loadFreshMockTestsFromDb, getAdminExams } = await import('./adminService');
+    const [tests, allExams] = await Promise.all([loadFreshMockTestsFromDb(), getAdminExams()]);
+    const publishedExamIds = new Set(allExams.filter(e => e.status !== 'created').map(e => e.id));
+    const publishedExamSlugs = new Set(allExams.filter(e => e.status !== 'created').map(e => e.slug));
+    list = tests.filter(m => {
+      if (m.status === 'created') return false;
+      if (m.examId && !publishedExamIds.has(m.examId) && !publishedExamSlugs.has(m.examSlug)) return false;
+      return true;
+    });
+  } catch {
+    list = list.filter(m => m.status !== 'created');
+  }
 
   if (examSlug) {
     return list.filter(m => m.examSlug === examSlug);
@@ -42,9 +52,18 @@ export async function getMockTestById(
 ): Promise<MockTest | null> {
   let allTests = MOCK_TESTS_DATA;
   try {
-    const { loadFreshMockTestsFromDb } = await import('./adminService');
-    allTests = await loadFreshMockTestsFromDb();
-  } catch {}
+    const { loadFreshMockTestsFromDb, getAdminExams } = await import('./adminService');
+    const [tests, allExams] = await Promise.all([loadFreshMockTestsFromDb(), getAdminExams()]);
+    const publishedExamIds = new Set(allExams.filter(e => e.status !== 'created').map(e => e.id));
+    const publishedExamSlugs = new Set(allExams.filter(e => e.status !== 'created').map(e => e.slug));
+    allTests = tests.filter(m => {
+      if (m.status === 'created') return false;
+      if (m.examId && !publishedExamIds.has(m.examId) && !publishedExamSlugs.has(m.examSlug)) return false;
+      return true;
+    });
+  } catch {
+    allTests = allTests.filter(m => m.status !== 'created');
+  }
 
   const test = allTests.find(m => m.id === idOrSlug || m.slug === idOrSlug);
   if (!test) return null;

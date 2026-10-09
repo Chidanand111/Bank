@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useEffect, useTransition } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -61,6 +61,23 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
   const [selectedPartition, setSelectedPartition] = useState<string>(
     currentPartitionId !== 'ALL' ? currentPartitionId : partitions[1]?.id || 'ALL'
   );
+
+  useEffect(() => {
+    if (isOpen) {
+      if (currentPartitionId && currentPartitionId !== 'ALL') {
+        setSelectedPartition(currentPartitionId);
+        if (currentPartitionId.startsWith('exam-')) {
+          setSelectedExamId(currentPartitionId);
+        } else {
+          const matchingExam = exams.find(e => e.id === currentPartitionId);
+          if (matchingExam) setSelectedExamId(matchingExam.id);
+        }
+      } else if (exams && exams.length > 0) {
+        setSelectedExamId(exams[0].id);
+      }
+    }
+  }, [isOpen, currentPartitionId, exams]);
+
   const [parsedQuestions, setParsedQuestions] = useState<AdminQuestionInput[]>([]);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string>('');

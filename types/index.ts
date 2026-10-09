@@ -79,6 +79,8 @@ export interface ExamPattern {
   totalDurationMinutes: number;
 }
 
+export type ExamStatus = 'created' | 'published';
+
 export interface Exam {
   id: string;
   slug: string;
@@ -88,6 +90,7 @@ export interface Exam {
   shortDescription: string;
   patterns: ExamPattern[];
   totalMockTests: number;
+  status?: ExamStatus;
 }
 
 export interface MockTestQuestion {
@@ -119,6 +122,7 @@ export interface MockTest {
   year?: number;
   enableSectionalTimer?: boolean;
   sectionDurationMinutes?: number;
+  status?: ExamStatus;
   sections: {
     id: string;
     code: string;
@@ -289,6 +293,7 @@ export interface AdminExamInput {
   slug?: string;
   category?: ExamCategory;
   description?: string;
+  status?: ExamStatus;
 }
 
 export interface AdminMockTestInput {
@@ -306,6 +311,7 @@ export interface AdminMockTestInput {
   year?: number;
   enableSectionalTimer?: boolean;
   sectionDurationMinutes?: number;
+  status?: ExamStatus;
   sections: {
     code: string;
     name: string;

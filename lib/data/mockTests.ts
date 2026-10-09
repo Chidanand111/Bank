@@ -226,6 +226,10 @@ export const MOCK_TESTS_DATA: MockTest[] = [
   },
 ];
 
+MOCK_TESTS_DATA.forEach(t => {
+  if (!t.status) t.status = 'published';
+});
+
 // Load persisted custom mock tests if available on server
 if (typeof window === 'undefined') {
   try {
@@ -236,6 +240,7 @@ if (typeof window === 'undefined') {
       const data = JSON.parse(fs.readFileSync(customTestsPath, 'utf8'));
       if (Array.isArray(data)) {
         for (const t of data) {
+          t.status = t.status || 'published';
           if (!MOCK_TESTS_DATA.some(mt => mt.id === t.id || mt.slug === t.slug)) {
             MOCK_TESTS_DATA.push(t);
           }

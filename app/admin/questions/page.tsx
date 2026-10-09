@@ -12,6 +12,8 @@ import {
   updateMockTestTitleAction,
   deleteMockTestAction,
   deleteExamAction,
+  toggleExamPublishAction,
+  toggleMockTestPublishAction,
   AdminPartitionInfo,
 } from '@/lib/services/adminService';
 import { AdminNav } from '@/components/admin/AdminNav';
@@ -22,6 +24,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { MathRenderer } from '@/components/ui/MathRenderer';
 import { BulkQuestionModal } from '@/components/admin/BulkQuestionModal';
+import { AddQuestionsPromptModal } from '@/components/admin/AddQuestionsPromptModal';
 import { compressImageFile, formatByteSize } from '@/lib/utils/imageCompressor';
 import {
   PlusCircle,
@@ -39,6 +42,8 @@ import {
   X,
   Upload,
   Download,
+  Globe,
+  EyeOff,
 } from 'lucide-react';
 
 export type ExamPartition = AdminPartitionInfo;
@@ -257,6 +262,11 @@ export default function AdminQuestionsPage() {
   const [isDeletePartitionModalOpen, setIsDeletePartitionModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
 
+  // Post-Create Exam / Partition Prompt State
+  const [isPromptOpen, setIsPromptOpen] = useState(false);
+  const [promptExamTitle, setPromptExamTitle] = useState('');
+  const [promptTargetPartitionId, setPromptTargetPartitionId] = useState('');
+
   const activePartition = partitions.find(p => p.id === activePartitionId) || partitions[0] || PARTITIONS[0];
 
   const loadQuestions = async () => {
@@ -294,6 +304,19 @@ export default function AdminQuestionsPage() {
         ]);
         if (parts && parts.length > 0) setPartitions(parts);
         if (examsList && examsList.length > 0) setExams(examsList);
+
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          const shouldOpenAdd = urlParams.get('openAdd') === 'true';
+          const shouldOpenBulk = urlParams.get('openBulk') === 'true';
+          const partParam = urlParams.get('partition');
+          const targetPart = parts.find(p => p.id === partParam) || (parts.length > 0 ? parts[0] : undefined);
+          if (shouldOpenAdd) {
+            openCreateModal(targetPart);
+          } else if (shouldOpenBulk) {
+            setIsBulkModalOpen(true);
+          }
+        }
       } catch (err) {
         console.warn('Failed to load partitions or exams:', err);
       }
@@ -346,14 +369,47 @@ export default function AdminQuestionsPage() {
         setPartitions(parts);
         setActivePartitionId(res.test.id);
         setIsCreatePyqModalOpen(false);
-        setFeedback({
-          text: `PYQ Paper "${res.test.title}" created successfully! Click "Add Question to this Exam" below to start adding questions.`,
-          type: 'success',
-        });
+        setPromptExamTitle(res.test.title);
+        setPromptTargetPartitionId(res.test.id);
+        setIsPromptOpen(true);
         setPyqTitle('');
         setPyqCustomExamTitle('');
       } else {
         setFeedback({ text: res.error || 'Failed to create PYQ paper.', type: 'error' });
+      }
+    });
+  };
+
+  const handlePublishActivePartition = () => {
+    if (!activePartition || activePartition.id === 'ALL') return;
+
+    startTransition(async () => {
+      let res;
+      if (activePartition.id.startsWith('exam-')) {
+        res = await toggleExamPublishAction(activePartition.id, 'published');
+      } else {
+        res = await toggleMockTestPublishAction(activePartition.id, 'published');
+        if (activePartition.examId && activePartition.examId !== 'ALL') {
+          await toggleExamPublishAction(activePartition.examId, 'published');
+        }
+      }
+
+      if (res && res.success) {
+        setFeedback({
+          text: `Exam "${activePartition.title}" has been published and is now live for students!`,
+          type: 'success',
+        });
+        const [freshParts, freshExams] = await Promise.all([
+          getAdminPartitions(),
+          getAdminExams(),
+        ]);
+        if (freshParts) setPartitions(freshParts);
+        if (freshExams) setExams(freshExams);
+      } else {
+        setFeedback({
+          text: res?.error || 'Failed to publish exam.',
+          type: 'error',
+        });
       }
     });
   };
@@ -903,13 +959,19 @@ export default function AdminQuestionsPage() {
                           <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : 'bg-blue-500'}`} />
                         )}
                         <span>{partition.label}</span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                            isActive ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {partition.badge}
-                        </span>
+                        {partition.status === 'created' ? (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-black bg-amber-400 text-amber-950">
+                            Draft
+                          </span>
+                        ) : (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                              isActive ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            {partition.badge}
+                          </span>
+                        )}
                       </button>
                       {partition.id !== 'ALL' && (
                         <button
@@ -944,6 +1006,15 @@ export default function AdminQuestionsPage() {
                 <span className="bg-amber-400 text-amber-950 text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md shadow-xs">
                   {activePartition.category === 'PYQ' ? 'Official Previous Year Paper' : 'Fixed Exam Session'}
                 </span>
+                {activePartition.status === 'created' ? (
+                  <span className="bg-amber-500 text-amber-950 text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md shadow-xs flex items-center gap-1">
+                    <EyeOff className="w-3 h-3" /> Created (Draft - Hidden)
+                  </span>
+                ) : (
+                  <span className="bg-emerald-500 text-white text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md shadow-xs flex items-center gap-1">
+                    <Globe className="w-3 h-3" /> Published
+                  </span>
+                )}
                 {activePartition.pyqYear && (
                   <span className="bg-white/20 text-white text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
                     <Calendar className="w-3 h-3" /> Year {activePartition.pyqYear}
@@ -975,6 +1046,18 @@ export default function AdminQuestionsPage() {
             </div>
 
             <div className="shrink-0 flex items-center gap-2.5 flex-wrap">
+              {activePartition.status === 'created' && (
+                <Button
+                  variant="primary"
+                  size="md"
+                  disabled={isPending}
+                  onClick={handlePublishActivePartition}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black border-none shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  title="Publish this exam so students can view and attempt it"
+                >
+                  <Globe className="w-4 h-4 text-emerald-950" /> Publish Exam
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="md"
@@ -982,6 +1065,15 @@ export default function AdminQuestionsPage() {
                 className="bg-white/10 hover:bg-white/20 text-white border-white/30 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
               >
                 <Edit2 className="w-4 h-4 text-amber-300" /> Edit Title
+              </Button>
+              <Button
+                variant="outline"
+                size="md"
+                onClick={() => setIsBulkModalOpen(true)}
+                className="bg-white/10 hover:bg-white/20 text-white border-white/30 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                title="Bulk import questions into this paper"
+              >
+                <Upload className="w-4 h-4" /> Bulk Import
               </Button>
               <Button
                 variant="danger"
@@ -1998,6 +2090,25 @@ export default function AdminQuestionsPage() {
           </div>
         </Modal>
       )}
+
+      {/* Post-Create Add Questions Choice Prompt Modal */}
+      <AddQuestionsPromptModal
+        isOpen={isPromptOpen}
+        onClose={() => setIsPromptOpen(false)}
+        examTitle={promptExamTitle}
+        onAddSingle={() => {
+          setIsPromptOpen(false);
+          const target = partitions.find(p => p.id === promptTargetPartitionId);
+          openCreateModal(target);
+        }}
+        onAddBulk={() => {
+          setIsPromptOpen(false);
+          if (promptTargetPartitionId) {
+            setActivePartitionId(promptTargetPartitionId);
+          }
+          setIsBulkModalOpen(true);
+        }}
+      />
     </div>
   );
 }
