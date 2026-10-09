@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Sparkles,
   BookOpen,
+  Loader2,
 } from 'lucide-react';
 
 export interface BulkQuestionModalProps {
@@ -81,6 +82,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
   const [parsedQuestions, setParsedQuestions] = useState<AdminQuestionInput[]>([]);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string>('');
+  const [isParsing, setIsParsing] = useState<boolean>(false);
   const [isPending, startTransition] = useTransition();
 
   // 1. Download Sample CSV File (with UTF-8 BOM for Excel compatibility)
@@ -125,7 +127,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
   };
 
   // 3. RFC 4180 compliant CSV parser respecting quoted newlines and escaped quotes
-  const parseFullCsv = (csvText: string): string[][] => {
+  const parseFullCsv = (csvText: string, delimiter: string = ','): string[][] => {
     const rows: string[][] = [];
     let currentRow: string[] = [];
     let currentVal = '';
@@ -143,7 +145,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
         } else {
           inQuotes = !inQuotes;
         }
-      } else if (char === ',' && !inQuotes) {
+      } else if (char === delimiter && !inQuotes) {
         currentRow.push(currentVal.trim());
         currentVal = '';
       } else if ((char === '\r' || char === '\n') && !inQuotes) {
@@ -171,6 +173,99 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     return rows;
   };
 
+  // Normalizes CSV text where entire lines may be wrapped in outer quotes (common export/AI artifact)
+  const normalizeCsvText = (rawText: string): string => {
+    let cleanText = rawText.charCodeAt(0) === 0xfeff ? rawText.slice(1) : rawText;
+    const lines = cleanText.split(/\r?\n/);
+    const nonEmpty = lines.filter((l) => l.trim().length > 0);
+
+    if (nonEmpty.length > 0) {
+      const firstLine = nonEmpty[0].trim();
+      const isOuterQuoted =
+        (firstLine.startsWith('"') && firstLine.endsWith('"') && (firstLine.includes(',') || firstLine.includes(';'))) ||
+        nonEmpty.slice(0, 5).every((l) => l.trim().startsWith('"') && l.trim().endsWith('"') && l.includes(','));
+
+      if (isOuterQuoted) {
+        return lines
+          .map((line) => {
+            const trimmed = line.trim();
+            if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+              return trimmed.slice(1, -1).replace(/""/g, '"');
+            }
+            return line;
+          })
+          .join('\n');
+      }
+    }
+    return cleanText;
+  };
+
+  // Robust CSV parser with delimiter & quotation fallback
+  const parseCsvWithFallbacks = (rawText: string): string[][] => {
+    let text = normalizeCsvText(rawText);
+    let rows = parseFullCsv(text, ',');
+
+    // Fallback: If only 1 column parsed and semicolon is present, try semicolon
+    if (rows.length > 0 && rows[0].length === 1 && rows[0][0].includes(';')) {
+      const semiRows = parseFullCsv(text, ';');
+      if (semiRows.length > 0 && semiRows[0].length > 1) {
+        return semiRows;
+      }
+    }
+
+    // Fallback: If rows[0].length is still 1 and commas exist, force-strip outer quotes line-by-line
+    if (rows.length > 0 && rows[0].length === 1 && rows[0][0].includes(',')) {
+      const lines = rawText.split(/\r?\n/);
+      const strippedText = lines
+        .map((l) => {
+          let s = l.trim();
+          if (s.startsWith('"') && s.endsWith('"')) {
+            s = s.slice(1, -1).replace(/""/g, '"');
+          }
+          return s;
+        })
+        .join('\n');
+      const retryRows = parseFullCsv(strippedText, ',');
+      if (retryRows.length > 0 && retryRows[0].length > 1) {
+        return retryRows;
+      }
+    }
+
+    return rows;
+  };
+
+  // Helper to extract value from row using flexible case-insensitive header aliases
+  const getFieldValue = (
+    headers: string[],
+    row: string[],
+    aliases: string[]
+  ): string => {
+    const cleanAliases = aliases.map((a) => a.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    // 1. Exact match
+    for (let i = 0; i < headers.length; i++) {
+      const cleanH = headers[i].toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanAliases.includes(cleanH)) {
+        return (row[i] || '').trim();
+      }
+    }
+    // 2. Substring match
+    for (let i = 0; i < headers.length; i++) {
+      const cleanH = headers[i].toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (cleanAliases.some((alias) => cleanH.includes(alias) || alias.includes(cleanH))) {
+        return (row[i] || '').trim();
+      }
+    }
+    return '';
+  };
+
+  const hasHeaderMatch = (headers: string[], aliases: string[]): boolean => {
+    const cleanAliases = aliases.map((a) => a.toLowerCase().replace(/[^a-z0-9]/g, ''));
+    return headers.some((h) => {
+      const cleanH = h.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return cleanAliases.some((alias) => cleanH === alias || cleanH.includes(alias));
+    });
+  };
+
   // 4. File upload handler
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -179,6 +274,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     setFileName(file.name);
     setParseErrors([]);
     setParsedQuestions([]);
+    setIsParsing(true);
 
     const reader = new FileReader();
 
@@ -234,148 +330,301 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
           }
         } catch {
           setParseErrors(['Failed to parse JSON file. Please check syntax.']);
+        } finally {
+          setIsParsing(false);
         }
+      };
+      reader.onerror = () => {
+        setParseErrors(['Failed to read file from disk.']);
+        setIsParsing(false);
       };
       reader.readAsText(file);
     } else {
       // CSV Parsing
       reader.onload = async (event) => {
-        const text = event.target?.result as string;
-        if (!text) return;
-
-        const rows = parseFullCsv(text);
-        if (rows.length < 2) {
-          setParseErrors(['CSV file must have at least a header row and one question row.']);
-          return;
-        }
-
-        const headers = rows[0].map((h) => h.toLowerCase().replace(/[^a-z0-9]/g, ''));
-        const questions: AdminQuestionInput[] = [];
-        const errors: string[] = [];
-
-        // Validate required headers
-        const requiredHeaders = ['sectioncode', 'topicname', 'text', 'optiona', 'optionb', 'correctoption'];
-        const missing = requiredHeaders.filter((rh) => !headers.some((h) => h.includes(rh)));
-        if (missing.length > 0) {
-          setParseErrors([`Missing required CSV column headers: ${missing.join(', ')}`]);
-          return;
-        }
-
-        for (let idx = 1; idx < rows.length; idx++) {
-          const rowValues = rows[idx];
-          if (rowValues.length < 6) continue; // skip incomplete rows
-
-          const rowData: Record<string, string> = {};
-          headers.forEach((h, i) => {
-            rowData[h] = rowValues[i] || '';
-          });
-
-          // Extract fields
-          const sectionCodeRaw = (rowData['sectioncode'] || 'REASONING').toUpperCase();
-          const sectionCode = sectionCodeRaw.includes('QUANT')
-            ? 'QUANT'
-            : sectionCodeRaw.includes('ENG')
-            ? 'ENGLISH'
-            : sectionCodeRaw.includes('GA') || sectionCodeRaw.includes('GEN')
-            ? 'GA'
-            : 'REASONING';
-
-          const topicName = rowData['topicname'] || 'General';
-          const qText = rowData['text'] || rowData['question'] || '';
-          if (!qText) {
-            errors.push(`Row ${idx + 1}: Question text cannot be empty.`);
-            continue;
+        try {
+          const text = event.target?.result as string;
+          if (!text) {
+            setParseErrors(['Selected CSV file is empty.']);
+            return;
           }
 
-          const optA = rowData['optiona'] || '';
-          const optB = rowData['optionb'] || '';
-          const optC = rowData['optionc'] || '';
-          const optD = rowData['optiond'] || '';
-          const optE = rowData['optione'] || '';
-
-          const rawCorrect = (rowData['correctoption'] || 'A').trim().toUpperCase();
-          const correctLetter = ['A', 'B', 'C', 'D', 'E'].includes(rawCorrect)
-            ? rawCorrect
-            : rawCorrect === '1'
-            ? 'A'
-            : rawCorrect === '2'
-            ? 'B'
-            : rawCorrect === '3'
-            ? 'C'
-            : rawCorrect === '4'
-            ? 'D'
-            : rawCorrect === '5'
-            ? 'E'
-            : 'A';
-
-          const optionsList = [
-            { text: optA, isCorrect: correctLetter === 'A' },
-            { text: optB, isCorrect: correctLetter === 'B' },
-            ...(optC ? [{ text: optC, isCorrect: correctLetter === 'C' }] : []),
-            ...(optD ? [{ text: optD, isCorrect: correctLetter === 'D' }] : []),
-            ...(optE ? [{ text: optE, isCorrect: correctLetter === 'E' }] : []),
-          ];
-
-          if (optionsList.length < 2) {
-            errors.push(`Row ${idx + 1}: At least Option A and Option B are required.`);
-            continue;
+          const rows = parseCsvWithFallbacks(text);
+          if (rows.length < 2) {
+            setParseErrors(['CSV file must have at least a header row and one question row.']);
+            return;
           }
 
-          const difficultyRaw = (rowData['difficulty'] || 'MEDIUM').toUpperCase();
-          const difficulty: Difficulty =
-            difficultyRaw === 'EASY' || difficultyRaw === 'HARD' ? difficultyRaw : 'MEDIUM';
+          const headers = rows[0];
+          const questions: AdminQuestionInput[] = [];
+          const errors: string[] = [];
 
-          const marks = parseFloat(rowData['marks'] || '1.0') || 1.0;
-          const negativeMarks = parseFloat(rowData['negativemarks'] || '0.25') || 0.25;
-          const explanation = rowData['explanation'] || '';
-
-          const groupId = (rowData['groupid'] || rowData['group'] || rowData['setid'] || '').trim() || undefined;
-          const passage = (rowData['passage'] || rowData['directions'] || rowData['context'] || '').trim() || undefined;
-          let passageImageUrl = (rowData['passageimageurl'] || rowData['passageimage'] || rowData['chartimageurl'] || rowData['diimage'] || '').trim() || undefined;
-          let imageUrl = (rowData['imageurl'] || rowData['image'] || rowData['diagram'] || '').trim() || undefined;
-
-          // Auto-compress base64 images if present in CSV
-          if (passageImageUrl && passageImageUrl.startsWith('data:image')) {
-            const comp = await compressDataUrl(passageImageUrl, 900, 0.76);
-            passageImageUrl = comp.compressedDataUrl;
+          // Validate essential columns
+          const missingColumns: string[] = [];
+          if (!hasHeaderMatch(headers, ['text', 'question', 'questiontext', 'qtext', 'problem', 'statement', 'q'])) {
+            missingColumns.push('Question Text ("text" or "question")');
           }
-          if (imageUrl && imageUrl.startsWith('data:image')) {
-            const comp = await compressDataUrl(imageUrl, 900, 0.76);
-            imageUrl = comp.compressedDataUrl;
+          if (!hasHeaderMatch(headers, ['optiona', 'option1', 'opta', 'opt1', 'choicea', 'choice1', 'a'])) {
+            missingColumns.push('Option A ("optionA" or "option1")');
+          }
+          if (!hasHeaderMatch(headers, ['optionb', 'option2', 'optb', 'opt2', 'choiceb', 'choice2', 'b'])) {
+            missingColumns.push('Option B ("optionB" or "option2")');
+          }
+          if (!hasHeaderMatch(headers, ['correctoption', 'correct', 'answer', 'ans', 'key', 'correctanswer', 'anskey'])) {
+            missingColumns.push('Correct Option ("correctOption" or "answer")');
           }
 
-          // Determine target exam ID from row or modal selection
-          const rowExam = (rowData['examid'] || rowData['exam'] || rowData['targetexam'] || '').trim();
-          let targetExamId = selectedExamId;
-          if (rowExam) {
-            targetExamId = rowExam.startsWith('exam-') ? rowExam : `exam-${rowExam.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-          } else if (selectedPartition && selectedPartition !== 'ALL') {
-            if (selectedPartition.toLowerCase().includes('sbi') || selectedPartition.toLowerCase().includes('clerk')) {
-              targetExamId = 'exam-sbi-clerk';
-            } else if (selectedPartition.startsWith('exam-')) {
-              targetExamId = selectedPartition;
+          if (missingColumns.length > 0) {
+            setParseErrors([
+              `Missing required CSV column headers: ${missingColumns.join(', ')}. Please check your file's header row.`,
+            ]);
+            return;
+          }
+
+          for (let idx = 1; idx < rows.length; idx++) {
+            const rowValues = rows[idx];
+            // Skip empty rows
+            if (!rowValues || rowValues.length === 0 || rowValues.every((val) => !val.trim())) {
+              continue;
             }
+
+            const qText = getFieldValue(headers, rowValues, [
+              'text',
+              'question',
+              'questiontext',
+              'qtext',
+              'problem',
+              'statement',
+              'q',
+            ]);
+            if (!qText) {
+              errors.push(`Row ${idx + 1}: Question text cannot be empty.`);
+              continue;
+            }
+
+            const optA = getFieldValue(headers, rowValues, [
+              'optiona',
+              'option1',
+              'opta',
+              'opt1',
+              'choicea',
+              'choice1',
+              'a',
+            ]);
+            const optB = getFieldValue(headers, rowValues, [
+              'optionb',
+              'option2',
+              'optb',
+              'opt2',
+              'choiceb',
+              'choice2',
+              'b',
+            ]);
+            const optC = getFieldValue(headers, rowValues, [
+              'optionc',
+              'option3',
+              'optc',
+              'opt3',
+              'choicec',
+              'choice3',
+              'c',
+            ]);
+            const optD = getFieldValue(headers, rowValues, [
+              'optiond',
+              'option4',
+              'optd',
+              'opt4',
+              'choiced',
+              'choice4',
+              'd',
+            ]);
+            const optE = getFieldValue(headers, rowValues, [
+              'optione',
+              'option5',
+              'opte',
+              'opt5',
+              'choicee',
+              'choice5',
+              'e',
+            ]);
+
+            if (!optA || !optB) {
+              errors.push(`Row ${idx + 1}: At least Option A and Option B are required.`);
+              continue;
+            }
+
+            const rawCorrect = getFieldValue(headers, rowValues, [
+              'correctoption',
+              'correct',
+              'answer',
+              'ans',
+              'key',
+              'correctanswer',
+              'anskey',
+            ]).trim();
+
+            let correctLetter = 'A';
+            const cleanCorrect = rawCorrect.toUpperCase().replace(/[^A-E0-9]/g, '');
+
+            if (['A', 'B', 'C', 'D', 'E'].includes(cleanCorrect)) {
+              correctLetter = cleanCorrect;
+            } else if (cleanCorrect === '1') {
+              correctLetter = 'A';
+            } else if (cleanCorrect === '2') {
+              correctLetter = 'B';
+            } else if (cleanCorrect === '3') {
+              correctLetter = 'C';
+            } else if (cleanCorrect === '4') {
+              correctLetter = 'D';
+            } else if (cleanCorrect === '5') {
+              correctLetter = 'E';
+            } else {
+              // Match exact option text if answer was written as text
+              const lowerRaw = rawCorrect.toLowerCase();
+              if (lowerRaw === optA.toLowerCase()) correctLetter = 'A';
+              else if (lowerRaw === optB.toLowerCase()) correctLetter = 'B';
+              else if (optC && lowerRaw === optC.toLowerCase()) correctLetter = 'C';
+              else if (optD && lowerRaw === optD.toLowerCase()) correctLetter = 'D';
+              else if (optE && lowerRaw === optE.toLowerCase()) correctLetter = 'E';
+              else {
+                correctLetter = 'A';
+              }
+            }
+
+            const optionsList = [
+              { text: optA, isCorrect: correctLetter === 'A' },
+              { text: optB, isCorrect: correctLetter === 'B' },
+              ...(optC ? [{ text: optC, isCorrect: correctLetter === 'C' }] : []),
+              ...(optD ? [{ text: optD, isCorrect: correctLetter === 'D' }] : []),
+              ...(optE ? [{ text: optE, isCorrect: correctLetter === 'E' }] : []),
+            ];
+
+            // Resolve Section Code
+            const sectionCodeRaw = getFieldValue(headers, rowValues, [
+              'sectioncode',
+              'section',
+              'subject',
+              'sec',
+            ]).toUpperCase();
+            const sectionCode =
+              sectionCodeRaw.includes('QUANT') || sectionCodeRaw.includes('MATH') || sectionCodeRaw.includes('NUM')
+                ? 'QUANT'
+                : sectionCodeRaw.includes('ENG') || sectionCodeRaw.includes('VERBAL')
+                ? 'ENGLISH'
+                : sectionCodeRaw.includes('GA') || sectionCodeRaw.includes('GEN') || sectionCodeRaw.includes('AWARE') || sectionCodeRaw.includes('FIN')
+                ? 'GA'
+                : 'REASONING';
+
+            // Resolve Topic Name
+            const topicName =
+              getFieldValue(headers, rowValues, [
+                'topicname',
+                'topic',
+                'subtopic',
+                'category',
+                'chapter',
+              ]) || 'General';
+
+            // Resolve Difficulty
+            const difficultyRaw = getFieldValue(headers, rowValues, [
+              'difficulty',
+              'diff',
+              'level',
+            ]).toUpperCase();
+            const difficulty: Difficulty =
+              difficultyRaw === 'EASY' || difficultyRaw === 'HARD' ? difficultyRaw : 'MEDIUM';
+
+            const marksStr = getFieldValue(headers, rowValues, ['marks', 'mark', 'positivescore', 'score']);
+            const marks = parseFloat(marksStr || '1.0') || 1.0;
+
+            const negMarksStr = getFieldValue(headers, rowValues, ['negativemarks', 'negmarks', 'penalty']);
+            const negativeMarks = parseFloat(negMarksStr || '0.25') || 0.25;
+
+            const explanation = getFieldValue(headers, rowValues, [
+              'explanation',
+              'solution',
+              'sol',
+              'exp',
+            ]);
+
+            const groupId =
+              getFieldValue(headers, rowValues, ['groupid', 'group', 'setid', 'set', 'passageid']) || undefined;
+            const passage =
+              getFieldValue(headers, rowValues, ['passage', 'directions', 'context', 'comprehension']) || undefined;
+
+            let passageImageUrl =
+              getFieldValue(headers, rowValues, [
+                'passageimageurl',
+                'passageimage',
+                'passageimg',
+                'chartimageurl',
+                'chartimage',
+                'chartimg',
+                'diimage',
+                'diimg',
+              ]) || undefined;
+
+            let imageUrl =
+              getFieldValue(headers, rowValues, ['imageurl', 'image', 'img', 'diagram', 'photo']) || undefined;
+
+            // Auto-compress base64 images if present in CSV
+            if (passageImageUrl && passageImageUrl.startsWith('data:image')) {
+              const comp = await compressDataUrl(passageImageUrl, 900, 0.76);
+              passageImageUrl = comp.compressedDataUrl;
+            }
+            if (imageUrl && imageUrl.startsWith('data:image')) {
+              const comp = await compressDataUrl(imageUrl, 900, 0.76);
+              imageUrl = comp.compressedDataUrl;
+            }
+
+            // Determine target exam ID from row or modal selection
+            const rowExam = getFieldValue(headers, rowValues, ['examid', 'exam', 'targetexam', 'mocktestid', 'paper']);
+            let targetExamId = selectedExamId;
+            if (rowExam) {
+              targetExamId = rowExam.startsWith('exam-')
+                ? rowExam
+                : `exam-${rowExam.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+            } else if (selectedPartition && selectedPartition !== 'ALL') {
+              if (selectedPartition.toLowerCase().includes('sbi') || selectedPartition.toLowerCase().includes('clerk')) {
+                targetExamId = 'exam-sbi-clerk';
+              } else if (selectedPartition.startsWith('exam-')) {
+                targetExamId = selectedPartition;
+              }
+            }
+
+            questions.push({
+              examId: targetExamId,
+              sectionCode,
+              topicName,
+              text: qText,
+              imageUrl,
+              passage,
+              passageImageUrl,
+              groupId,
+              difficulty,
+              marks,
+              negativeMarks,
+              explanation,
+              options: optionsList,
+            });
           }
 
-          questions.push({
-            examId: targetExamId,
-            sectionCode,
-            topicName,
-            text: qText,
-            imageUrl,
-            passage,
-            passageImageUrl,
-            groupId,
-            difficulty,
-            marks,
-            negativeMarks,
-            explanation,
-            options: optionsList,
-          });
-        }
+          if (questions.length === 0 && errors.length === 0) {
+            errors.push(`No valid question rows could be read from ${file.name}. Please ensure questions have text and options.`);
+          }
 
-        setParsedQuestions(questions);
-        setParseErrors(errors);
+          setParsedQuestions(questions);
+          setParseErrors(errors);
+        } catch (err: unknown) {
+          const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+          setParseErrors([`Failed to parse CSV file: ${errorMsg}`]);
+        } finally {
+          setIsParsing(false);
+        }
+      };
+      reader.onerror = () => {
+        setParseErrors(['Failed to read file from disk.']);
+        setIsParsing(false);
       };
       reader.readAsText(file);
     }
@@ -386,7 +635,13 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     if (parsedQuestions.length === 0) return;
 
     startTransition(async () => {
-      const res = await bulkImportQuestionsAction(parsedQuestions, selectedPartition);
+      // Ensure target exam ID reflects the currently selected exam if not specified per row
+      const questionsToSubmit = parsedQuestions.map((q) => ({
+        ...q,
+        examId: q.examId || selectedExamId,
+      }));
+
+      const res = await bulkImportQuestionsAction(questionsToSubmit, selectedPartition);
       if (res.success) {
         onSuccess(res.count);
         onClose();
@@ -522,10 +777,16 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
             />
             <div className="flex flex-col items-center justify-center space-y-2">
               <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                <Upload className="w-5 h-5" />
+                {isParsing ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Upload className="w-5 h-5" />
+                )}
               </div>
               <div className="text-xs text-slate-700 font-medium">
-                {fileName ? (
+                {isParsing ? (
+                  <span className="font-bold text-blue-700 animate-pulse">Reading & analyzing {fileName}...</span>
+                ) : fileName ? (
                   <span className="font-bold text-blue-700">{fileName}</span>
                 ) : (
                   <>
@@ -537,6 +798,14 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Fallback Warning if 0 questions parsed */}
+        {fileName && !isParsing && parsedQuestions.length === 0 && parseErrors.length === 0 && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>No questions were extracted from {fileName}. Please ensure the file has a valid header and question rows.</span>
+          </div>
+        )}
 
         {/* Error Messages if any */}
         {parseErrors.length > 0 && (
@@ -620,20 +889,24 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
 
         {/* Footer Actions */}
         <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
-          <Button variant="secondary" size="md" onClick={onClose} disabled={isPending}>
+          <Button variant="secondary" size="md" onClick={onClose} disabled={isPending || isParsing}>
             Cancel
           </Button>
 
           <Button
             variant="primary"
             size="md"
-            isLoading={isPending}
-            disabled={parsedQuestions.length === 0}
+            isLoading={isPending || isParsing}
+            disabled={parsedQuestions.length === 0 || isPending || isParsing}
             onClick={handleImportSubmit}
             className="bg-blue-600 hover:bg-blue-700 font-bold flex items-center gap-1.5"
           >
             <Sparkles className="w-4 h-4" />
-            Import {parsedQuestions.length > 0 ? `${parsedQuestions.length} Questions` : 'Questions'}
+            {isParsing
+              ? 'Analyzing File...'
+              : parsedQuestions.length > 0
+              ? `Import ${parsedQuestions.length} Questions`
+              : 'Import Questions'}
           </Button>
         </div>
       </div>
