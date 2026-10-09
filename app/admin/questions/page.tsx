@@ -57,7 +57,30 @@ const PARTITIONS: ExamPartition[] = [
     isPyq: false,
     examId: 'ALL',
     category: 'ALL',
+    status: 'published',
     description: 'Browse, search, and manage all questions across all exams and subjects in the database.',
+  },
+  {
+    id: 'exam-ibps-po',
+    label: 'IBPS PO (Probationary Officer)',
+    badge: 'Published Exam',
+    title: 'IBPS PO - Question Bank',
+    isPyq: false,
+    examId: 'exam-ibps-po',
+    category: 'EXAM',
+    status: 'published',
+    description: 'All practice and dedicated questions mapped to IBPS PO.',
+  },
+  {
+    id: 'exam-sbi-clerk',
+    label: 'SBI Clerk (Junior Associate)',
+    badge: 'Published Exam',
+    title: 'SBI Clerk - Question Bank',
+    isPyq: false,
+    examId: 'exam-sbi-clerk',
+    category: 'EXAM',
+    status: 'published',
+    description: 'All practice and dedicated questions mapped to SBI Clerk.',
   },
   {
     id: 'mock-sbi-clerk-2024-pyq',
@@ -261,7 +284,7 @@ export default function AdminQuestionsPage() {
   const [pyqPreset, setPyqPreset] = useState<'PRELIMS_3' | 'MAINS_4'>('PRELIMS_3');
 
   // Partition Organizing & Search States
-  const [partitionFilter, setPartitionFilter] = useState<'ALL' | 'PYQ' | 'MOCK'>('ALL');
+  const [partitionFilter, setPartitionFilter] = useState<'ALL' | 'EXAM' | 'PYQ' | 'MOCK'>('ALL');
   const [partitionSearch, setPartitionSearch] = useState('');
 
   // Edit Partition Title States
@@ -510,7 +533,13 @@ export default function AdminQuestionsPage() {
     const part = targetPartition || (activePartitionId !== 'ALL' ? activePartition : null);
 
     setEditingQuestionId(null);
-    setFormExamId(part && part.examId !== 'ALL' ? part.examId : 'exam-ibps-po');
+    setFormExamId(
+      part?.category === 'EXAM'
+        ? part.id
+        : part && part.examId !== 'ALL'
+        ? part.examId
+        : 'exam-ibps-po'
+    );
     setFormSectionCode('QUANT');
     setFormTopicName(part?.isPyq ? 'Previous Year Official' : 'Number Series');
     setFormText('');
@@ -582,7 +611,7 @@ export default function AdminQuestionsPage() {
       isPyq: formIsPyq,
       pyqYear: formPyqYear !== '' ? Number(formPyqYear) : undefined,
       pyqExam: formPyqExam.trim() || undefined,
-      mockTestId: activePartitionId !== 'ALL' ? activePartitionId : undefined,
+      mockTestId: activePartition.category === 'EXAM' ? undefined : (activePartitionId !== 'ALL' ? activePartitionId : undefined),
       options: options.map(o => ({
         text: o.text.trim(),
         imageUrl: o.imageUrl.trim() || undefined,
@@ -771,6 +800,18 @@ export default function AdminQuestionsPage() {
               </button>
               <button
                 type="button"
+                onClick={() => setPartitionFilter('EXAM')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                  partitionFilter === 'EXAM'
+                    ? 'bg-white text-emerald-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                🏛️ Target Exams ({partitions.filter(p => p.category === 'EXAM').length})
+              </button>
+              <button
+                type="button"
                 onClick={() => setPartitionFilter('PYQ')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
                   partitionFilter === 'PYQ'
@@ -829,6 +870,103 @@ export default function AdminQuestionsPage() {
                     Complete Repository
                   </span>
                 </button>
+              </div>
+
+              {/* 2. Target Banking Examinations & Architectures (Includes exams created by admin) */}
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-900">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    Target Banking Examinations & Architectures ({partitions.filter(p => p.category === 'EXAM').length})
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    Includes all exams created by admin
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {partitions.filter(p => p.category === 'EXAM').map(partition => {
+                    const isActive = activePartitionId === partition.id;
+                    const isDraft = partition.status === 'created';
+                    return (
+                      <div
+                        key={partition.id}
+                        className={`inline-flex items-center rounded-xl text-xs font-semibold transition-all border shadow-2xs ${
+                          isActive
+                            ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-300'
+                            : isDraft
+                            ? 'bg-amber-50/80 hover:bg-amber-100 text-amber-950 border-amber-300'
+                            : 'bg-emerald-50/70 hover:bg-emerald-100/90 text-emerald-950 border-emerald-200'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setActivePartitionId(partition.id)}
+                          className="px-3 py-2 flex items-center gap-2 text-left cursor-pointer"
+                        >
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : isDraft ? 'bg-amber-500' : 'bg-emerald-600'}`} />
+                          <span>{partition.label}</span>
+                          {isDraft ? (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-black ${isActive ? 'bg-amber-300 text-amber-950' : 'bg-amber-200 text-amber-900'}`}>
+                              Draft
+                            </span>
+                          ) : (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isActive ? 'bg-emerald-900 text-emerald-100' : 'bg-emerald-200/80 text-emerald-900'}`}>
+                              {partition.badge}
+                            </span>
+                          )}
+                        </button>
+                        {isDraft && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startTransition(async () => {
+                                const res = await toggleExamPublishAction(partition.id, 'published');
+                                if (res?.success) {
+                                  setFeedback({
+                                    text: `Exam "${partition.label}" has been published and is now live for students!`,
+                                    type: 'success',
+                                  });
+                                  const [freshParts, freshExams] = await Promise.all([
+                                    getAdminPartitions(),
+                                    getAdminExams(),
+                                  ]);
+                                  if (freshParts) setPartitions(freshParts);
+                                  if (freshExams) setExams(freshExams);
+                                }
+                              });
+                            }}
+                            className={`px-2 py-2 text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer border-l flex items-center gap-1 ${
+                              isActive
+                                ? 'border-emerald-600/60 text-emerald-200 hover:text-white hover:bg-emerald-800'
+                                : 'border-amber-200 text-amber-700 hover:text-emerald-700 hover:bg-emerald-50'
+                            }`}
+                            title="Click to publish exam immediately so students can view it"
+                          >
+                            <Globe className="w-3 h-3" />
+                            Publish
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingPartition(partition);
+                            setIsDeletePartitionModalOpen(true);
+                          }}
+                          className={`pr-2.5 pl-1.5 py-2 transition-colors cursor-pointer border-l ${
+                            isActive
+                              ? 'border-emerald-600/60 text-emerald-200 hover:text-red-200 hover:bg-emerald-800/50'
+                              : 'border-emerald-200/70 text-slate-400 hover:text-red-600 hover:bg-red-50/60'
+                          }`}
+                          title={`Delete ${partition.label} and all questions in it`}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* 2. Official Previous Year Papers */}
@@ -963,6 +1101,9 @@ export default function AdminQuestionsPage() {
                         onClick={() => setActivePartitionId(partition.id)}
                         className="px-3.5 py-2 flex items-center gap-2 text-left cursor-pointer"
                       >
+                        {partition.category === 'EXAM' && (
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : partition.status === 'created' ? 'bg-amber-500' : 'bg-emerald-600'}`} />
+                        )}
                         {partition.category === 'PYQ' && (
                           <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : 'bg-purple-600'}`} />
                         )}
@@ -984,6 +1125,40 @@ export default function AdminQuestionsPage() {
                           </span>
                         )}
                       </button>
+                      {partition.status === 'created' && partition.id !== 'ALL' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startTransition(async () => {
+                              const res = partition.id.startsWith('exam-')
+                                ? await toggleExamPublishAction(partition.id, 'published')
+                                : await toggleMockTestPublishAction(partition.id, 'published');
+                              if (res?.success) {
+                                setFeedback({
+                                  text: `Exam "${partition.label}" has been published and is now live for students!`,
+                                  type: 'success',
+                                });
+                                const [freshParts, freshExams] = await Promise.all([
+                                  getAdminPartitions(),
+                                  getAdminExams(),
+                                ]);
+                                if (freshParts) setPartitions(freshParts);
+                                if (freshExams) setExams(freshExams);
+                              }
+                            });
+                          }}
+                          className={`px-2 py-2 text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer border-l flex items-center gap-1 ${
+                            isActive
+                              ? 'border-indigo-500/60 text-amber-200 hover:text-white hover:bg-indigo-800'
+                              : 'border-slate-200 text-amber-700 hover:text-emerald-700 hover:bg-emerald-50'
+                          }`}
+                          title="Click to publish immediately so students can view it"
+                        >
+                          <Globe className="w-3 h-3" />
+                          Publish
+                        </button>
+                      )}
                       {partition.id !== 'ALL' && (
                         <button
                           type="button"
@@ -1015,7 +1190,7 @@ export default function AdminQuestionsPage() {
             <div className="space-y-2 max-w-3xl">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="bg-amber-400 text-amber-950 text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md shadow-xs">
-                  {activePartition.category === 'PYQ' ? 'Official Previous Year Paper' : 'Fixed Exam Session'}
+                  {activePartition.category === 'PYQ' ? 'Official Previous Year Paper' : activePartition.category === 'EXAM' ? 'Target Examination' : 'Fixed Exam Session'}
                 </span>
                 {activePartition.status === 'created' ? (
                   <span className="bg-amber-500 text-amber-950 text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md shadow-xs flex items-center gap-1">
@@ -1374,6 +1549,11 @@ export default function AdminQuestionsPage() {
                       {ex.title}
                     </option>
                   ))}
+                  {formExamId && !exams.some(ex => ex.id === formExamId) && (
+                    <option value={formExamId}>
+                      {activePartition?.label || formExamId}
+                    </option>
+                  )}
                 </select>
               </div>
 

@@ -1,1 +1,46 @@
-[]
+[
+  {
+    "id": "mock-test-verify-exam-1791577402297-prelims-1",
+    "slug": "test-verify-exam-1791577402297-prelims-1",
+    "title": "Verification Test Bank Exam 1791577402297 Prelims Practice Mock 1",
+    "description": "Full-length preliminary practice mock test for Verification Test Bank Exam 1791577402297. Features sectional timers, TCS iON question palette, and detailed explanations.",
+    "examId": "exam-test-verify-exam-1791577402297",
+    "examSlug": "test-verify-exam-1791577402297",
+    "examTitle": "Verification Test Bank Exam 1791577402297",
+    "durationMinutes": 60,
+    "totalMarks": 100,
+    "totalQuestions": 100,
+    "cutoffMarks": 60,
+    "isFree": true,
+    "isFixed": true,
+    "isPyq": false,
+    "status": "created",
+    "sections": [
+      {
+        "id": "sec-test-verify-exam-1791577402297-eng",
+        "code": "ENGLISH",
+        "name": "English Language",
+        "questionCount": 30,
+        "marks": 30,
+        "durationMinutes": 20
+      },
+      {
+        "id": "sec-test-verify-exam-1791577402297-quant",
+        "code": "QUANT",
+        "name": "Quantitative Aptitude",
+        "questionCount": 35,
+        "marks": 35,
+        "durationMinutes": 20
+      },
+      {
+        "id": "sec-test-verify-exam-1791577402297-reason",
+        "code": "REASONING",
+        "name": "Reasoning Ability",
+        "questionCount": 35,
+        "marks": 35,
+        "durationMinutes": 20
+      }
+    ],
+    "questions": []
+  }
+]

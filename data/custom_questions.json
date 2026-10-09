@@ -382,5 +382,25 @@
     "difficulty": "MEDIUM",
     "marks": 1,
     "negativeMarks": 0.25
+  },
+  {
+    "id": "q-custom-1791577422722-ovza",
+    "exam": "exam-test-verify-exam-1791577402297",
+    "section": "Quantitative Aptitude",
+    "topic": "Simplification",
+    "question": "What is 15 * 12 - 30?",
+    "isPyq": false,
+    "options": {
+      "A": "150",
+      "B": "140",
+      "C": "160",
+      "D": "130",
+      "E": "120"
+    },
+    "answer": "A",
+    "explanation": "15 * 12 = 180; 180 - 30 = 150.",
+    "difficulty": "EASY",
+    "marks": 1,
+    "negativeMarks": 0.25
   }
 ]

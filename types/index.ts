@@ -58,6 +58,7 @@ export interface Question {
   sectionName: string;
   topicId: string;
   topicName: string;
+  mockTestId?: string;
   options: Option[];
 }
 

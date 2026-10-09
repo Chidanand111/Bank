@@ -424,6 +424,7 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
   addQuestionToJsonDb({
     id: newQuestionId,
     exam: input.examId || (input.isPyq ? (input.pyqExam || 'SBI Clerk Prelims 2024 PYQ') : exam.title),
+    examId: input.examId,
     section: newQuestion.sectionName,
     topic: input.topicName,
     question: input.text,
@@ -452,7 +453,7 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
 
   // Persist directly to Neon PostgreSQL Database
   try {
-    const dbExam = input.examId
+    let dbExam = input.examId
       ? await prisma.exam.findFirst({
           where: {
             OR: [
@@ -466,14 +467,72 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
           include: { sections: { include: { topics: true } } },
         });
 
-    const finalExamId = dbExam ? dbExam.id : (await prisma.exam.findFirst())?.id || input.examId || 'exam-ibps-po';
-    const existingSec = dbExam?.sections.find(s => s.code === input.sectionCode);
-    const fallbackSec = existingSec ? null : await prisma.section.findFirst({ where: { code: input.sectionCode } });
-    const finalSecId = existingSec?.id || fallbackSec?.id || (await prisma.section.findFirst())?.id || newQuestion.sectionId;
+    if (!dbExam && input.examId) {
+      const cleanSlug = input.examId.replace(/^exam-/, '');
+      const allExams = await getAdminExams();
+      const existingExamData = allExams.find(e => e.id === input.examId || e.slug === cleanSlug);
+      const titleToUse = existingExamData?.title || cleanSlug.toUpperCase();
+      try {
+        dbExam = await prisma.exam.upsert({
+          where: { slug: cleanSlug },
+          update: { title: titleToUse },
+          create: {
+            id: input.examId.startsWith('exam-') ? input.examId : `exam-${cleanSlug}`,
+            slug: cleanSlug,
+            title: titleToUse,
+            category: existingExamData?.category || 'PO',
+            description: existingExamData?.description || `${titleToUse} Examination`,
+            isActive: existingExamData?.status === 'published',
+          },
+          include: { sections: { include: { topics: true } } },
+        });
+      } catch (upsertErr) {
+        console.warn('Could not auto-upsert exam in createQuestionAction:', upsertErr);
+      }
+    }
 
-    const existingTopic = existingSec?.topics.find(t => t.name.toLowerCase() === input.topicName.toLowerCase());
-    const fallbackTopic = existingTopic ? null : await prisma.topic.findFirst({ where: { sectionId: finalSecId } });
-    const finalTopicId = existingTopic?.id || fallbackTopic?.id || (await prisma.topic.findFirst())?.id || newQuestion.topicId;
+    let finalExamId = dbExam?.id || input.examId || (await prisma.exam.findFirst())?.id || 'exam-ibps-po';
+    let finalSecId: string;
+    let finalTopicId: string;
+
+    if (dbExam) {
+      let existingSec = dbExam.sections?.find(s => s.code === input.sectionCode);
+      if (!existingSec) {
+        const secName = input.sectionCode === 'QUANT' ? 'Quantitative Aptitude'
+          : input.sectionCode === 'ENGLISH' ? 'English Language'
+          : input.sectionCode === 'FINANCIAL_AWARENESS' ? 'General / Banking Awareness'
+          : 'Reasoning Ability';
+        existingSec = await prisma.section.upsert({
+          where: { examId_code: { examId: dbExam.id, code: input.sectionCode } },
+          update: { name: secName },
+          create: {
+            id: `sec-${dbExam.slug}-${input.sectionCode.toLowerCase()}`,
+            name: secName,
+            code: input.sectionCode,
+            examId: dbExam.id,
+          },
+          include: { topics: true },
+        });
+      }
+      finalSecId = existingSec.id;
+
+      let existingTopic = existingSec.topics?.find(t => t.name.toLowerCase() === input.topicName.toLowerCase());
+      if (!existingTopic) {
+        existingTopic = await prisma.topic.create({
+          data: {
+            id: `top-${dbExam.slug}-${input.topicName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
+            name: input.topicName || 'General',
+            sectionId: finalSecId,
+          },
+        });
+      }
+      finalTopicId = existingTopic.id;
+    } else {
+      const fallbackSec = await prisma.section.findFirst({ where: { code: input.sectionCode } }) || await prisma.section.findFirst();
+      finalSecId = fallbackSec?.id || newQuestion.sectionId;
+      const fallbackTopic = await prisma.topic.findFirst({ where: { sectionId: finalSecId } }) || await prisma.topic.findFirst();
+      finalTopicId = fallbackTopic?.id || newQuestion.topicId;
+    }
 
     await prisma.question.create({
       data: {
@@ -601,13 +660,16 @@ export async function bulkImportQuestionsAction(
 
       // If a specific partition is provided, assign it to question and associate target examId
       if (partitionId && partitionId !== 'ALL') {
-        inputToUse.mockTestId = partitionId;
-        if (partitionId.toLowerCase().includes('sbi') || partitionId.toLowerCase().includes('clerk')) {
-          inputToUse.examId = 'exam-sbi-clerk';
-        } else if (partitionId.startsWith('exam-')) {
+        if (partitionId.startsWith('exam-')) {
           inputToUse.examId = partitionId;
-        } else if (!inputToUse.examId) {
-          inputToUse.examId = 'exam-ibps-po';
+          inputToUse.mockTestId = undefined;
+        } else {
+          inputToUse.mockTestId = partitionId;
+          if (partitionId.toLowerCase().includes('sbi') || partitionId.toLowerCase().includes('clerk')) {
+            inputToUse.examId = 'exam-sbi-clerk';
+          } else if (!inputToUse.examId) {
+            inputToUse.examId = 'exam-ibps-po';
+          }
         }
       }
 
@@ -1811,7 +1873,7 @@ export interface AdminPartitionInfo {
   isPyq: boolean;
   pyqYear?: number;
   examId: string;
-  category: 'ALL' | 'PYQ' | 'MOCK';
+  category: 'ALL' | 'PYQ' | 'MOCK' | 'EXAM';
   description: string;
   status?: ExamStatus;
 }
@@ -1825,9 +1887,18 @@ export async function toggleExamPublishAction(
 ): Promise<{ success: boolean; status?: ExamStatus; error?: string }> {
   await requireAdmin();
 
-  const exam = EXAMS_DATA.find(
+  let exam = EXAMS_DATA.find(
     e => e.id === examIdOrSlug || e.slug === examIdOrSlug || e.slug === examIdOrSlug.replace(/^exam-/, '')
   );
+  if (!exam) {
+    const allExams = await getAdminExams();
+    exam = allExams.find(
+      e => e.id === examIdOrSlug || e.slug === examIdOrSlug || e.slug === examIdOrSlug.replace(/^exam-/, '')
+    );
+    if (exam && !EXAMS_DATA.some(e => e.id === exam!.id)) {
+      EXAMS_DATA.push(exam);
+    }
+  }
   if (!exam) {
     return { success: false, error: 'Exam not found.' };
   }
@@ -1925,7 +1996,10 @@ export async function toggleMockTestPublishAction(
  * Returns dynamic partitions consolidating default papers and any custom PYQ papers from DB
  */
 export async function getAdminPartitions(): Promise<AdminPartitionInfo[]> {
-  const allTests = await loadFreshMockTestsFromDb();
+  const [allTests, allExams] = await Promise.all([
+    loadFreshMockTestsFromDb(),
+    getAdminExams(),
+  ]);
 
   const basePartitions: AdminPartitionInfo[] = [
     {
@@ -1941,16 +2015,16 @@ export async function getAdminPartitions(): Promise<AdminPartitionInfo[]> {
     },
   ];
 
-  const examPartitions: AdminPartitionInfo[] = EXAMS_DATA.map(e => ({
+  const examPartitions: AdminPartitionInfo[] = allExams.map(e => ({
     id: e.id,
     label: e.title,
-    badge: `${e.category} Exam`,
+    badge: e.status === 'created' ? 'Draft Exam' : 'Published Exam',
     title: `${e.title} - Question Bank`,
     isPyq: false,
     examId: e.id,
-    category: e.category as any,
+    category: 'EXAM',
     status: e.status || 'published',
-    description: `All practice and previous year questions mapped to ${e.title}.`,
+    description: `All practice and dedicated questions mapped to ${e.title}.`,
   }));
 
   const testPartitions: AdminPartitionInfo[] = allTests.map(t => ({

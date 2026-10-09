@@ -60,5 +60,123 @@
         ]
       }
     ]
+  },
+  {
+    "id": "exam-test-verify-exam-1791577402297",
+    "slug": "test-verify-exam-1791577402297",
+    "title": "Verification Test Bank Exam 1791577402297",
+    "category": "PO",
+    "description": "Testing admin exam partition question flow and publishing.",
+    "shortDescription": "Testing admin exam partition question flow and publishing.",
+    "totalMockTests": 1,
+    "status": "created",
+    "patterns": [
+      {
+        "stage": "Prelims",
+        "totalQuestions": 100,
+        "totalMarks": 100,
+        "totalDurationMinutes": 60,
+        "sections": [
+          {
+            "id": "sec-test-verify-exam-1791577402297-eng",
+            "name": "English Language",
+            "code": "ENGLISH",
+            "numQuestions": 30,
+            "maxMarks": 30,
+            "durationMinutes": 20,
+            "topics": [
+              "Reading Comprehension",
+              "Error Detection",
+              "Para Jumbles"
+            ]
+          },
+          {
+            "id": "sec-test-verify-exam-1791577402297-quant",
+            "name": "Quantitative Aptitude",
+            "code": "QUANT",
+            "numQuestions": 35,
+            "maxMarks": 35,
+            "durationMinutes": 20,
+            "topics": [
+              "Data Interpretation",
+              "Arithmetic",
+              "Number Series"
+            ]
+          },
+          {
+            "id": "sec-test-verify-exam-1791577402297-reason",
+            "name": "Reasoning Ability",
+            "code": "REASONING",
+            "numQuestions": 35,
+            "maxMarks": 35,
+            "durationMinutes": 20,
+            "topics": [
+              "Puzzles",
+              "Seating Arrangement",
+              "Syllogism"
+            ]
+          }
+        ]
+      },
+      {
+        "stage": "Mains",
+        "totalQuestions": 155,
+        "totalMarks": 200,
+        "totalDurationMinutes": 180,
+        "sections": [
+          {
+            "id": "sec-test-verify-exam-1791577402297-m-reason",
+            "name": "Reasoning Ability",
+            "code": "REASONING",
+            "numQuestions": 45,
+            "maxMarks": 60,
+            "durationMinutes": 60,
+            "topics": [
+              "Advanced Puzzles",
+              "Machine Input-Output",
+              "Logical Reasoning"
+            ]
+          },
+          {
+            "id": "sec-test-verify-exam-1791577402297-m-eng",
+            "name": "English Language",
+            "code": "ENGLISH",
+            "numQuestions": 35,
+            "maxMarks": 40,
+            "durationMinutes": 40,
+            "topics": [
+              "Advanced Comprehension",
+              "Vocabulary",
+              "Paragraph Completion"
+            ]
+          },
+          {
+            "id": "sec-test-verify-exam-1791577402297-m-quant",
+            "name": "Quantitative Aptitude",
+            "code": "QUANT",
+            "numQuestions": 35,
+            "maxMarks": 60,
+            "durationMinutes": 45,
+            "topics": [
+              "Data Analysis & Interpretation",
+              "Caselet DI"
+            ]
+          },
+          {
+            "id": "sec-test-verify-exam-1791577402297-m-ga",
+            "name": "General / Banking Awareness",
+            "code": "FINANCIAL_AWARENESS",
+            "numQuestions": 40,
+            "maxMarks": 40,
+            "durationMinutes": 35,
+            "topics": [
+              "Banking Awareness",
+              "Monetary Policy",
+              "Current Affairs"
+            ]
+          }
+        ]
+      }
+    ]
   }
 ]

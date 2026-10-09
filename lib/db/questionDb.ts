@@ -10,6 +10,7 @@ import { EXAMS_DATA } from '../data/exams';
 export interface RawJsonQuestion {
   id: number | string;
   exam: string;
+  examId?: string;
   section: string;
   topic: string;
   question: string;
@@ -129,7 +130,7 @@ export function mapSectionToCode(sectionName: string): { sectionCode: string; se
  */
 export function normalizeQuestion(raw: RawJsonQuestion): Question {
   const qId = typeof raw.id === 'number' ? `q-json-${raw.id}` : String(raw.id);
-  const { examId } = mapExamToId(raw.exam);
+  const { examId } = raw.examId ? { examId: raw.examId } : mapExamToId(raw.exam);
   const { sectionCode, sectionId, sectionName } = mapSectionToCode(raw.section);
   const topicId = `top-${sectionCode.toLowerCase()}-${(raw.topic || 'general').toLowerCase().replace(/\s+/g, '-')}`;
 
@@ -651,6 +652,30 @@ export function partitionQuestionsList(rawAll: Question[], partitionKey: string)
         const numB = matchB ? parseInt(matchB[1], 10) : 0;
         return numA - numB;
       });
+  }
+
+  // Targeted Exam partition (e.g. exam-ibps-po, exam-sbi-clerk, or any admin created exams)
+  if (normKey.startsWith('exam-')) {
+    const cleanNorm = normKey.replace(/^exam-/, '');
+    const matched = all.filter(q => {
+      const qExamId = (q.examId || '').toLowerCase().trim();
+      const qExamSlug = qExamId.replace(/^exam-/, '');
+      const qMockId = (q.mockTestId || '').toLowerCase().trim();
+      return (
+        qExamId === normKey ||
+        qExamSlug === cleanNorm ||
+        qExamId === cleanNorm ||
+        qMockId === normKey ||
+        qMockId === cleanNorm
+      );
+    });
+    return matched.sort((a, b) => {
+      const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+      const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+      const numA = matchA ? parseInt(matchA[1], 10) : 0;
+      const numB = matchB ? parseInt(matchB[1], 10) : 0;
+      return numA - numB;
+    });
   }
 
   // Dynamic match for any custom-created PYQ or Mock Test partition
