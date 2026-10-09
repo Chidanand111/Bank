@@ -226,3 +226,48 @@ export const MOCK_TESTS_DATA: MockTest[] = [
   },
 ];
 
+// Load persisted custom mock tests if available on server
+if (typeof window === 'undefined') {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const customTestsPath = path.resolve(process.cwd(), 'data', 'custom_mock_tests.json');
+    if (fs.existsSync(customTestsPath)) {
+      const data = JSON.parse(fs.readFileSync(customTestsPath, 'utf8'));
+      if (Array.isArray(data)) {
+        for (const t of data) {
+          if (!MOCK_TESTS_DATA.some(mt => mt.id === t.id || mt.slug === t.slug)) {
+            MOCK_TESTS_DATA.push(t);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load custom mock tests from disk:', err);
+  }
+}
+
+export function saveCustomMockTestsToFile(tests: MockTest[]): void {
+  if (typeof window === 'undefined') {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const dataDir = path.resolve(process.cwd(), 'data');
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      const customTestsPath = path.resolve(dataDir, 'custom_mock_tests.json');
+      // Save tests that are custom (not part of the initial built-in static list)
+      const builtinIds = new Set([
+        'mock-ibps-po-1', 'mock-ibps-po-2', 'mock-sbi-clerk-1', 'mock-sbi-clerk-2',
+        'mock-sbi-clerk-2024-pyq', 'mock-sbi-clerk-2023-pyq', 'mock-ibps-po-2025-mains-pyq',
+        'mock-ibps-po-2024-pyq', 'mock-ibps-po-2023-pyq'
+      ]);
+      const customOnly = tests.filter(t => !builtinIds.has(t.id));
+      fs.writeFileSync(customTestsPath, JSON.stringify(customOnly, null, 2), 'utf8');
+    } catch (err) {
+      console.warn('Failed to save custom mock tests to disk:', err);
+    }
+  }
+}
+

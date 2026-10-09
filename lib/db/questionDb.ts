@@ -4,6 +4,7 @@ import pyqQuestionsData from '@/data/sbi_clerk_2024_pyq.json';
 import ibpsPo2024Data from '@/data/ibps_po_2024_prelims_pyq.json';
 import ibpsPo2023Data from '@/data/ibps_po_2023_prelims_pyq.json';
 import ibpsPo2025MainsData from '@/data/ibps_po_2025_mains_pyq.json';
+import { EXAMS_DATA } from '../data/exams';
 
 export interface RawJsonQuestion {
   id: number | string;
@@ -43,20 +44,62 @@ for (const q of combinedRaw) {
     initialStore.push(q);
   }
 }
+
+// Load custom questions from disk if available
+if (typeof window === 'undefined') {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const customQPath = path.resolve(process.cwd(), 'data', 'custom_questions.json');
+    if (fs.existsSync(customQPath)) {
+      const data = JSON.parse(fs.readFileSync(customQPath, 'utf8'));
+      if (Array.isArray(data)) {
+        for (const q of data) {
+          const strId = String(q.id);
+          if (!seenStoreIds.has(strId)) {
+            seenStoreIds.add(strId);
+            initialStore.push(q);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load custom questions from disk:', err);
+  }
+}
+
 let questionStore: RawJsonQuestion[] = initialStore;
 
 /**
  * Standardize Exam names to exam IDs and slugs
  */
 export function mapExamToId(examName: string): { examId: string; examSlug: string } {
-  if (examName && examName.startsWith('exam-')) {
-    return { examId: examName, examSlug: examName.replace(/^exam-/, '') };
+  if (!examName) {
+    return { examId: 'exam-ibps-po', examSlug: 'ibps-po' };
   }
-  const norm = (examName || '').toLowerCase();
+  if (examName.startsWith('exam-')) {
+    const slug = examName.replace(/^exam-/, '');
+    return { examId: examName, examSlug: slug };
+  }
+  const norm = examName.toLowerCase().trim();
+  const matched = EXAMS_DATA.find(e =>
+    e.id.toLowerCase() === norm ||
+    e.slug.toLowerCase() === norm ||
+    e.title.toLowerCase() === norm ||
+    e.title.toLowerCase().includes(norm) ||
+    norm.includes(e.title.toLowerCase())
+  );
+  if (matched) {
+    return { examId: matched.id, examSlug: matched.slug };
+  }
   if (norm.includes('sbi') || norm.includes('clerk')) {
     return { examId: 'exam-sbi-clerk', examSlug: 'sbi-clerk' };
   }
-  return { examId: 'exam-ibps-po', examSlug: 'ibps-po' };
+  if (norm.includes('ibps') || norm.includes('po')) {
+    return { examId: 'exam-ibps-po', examSlug: 'ibps-po' };
+  }
+  const slug = norm.replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'general';
+  return { examId: `exam-${slug}`, examSlug: slug };
 }
 
 /**
@@ -255,8 +298,13 @@ export function pickRandomQuestions(params: {
 
   const isMatchingExam = (q: Question) => {
     if (!examSlug) return true;
-    const isSbi = examSlug.includes('sbi');
-    return isSbi ? q.examId.includes('sbi') : q.examId.includes('ibps');
+    const cleanSlug = examSlug.toLowerCase().replace(/^exam-/, '');
+    const cleanExamId = (q.examId || '').toLowerCase().replace(/^exam-/, '');
+    if (cleanExamId === cleanSlug) return true;
+    if (cleanExamId.includes(cleanSlug) || cleanSlug.includes(cleanExamId)) return true;
+    if (cleanSlug.includes('sbi') && cleanExamId.includes('sbi')) return true;
+    if (cleanSlug.includes('ibps') && cleanExamId.includes('ibps')) return true;
+    return false;
   };
 
   const primarySet = sectionQuestions.filter(isMatchingExam);
@@ -581,9 +629,12 @@ export function partitionQuestionsList(rawAll: Question[], partitionKey: string)
     const qPyq = (q.pyqExam || '').toLowerCase().trim();
     const qId = String(q.id).toLowerCase().trim();
     const cleanNorm = normKey.replace(/^mock-/, '');
+    const qExamId = (q.examId || '').toLowerCase().trim();
+    const qExamSlug = qExamId.replace(/^exam-/, '');
     return (
       (qPyq && (qPyq === normKey || cleanNorm.includes(qPyq) || qPyq.includes(cleanNorm))) ||
-      qId.includes(cleanNorm)
+      qId.includes(cleanNorm) ||
+      (qExamId && (qExamId === normKey || qExamSlug === cleanNorm || cleanNorm.startsWith(qExamSlug) || cleanNorm.includes(qExamSlug)))
     );
   });
   if (dynamicMatch.length > 0) {
@@ -744,6 +795,7 @@ export function addQuestionToJsonDb(newQuestion: RawJsonQuestion): Question {
   const id = newQuestion.id || Date.now();
   const q: RawJsonQuestion = { ...newQuestion, id };
   questionStore.push(q);
+  saveCustomQuestionsToFile();
   return normalizeQuestion(q);
 }
 
@@ -758,6 +810,7 @@ export function updateQuestionInJsonDb(id: number | string, updates: Partial<Raw
     ...questionStore[idx],
     ...updates,
   };
+  saveCustomQuestionsToFile();
   return normalizeQuestion(questionStore[idx]);
 }
 
@@ -767,7 +820,9 @@ export function updateQuestionInJsonDb(id: number | string, updates: Partial<Raw
 export function deleteQuestionFromJsonDb(id: number | string): boolean {
   const initialLen = questionStore.length;
   questionStore = questionStore.filter(q => !matchesQuestionId(q.id, id));
-  return questionStore.length < initialLen;
+  const changed = questionStore.length < initialLen;
+  if (changed) saveCustomQuestionsToFile();
+  return changed;
 }
 
 /**
@@ -786,7 +841,9 @@ export function deleteQuestionsByIdsFromStore(questionIds: string[]): number {
     return true;
   });
 
-  return initialLen - questionStore.length;
+  const count = initialLen - questionStore.length;
+  if (count > 0) saveCustomQuestionsToFile();
+  return count;
 }
 
 /**
@@ -807,7 +864,31 @@ export function deleteExamQuestionsFromStore(examId: string, examTitle?: string)
     return true;
   });
 
-  return initialLen - questionStore.length;
+  const count = initialLen - questionStore.length;
+  if (count > 0) saveCustomQuestionsToFile();
+  return count;
+}
+
+/**
+ * Persist custom questions to data/custom_questions.json
+ */
+export function saveCustomQuestionsToFile(): void {
+  if (typeof window === 'undefined') {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const dataDir = path.resolve(process.cwd(), 'data');
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      const customQPath = path.resolve(dataDir, 'custom_questions.json');
+      const staticIdSet = new Set(combinedRaw.map(q => String(q.id)));
+      const customOnly = questionStore.filter(q => !staticIdSet.has(String(q.id)));
+      fs.writeFileSync(customQPath, JSON.stringify(customOnly, null, 2), 'utf8');
+    } catch (err) {
+      console.warn('Failed to save custom questions to disk:', err);
+    }
+  }
 }
 
 /**
@@ -867,5 +948,6 @@ export function syncQuestionsToStore(questions: Question[]): void {
       });
     }
   }
+  saveCustomQuestionsToFile();
 }
 

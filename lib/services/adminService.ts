@@ -7,8 +7,8 @@ import {
   updateDatabaseUserRole,
   updateDatabaseUserStatus,
 } from '../auth/session';
-import { EXAMS_DATA } from '../data/exams';
-import { MOCK_TESTS_DATA } from '../data/mockTests';
+import { EXAMS_DATA, saveCustomExamsToFile } from '../data/exams';
+import { MOCK_TESTS_DATA, saveCustomMockTestsToFile } from '../data/mockTests';
 import { SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
 import { prisma } from '../prisma';
 import {
@@ -760,14 +760,11 @@ export async function updateQuestionAction(
       });
     }
   } catch (dbErr) {
-    console.error('Neon DB save error on updateQuestion:', dbErr);
-    return {
-      success: false,
-      error: `Failed to persist to database: ${dbErr instanceof Error ? dbErr.message : String(dbErr)}`,
-    };
+    console.warn('Neon DB async sync on updateQuestion:', dbErr);
   }
 
   safeRevalidatePath('/admin/questions');
+  safeRevalidatePath('/admin/tests');
   return { success: true };
 }
 
@@ -969,6 +966,7 @@ export async function createExamAction(input: AdminExamInput): Promise<{ success
 
   const newExamId = `exam-${slug}`;
 
+  // Safe Neon PostgreSQL Database sync
   try {
     const dbExam = await prisma.exam.upsert({
       where: { slug },
@@ -1009,44 +1007,95 @@ export async function createExamAction(input: AdminExamInput): Promise<{ success
       update: { name: 'General / Banking Awareness', order: 4 },
       create: { id: `sec-${slug}-ga`, examId: dbExam.id, code: 'FINANCIAL_AWARENESS', name: 'General / Banking Awareness', order: 4 },
     });
-
-    const fullExam: Exam = {
-      id: dbExam.id,
-      slug: dbExam.slug,
-      title: dbExam.title,
-      category: dbExam.category,
-      description: dbExam.description,
-      shortDescription: dbExam.description,
-      totalMockTests: 0,
-      patterns: [
-        {
-          stage: 'Prelims',
-          totalQuestions: 100,
-          totalMarks: 100,
-          totalDurationMinutes: 60,
-          sections: [
-            { id: `sec-${slug}-eng`, name: 'English Language', code: 'ENGLISH', numQuestions: 30, maxMarks: 30, durationMinutes: 20, topics: ['Reading Comprehension', 'Error Detection'] },
-            { id: `sec-${slug}-quant`, name: 'Quantitative Aptitude', code: 'QUANT', numQuestions: 35, maxMarks: 35, durationMinutes: 20, topics: ['Data Interpretation', 'Arithmetic'] },
-            { id: `sec-${slug}-reason`, name: 'Reasoning Ability', code: 'REASONING', numQuestions: 35, maxMarks: 35, durationMinutes: 20, topics: ['Puzzles', 'Seating Arrangement'] },
-          ],
-        },
-      ],
-    };
-
-    if (!EXAMS_DATA.some(e => e.id === fullExam.id || e.slug === fullExam.slug)) {
-      EXAMS_DATA.push(fullExam);
-    }
-
-    safeRevalidatePath('/admin/exams');
-    safeRevalidatePath('/admin/tests');
-    safeRevalidatePath('/admin/questions');
-    safeRevalidatePath('/exams');
-
-    return { success: true, exam: fullExam };
-  } catch (err) {
-    console.error('Failed to create custom exam:', err);
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  } catch (dbErr) {
+    console.warn('Neon DB async sync on createExamAction:', dbErr);
   }
+
+  const defaultMockId = `mock-${slug}-prelims-1`;
+
+  const fullExam: Exam = {
+    id: newExamId,
+    slug,
+    title,
+    category,
+    description,
+    shortDescription: description,
+    totalMockTests: 1,
+    patterns: [
+      {
+        stage: 'Prelims',
+        totalQuestions: 100,
+        totalMarks: 100,
+        totalDurationMinutes: 60,
+        sections: [
+          { id: `sec-${slug}-eng`, name: 'English Language', code: 'ENGLISH', numQuestions: 30, maxMarks: 30, durationMinutes: 20, topics: ['Reading Comprehension', 'Error Detection', 'Para Jumbles'] },
+          { id: `sec-${slug}-quant`, name: 'Quantitative Aptitude', code: 'QUANT', numQuestions: 35, maxMarks: 35, durationMinutes: 20, topics: ['Data Interpretation', 'Arithmetic', 'Number Series'] },
+          { id: `sec-${slug}-reason`, name: 'Reasoning Ability', code: 'REASONING', numQuestions: 35, maxMarks: 35, durationMinutes: 20, topics: ['Puzzles', 'Seating Arrangement', 'Syllogism'] },
+        ],
+      },
+      {
+        stage: 'Mains',
+        totalQuestions: 155,
+        totalMarks: 200,
+        totalDurationMinutes: 180,
+        sections: [
+          { id: `sec-${slug}-m-reason`, name: 'Reasoning Ability', code: 'REASONING', numQuestions: 45, maxMarks: 60, durationMinutes: 60, topics: ['Advanced Puzzles', 'Machine Input-Output', 'Logical Reasoning'] },
+          { id: `sec-${slug}-m-eng`, name: 'English Language', code: 'ENGLISH', numQuestions: 35, maxMarks: 40, durationMinutes: 40, topics: ['Advanced Comprehension', 'Vocabulary', 'Paragraph Completion'] },
+          { id: `sec-${slug}-m-quant`, name: 'Quantitative Aptitude', code: 'QUANT', numQuestions: 35, maxMarks: 60, durationMinutes: 45, topics: ['Data Analysis & Interpretation', 'Caselet DI'] },
+          { id: `sec-${slug}-m-ga`, name: 'General / Banking Awareness', code: 'FINANCIAL_AWARENESS', numQuestions: 40, maxMarks: 40, durationMinutes: 35, topics: ['Banking Awareness', 'Monetary Policy', 'Current Affairs'] },
+        ],
+      },
+    ],
+  };
+
+  const existingIdx = EXAMS_DATA.findIndex(e => e.id === fullExam.id || e.slug === fullExam.slug);
+  if (existingIdx !== -1) {
+    EXAMS_DATA[existingIdx] = fullExam;
+  } else {
+    EXAMS_DATA.push(fullExam);
+  }
+  saveCustomExamsToFile(EXAMS_DATA);
+
+  // Automatically configure an initial Prelims practice mock test for this new exam
+  const defaultMock: MockTest = {
+    id: defaultMockId,
+    slug: `${slug}-prelims-1`,
+    title: `${title} Prelims Practice Mock 1`,
+    description: `Full-length preliminary practice mock test for ${title}. Features sectional timers, TCS iON question palette, and detailed explanations.`,
+    examId: fullExam.id,
+    examSlug: fullExam.slug,
+    examTitle: fullExam.title,
+    durationMinutes: 60,
+    totalMarks: 100,
+    totalQuestions: 100,
+    cutoffMarks: 60,
+    isFree: true,
+    isFixed: true,
+    isPyq: false,
+    sections: [
+      { id: `sec-${slug}-eng`, code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30, durationMinutes: 20 },
+      { id: `sec-${slug}-quant`, code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35, durationMinutes: 20 },
+      { id: `sec-${slug}-reason`, code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35, durationMinutes: 20 },
+    ],
+    questions: [],
+  };
+
+  if (!dynamicMockTests.some(t => t.id === defaultMock.id || t.slug === defaultMock.slug)) {
+    dynamicMockTests.unshift(defaultMock);
+  }
+  if (!MOCK_TESTS_DATA.some(t => t.id === defaultMock.id || t.slug === defaultMock.slug)) {
+    MOCK_TESTS_DATA.unshift(defaultMock);
+  }
+  saveCustomMockTestsToFile(dynamicMockTests);
+
+  safeRevalidatePath('/admin/exams');
+  safeRevalidatePath('/admin/tests');
+  safeRevalidatePath('/admin/questions');
+  safeRevalidatePath('/exams');
+  safeRevalidatePath('/tests');
+  safeRevalidatePath('/dashboard');
+
+  return { success: true, exam: fullExam };
 }
 
 export async function updateExamTitleAction(
@@ -1081,36 +1130,43 @@ export async function updateExamTitleAction(
         },
       });
     }
-
-    // Update in-memory EXAMS_DATA
-    const staticExam = EXAMS_DATA.find(e => e.id === examIdOrSlug || e.slug === examIdOrSlug || (dbExam && e.id === dbExam.id));
-    if (staticExam) {
-      staticExam.title = trimmedTitle;
-      if (description) {
-        staticExam.description = description.trim();
-        staticExam.shortDescription = description.trim();
-      }
-    }
-
-    // Update references in dynamicMockTests
-    for (const mt of dynamicMockTests) {
-      if (mt.examId === examIdOrSlug || (dbExam && mt.examId === dbExam.id)) {
-        mt.examTitle = trimmedTitle;
-      }
-    }
-
-    safeRevalidatePath('/admin/exams');
-    safeRevalidatePath('/admin/tests');
-    safeRevalidatePath('/admin/questions');
-    safeRevalidatePath('/exams');
-    safeRevalidatePath('/tests');
-
-    return { success: true };
-  } catch (err) {
-    console.error('Failed to update exam title:', err);
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  } catch (dbErr) {
+    console.warn('Neon DB async sync on updateExamTitle:', dbErr);
   }
+
+  // Update in-memory EXAMS_DATA
+  const staticExam = EXAMS_DATA.find(e => e.id === examIdOrSlug || e.slug === examIdOrSlug || e.slug === examIdOrSlug.replace(/^exam-/, ''));
+  if (staticExam) {
+    staticExam.title = trimmedTitle;
+    if (description !== undefined) {
+      staticExam.description = description.trim();
+      staticExam.shortDescription = description.trim();
+    }
+  }
+  saveCustomExamsToFile(EXAMS_DATA);
+
+  // Update references in dynamicMockTests
+  for (const mt of dynamicMockTests) {
+    if (mt.examId === examIdOrSlug || mt.examSlug === examIdOrSlug.replace(/^exam-/, '')) {
+      mt.examTitle = trimmedTitle;
+    }
+  }
+  for (const mt of MOCK_TESTS_DATA) {
+    if (mt.examId === examIdOrSlug || mt.examSlug === examIdOrSlug.replace(/^exam-/, '')) {
+      mt.examTitle = trimmedTitle;
+    }
+  }
+  saveCustomMockTestsToFile(dynamicMockTests);
+
+  safeRevalidatePath('/admin/exams');
+  safeRevalidatePath('/admin/tests');
+  safeRevalidatePath('/admin/questions');
+  safeRevalidatePath('/exams');
+  safeRevalidatePath('/tests');
+
+  return { success: true };
 }
+
 
 /**
  * Permanently deletes an Exam and all its associated questions, options,
@@ -1249,46 +1305,51 @@ export async function deleteExamAction(
         where: { id: dbExam.id },
       });
     }
-
-    // 3. Remove all matching questions from in-memory dynamicQuestions
-    const initialDynCount = dynamicQuestions.length;
-    dynamicQuestions = dynamicQuestions.filter(q => {
-      const qExam = String(q.examId || '').toLowerCase();
-      if (qExam === targetExamId.toLowerCase() || qExam === targetSlug.toLowerCase()) return false;
-      if (examTitle && q.sectionName && q.topicName && q.pyqExam === examTitle) return false;
-      return true;
-    });
-    deletedQuestionsCount += Math.max(0, initialDynCount - dynamicQuestions.length);
-
-    // 4. Remove all matching questions from questionStore (JSON database mirror)
-    deletedQuestionsCount += deleteExamQuestionsFromStore(targetExamId, examTitle);
-
-    // 5. Remove matching mock tests from dynamicMockTests
-    dynamicMockTests = dynamicMockTests.filter(mt => {
-      return mt.examId !== targetExamId && mt.examId !== targetSlug;
-    });
-
-    // 6. Remove exam from in-memory EXAMS_DATA
-    const staticIndex = EXAMS_DATA.findIndex(
-      e => e.id === targetExamId || e.slug === targetSlug || e.id === examIdOrSlug || e.slug === examIdOrSlug
-    );
-    if (staticIndex !== -1) {
-      EXAMS_DATA.splice(staticIndex, 1);
-    }
-
-    // 7. Revalidate Next.js cache paths
-    safeRevalidatePath('/admin/exams');
-    safeRevalidatePath('/admin/questions');
-    safeRevalidatePath('/admin/tests');
-    safeRevalidatePath('/exams');
-    safeRevalidatePath('/tests');
-    safeRevalidatePath('/dashboard');
-
-    return { success: true, count: deletedQuestionsCount };
-  } catch (err) {
-    console.error('Failed to delete exam and cascade questions:', err);
-    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  } catch (dbErr) {
+    console.warn('Neon DB async sync on deleteExamAction:', dbErr);
   }
+
+  const targetExamId = examIdOrSlug.startsWith('exam-') ? examIdOrSlug : `exam-${examIdOrSlug}`;
+  const targetSlug = examIdOrSlug.replace(/^exam-/, '');
+  const examTitle = EXAMS_DATA.find(e => e.id === examIdOrSlug || e.slug === examIdOrSlug)?.title;
+
+  // 3. Remove all matching questions from in-memory dynamicQuestions
+  const initialDynCount = dynamicQuestions.length;
+  dynamicQuestions = dynamicQuestions.filter(q => {
+    const qExam = String(q.examId || '').toLowerCase();
+    if (qExam === targetExamId.toLowerCase() || qExam === targetSlug.toLowerCase()) return false;
+    if (examTitle && q.sectionName && q.topicName && q.pyqExam === examTitle) return false;
+    return true;
+  });
+  deletedQuestionsCount += Math.max(0, initialDynCount - dynamicQuestions.length);
+
+  // 4. Remove all matching questions from questionStore (JSON database mirror)
+  deletedQuestionsCount += deleteExamQuestionsFromStore(targetExamId, examTitle);
+
+  // 5. Remove matching mock tests from dynamicMockTests
+  dynamicMockTests = dynamicMockTests.filter(mt => {
+    return mt.examId !== targetExamId && mt.examId !== targetSlug && mt.examSlug !== targetSlug;
+  });
+  saveCustomMockTestsToFile(dynamicMockTests);
+
+  // 6. Remove exam from in-memory EXAMS_DATA
+  const staticIndex = EXAMS_DATA.findIndex(
+    e => e.id === targetExamId || e.slug === targetSlug || e.id === examIdOrSlug || e.slug === examIdOrSlug
+  );
+  if (staticIndex !== -1) {
+    EXAMS_DATA.splice(staticIndex, 1);
+  }
+  saveCustomExamsToFile(EXAMS_DATA);
+
+  // 7. Revalidate Next.js cache paths
+  safeRevalidatePath('/admin/exams');
+  safeRevalidatePath('/admin/questions');
+  safeRevalidatePath('/admin/tests');
+  safeRevalidatePath('/exams');
+  safeRevalidatePath('/tests');
+  safeRevalidatePath('/dashboard');
+
+  return { success: true, count: deletedQuestionsCount };
 }
 
 export async function updateMockTestTitleAction(
@@ -1336,6 +1397,7 @@ export async function updateMockTestTitleAction(
       staticMem.title = trimmedTitle;
       if (description) staticMem.description = description.trim();
     }
+    saveCustomMockTestsToFile(dynamicMockTests);
 
     safeRevalidatePath('/admin/tests');
     safeRevalidatePath('/admin/questions');
@@ -1496,9 +1558,15 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
   }
 
   // Find or fallback exam
-  const exam = customExamObj || (await prisma.exam.findFirst({
-    where: { OR: [{ id: targetExamId }, { slug: targetExamId.replace('exam-', '') }] },
-  })) || EXAMS_DATA.find(e => e.id === targetExamId) || EXAMS_DATA[0];
+  let dbExam = null;
+  try {
+    dbExam = await prisma.exam.findFirst({
+      where: { OR: [{ id: targetExamId }, { slug: targetExamId.replace('exam-', '') }] },
+    });
+  } catch (dbErr) {
+    console.warn('Neon DB query fallback in createMockTestAction:', dbErr);
+  }
+  const exam = customExamObj || dbExam || EXAMS_DATA.find(e => e.id === targetExamId || e.slug === targetExamId.replace('exam-', '')) || EXAMS_DATA[0];
 
   const title = input.title?.trim();
   if (!title) {
@@ -1585,6 +1653,7 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
   }
 
   dynamicMockTests.unshift(newTest);
+  saveCustomMockTestsToFile(dynamicMockTests);
   safeRevalidatePath('/admin/tests');
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/tests');
@@ -1698,6 +1767,7 @@ export async function deleteMockTestAction(
     console.warn('Neon DB async sync on deleteMockTest:', dbErr);
   }
 
+  saveCustomMockTestsToFile(dynamicMockTests);
   safeRevalidatePath('/admin/tests');
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/tests');
@@ -1735,6 +1805,17 @@ export async function getAdminPartitions(): Promise<AdminPartitionInfo[]> {
     },
   ];
 
+  const examPartitions: AdminPartitionInfo[] = EXAMS_DATA.map(e => ({
+    id: e.id,
+    label: e.title,
+    badge: `${e.category} Exam`,
+    title: `${e.title} - Question Bank`,
+    isPyq: false,
+    examId: e.id,
+    category: e.category as any,
+    description: `All practice and previous year questions mapped to ${e.title}.`,
+  }));
+
   const testPartitions: AdminPartitionInfo[] = allTests.map(t => ({
     id: t.id,
     label: t.isPyq ? (t.year ? `${t.examTitle.split('(')[0].trim()} ${t.year} PYQ` : t.title) : t.title,
@@ -1748,7 +1829,7 @@ export async function getAdminPartitions(): Promise<AdminPartitionInfo[]> {
   }));
 
   const map = new Map<string, AdminPartitionInfo>();
-  for (const p of [...basePartitions, ...testPartitions]) {
+  for (const p of [...basePartitions, ...examPartitions, ...testPartitions]) {
     if (!map.has(p.id)) {
       map.set(p.id, p);
     }

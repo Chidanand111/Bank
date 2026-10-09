@@ -182,3 +182,42 @@ export const EXAMS_DATA: Exam[] = [
     ]
   }
 ];
+
+// Load persisted custom exams if available on server
+if (typeof window === 'undefined') {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    const customExamsPath = path.resolve(process.cwd(), 'data', 'custom_exams.json');
+    if (fs.existsSync(customExamsPath)) {
+      const data = JSON.parse(fs.readFileSync(customExamsPath, 'utf8'));
+      if (Array.isArray(data)) {
+        for (const ex of data) {
+          if (!EXAMS_DATA.some(e => e.id === ex.id || e.slug === ex.slug)) {
+            EXAMS_DATA.push(ex);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load custom exams from disk:', err);
+  }
+}
+
+export function saveCustomExamsToFile(exams: Exam[]): void {
+  if (typeof window === 'undefined') {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+      const dataDir = path.resolve(process.cwd(), 'data');
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+      const customExamsPath = path.resolve(dataDir, 'custom_exams.json');
+      const customOnly = exams.filter(e => e.id !== 'exam-ibps-po' && e.id !== 'exam-sbi-clerk');
+      fs.writeFileSync(customExamsPath, JSON.stringify(customOnly, null, 2), 'utf8');
+    } catch (err) {
+      console.warn('Failed to save custom exams to disk:', err);
+    }
+  }
+}

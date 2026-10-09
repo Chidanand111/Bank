@@ -38,6 +38,7 @@ import {
   Calendar,
   X,
   Upload,
+  Download,
 } from 'lucide-react';
 
 export type ExamPartition = AdminPartitionInfo;
@@ -607,6 +608,16 @@ export default function AdminQuestionsPage() {
           </div>
 
           <div className="flex items-center gap-2 self-stretch sm:self-auto">
+            <a
+              href="/sample_banking_questions_template.csv"
+              download="sample_banking_questions_template.csv"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 rounded-xl transition-all shadow-2xs cursor-pointer"
+              title="Download official sample CSV template with RC passages, DI charts, and LaTeX math"
+            >
+              <Download className="w-3.5 h-3.5 text-blue-600" />
+              <span className="hidden sm:inline">Sample CSV</span>
+            </a>
+
             <Button
               variant="outline"
               size="md"
@@ -1016,8 +1027,11 @@ export default function AdminQuestionsPage() {
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="ALL">All Target Exams</option>
-              <option value="exam-ibps-po">IBPS PO</option>
-              <option value="exam-sbi-clerk">SBI Clerk</option>
+              {exams.map((ex) => (
+                <option key={ex.id} value={ex.id}>
+                  {ex.title}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -1252,8 +1266,11 @@ export default function AdminQuestionsPage() {
                   onChange={(e) => setFormExamId(e.target.value)}
                   className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500"
                 >
-                  <option value="exam-ibps-po">IBPS PO</option>
-                  <option value="exam-sbi-clerk">SBI Clerk</option>
+                  {exams.map((ex) => (
+                    <option key={ex.id} value={ex.id}>
+                      {ex.title}
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -1926,6 +1943,7 @@ export default function AdminQuestionsPage() {
         }}
         partitions={partitions}
         currentPartitionId={activePartitionId}
+        exams={exams}
       />
 
       {/* Delete Exam Partition Confirmation Modal */}
