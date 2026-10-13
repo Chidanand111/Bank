@@ -14,7 +14,7 @@ import {
   CheckCircle2,
   ArrowRight,
   Sparkles,
-  Zap,
+  PlayCircle,
   Target
 } from 'lucide-react';
 
@@ -57,7 +57,7 @@ export default async function HomePage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             {/* Left Content */}
             <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
                 <Sparkles className="w-4 h-4 text-blue-600" />
                 Updated for 2024-2025 IBPS & SBI Exam Cycles
               </div>
@@ -70,13 +70,13 @@ export default async function HomePage() {
               </h1>
 
               <p className="text-lg text-slate-600 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Take real exam-like mock tests for <strong className="text-slate-800">IBPS PO</strong> and{' '}
-                <strong className="text-slate-800">SBI Clerk</strong>. Track accuracy, boost your speed, and review detailed step-by-step explanations.
+                Take real exam-like mock tests for <strong className="text-slate-900">IBPS PO</strong> and{' '}
+                <strong className="text-slate-900">SBI Clerk</strong>. Track accuracy, boost your speed, and review detailed step-by-step explanations.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-2">
                 <Link href="/tests">
-                  <Button variant="primary" size="lg" className="w-full sm:w-auto shadow-md">
+                  <Button variant="primary" size="lg" className="w-full sm:w-auto">
                     Start a Mock Test
                     <ArrowRight className="w-5 h-5 ml-1" />
                   </Button>
@@ -116,7 +116,7 @@ export default async function HomePage() {
                         <ShieldCheck className="w-6 h-6" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-slate-900 text-sm">IBPS PO Prelims Live Test</h4>
+                        <h2 className="font-bold text-slate-900 text-sm">IBPS PO Prelims Live Test</h2>
                         <span className="text-xs text-slate-500">60 Minutes • 100 Marks</span>
                       </div>
                     </div>
@@ -140,7 +140,7 @@ export default async function HomePage() {
 
                   <Link href="/test/mock-ibps-po-1">
                     <Button variant="primary" size="md" className="w-full justify-center mt-2 shadow-xs">
-                      <Zap className="w-4 h-4 mr-1.5" /> Try Featured Mock Test Now
+                      <PlayCircle className="w-4 h-4 mr-1.5" /> Try Featured Mock Test Now
                     </Button>
                   </Link>
                 </CardContent>
@@ -173,11 +173,11 @@ export default async function HomePage() {
           ))}
 
           {/* Coming Soon Card */}
-          <Card className="border border-dashed border-slate-300 bg-slate-50/50 flex flex-col justify-center items-center text-center p-8">
+          <Card className="md:col-start-1 md:col-span-1 h-full border border-dashed border-slate-300 bg-slate-50/50 flex flex-col justify-center items-center text-center p-6">
             <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center mb-4">
               <Sparkles className="w-6 h-6" />
             </div>
-            <h3 className="text-lg font-bold text-slate-800">More Exams Coming Soon</h3>
+            <h3 className="text-lg font-bold text-slate-900">More Exams Coming Soon</h3>
             <p className="text-xs text-slate-500 mt-1 max-w-xs">
               RBI Grade B, IBPS RRB Officer Scale 1, and NABARD Assistant test series currently in preparation.
             </p>
@@ -256,7 +256,7 @@ export default async function HomePage() {
             </p>
           </div>
           <Link href="/tests">
-            <Button variant="secondary" size="lg" className="shrink-0 bg-white text-blue-700 hover:bg-blue-50 font-bold px-8 shadow-md">
+            <Button variant="inverted" size="lg" className="shrink-0 px-8">
               Start Free Mock Test Now
             </Button>
           </Link>

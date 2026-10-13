@@ -183,7 +183,7 @@ export const MOCK_TESTS_DATA: MockTest[] = [
     description: 'Authentic 100-question actual exam paper from IBPS PO Prelims 2025. Features Reasoning Ability (35 Qs), Quantitative Aptitude (35 Qs), and English Language (30 Qs) with 20-minute sectional timings.',
     examId: 'exam-ibps-po-2025-pyq',
     examSlug: 'ibps-po-2025-pyq',
-    examTitle: 'IBPS PO 2025 PYQ',
+    examTitle: 'IBPS PO 2025 Previous Year Papers',
     durationMinutes: 60,
     totalMarks: 100,
     totalQuestions: 100,

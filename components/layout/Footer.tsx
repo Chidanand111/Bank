@@ -33,7 +33,7 @@ export const Footer: React.FC = () => {
 
           {/* Col 2 */}
           <div>
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Target Exams</h4>
+            <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Target Exams</h3>
             <ul className="space-y-2.5 text-sm">
               <li>
                 <Link href="/exams/ibps-po" className="hover:text-white transition-colors">
@@ -46,17 +46,17 @@ export const Footer: React.FC = () => {
                 </Link>
               </li>
               <li>
-                <span className="text-slate-600 cursor-not-allowed">RBI Grade B (Coming Soon)</span>
+                <span className="text-slate-500 cursor-not-allowed">RBI Grade B (Coming Soon)</span>
               </li>
               <li>
-                <span className="text-slate-600 cursor-not-allowed">IBPS RRB Officer (Coming Soon)</span>
+                <span className="text-slate-500 cursor-not-allowed">IBPS RRB Officer (Coming Soon)</span>
               </li>
             </ul>
           </div>
 
           {/* Col 3 */}
           <div>
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Practice & Prep</h4>
+            <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Practice & Prep</h3>
             <ul className="space-y-2.5 text-sm">
               <li>
                 <Link href="/tests" className="hover:text-white transition-colors">
@@ -78,7 +78,7 @@ export const Footer: React.FC = () => {
 
           {/* Col 4 */}
           <div>
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Exam Standard</h4>
+            <h3 className="text-sm font-semibold text-white uppercase tracking-wider mb-4">Exam Standard</h3>
             <p className="text-xs text-slate-400 leading-relaxed">
               Our mock test environment accurately mirrors the official TCS iON exam engine with sectional timers, question status palettes, and negative marking rules (+1.0 / -0.25).
             </p>

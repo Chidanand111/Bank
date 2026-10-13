@@ -44,20 +44,20 @@ export const TestCard: React.FC<TestCardProps> = ({ test }) => {
 
         <div className="grid grid-cols-3 gap-2 py-3 border-y border-slate-100 text-xs text-slate-600">
           <div className="flex flex-col items-center p-2 rounded-lg bg-slate-50">
-            <span className="text-slate-400 font-medium flex items-center gap-1">
-              <FileText className="w-3.5 h-3.5 text-blue-500" /> Questions
+            <span className="text-slate-500 font-medium flex items-center gap-1">
+              <FileText className="w-3.5 h-3.5 text-blue-600" /> Questions
             </span>
             <span className="font-semibold text-slate-900 text-sm mt-0.5">{test.totalQuestions}</span>
           </div>
           <div className="flex flex-col items-center p-2 rounded-lg bg-slate-50">
-            <span className="text-slate-400 font-medium flex items-center gap-1">
-              <Award className="w-3.5 h-3.5 text-blue-500" /> Marks
+            <span className="text-slate-500 font-medium flex items-center gap-1">
+              <Award className="w-3.5 h-3.5 text-blue-600" /> Marks
             </span>
             <span className="font-semibold text-slate-900 text-sm mt-0.5">{test.totalMarks}</span>
           </div>
           <div className="flex flex-col items-center p-2 rounded-lg bg-slate-50">
-            <span className="text-slate-400 font-medium flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5 text-blue-500" /> Time
+            <span className="text-slate-500 font-medium flex items-center gap-1">
+              <Clock className="w-3.5 h-3.5 text-blue-600" /> Time
             </span>
             <span className="font-semibold text-slate-900 text-sm mt-0.5">{test.durationMinutes} m</span>
           </div>
@@ -68,7 +68,7 @@ export const TestCard: React.FC<TestCardProps> = ({ test }) => {
             Cut-off Benchmark: <span className="font-semibold text-slate-700">{test.cutoffMarks}</span>
           </div>
           <Link href={`/test/${test.id}`}>
-            <Button variant="primary" size="sm" className="flex items-center gap-1.5 shadow-xs">
+            <Button variant="primary" size="md" className="flex items-center justify-center gap-1.5 min-w-[140px] sm:min-w-[160px]">
               <PlayCircle className="w-4 h-4" />
               Start Test
             </Button>

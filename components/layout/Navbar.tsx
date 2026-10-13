@@ -60,7 +60,7 @@ export const Navbar: React.FC<NavbarProps> = ({ user }) => {
               <span className="text-xl font-extrabold tracking-tight text-slate-900 leading-none">
                 Bank<span className="text-blue-600">Mock</span>
               </span>
-              <span className="text-[10px] font-medium text-slate-500 tracking-wider uppercase mt-0.5">
+              <span className="text-[10px] font-medium text-slate-500 mt-0.5">
                 Banking Exam Prep
               </span>
             </div>

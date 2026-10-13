@@ -4,7 +4,7 @@ import { Exam } from '@/types';
 import { Card, CardContent } from '../ui/Card';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
-import { ArrowRight, BookOpen, Clock, FileText } from 'lucide-react';
+import { PlayCircle, BookOpen, Clock, FileText } from 'lucide-react';
 
 export interface ExamCardProps {
   exam: Exam;
@@ -65,8 +65,8 @@ export const ExamCard: React.FC<ExamCardProps> = ({ exam }) => {
           </Link>
           <Link href={`/tests?exam=${exam.slug}`} className="w-full">
             <Button variant="primary" size="md" className="w-full flex items-center justify-center gap-1.5">
+              <PlayCircle className="w-4 h-4" />
               Take Mock
-              <ArrowRight className="w-4 h-4" />
             </Button>
           </Link>
         </div>

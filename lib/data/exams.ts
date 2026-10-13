@@ -186,7 +186,7 @@ export const EXAMS_DATA: Exam[] = [
   {
     id: 'exam-ibps-po-2025-pyq',
     slug: 'ibps-po-2025-pyq',
-    title: 'IBPS PO 2025 PYQ',
+    title: 'IBPS PO 2025 Previous Year Papers',
     category: 'PO',
     description: 'Authentic 2025 IBPS PO examination papers featuring official prelims questions, 20-minute sectional timers, and comprehensive explanations.',
     shortDescription: 'Official IBPS PO 2025 Prelims & Mains actual exam question papers with real exam scoring.',
