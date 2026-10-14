@@ -101,6 +101,15 @@ model Question {
   answers           Answer[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+
+  @@index([examId])
+  @@index([sectionId])
+  @@index([topicId])
+  @@index([difficulty])
+  @@index([isPyq])
+  @@index([groupId])
+  @@index([examId, sectionId])
+  @@index([examId, sectionId, difficulty])
 }
 
 model Option {
@@ -112,6 +121,9 @@ model Option {
   isCorrect  Boolean  @default(false)
   order      Int      @default(0)
   answers    Answer[]
+
+  @@index([questionId])
+  @@index([questionId, order])
 }
 
 model MockTest {
@@ -134,6 +146,11 @@ model MockTest {
   attempts          Attempt[]
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+
+  @@index([examId])
+  @@index([examId, isPublished])
+  @@index([isPyq])
+  @@index([createdAt])
 }
 
 model MockTestQuestion {
@@ -147,6 +164,9 @@ model MockTestQuestion {
   order      Int      @default(0)
 
   @@unique([mockTestId, questionId])
+  @@index([mockTestId, order])
+  @@index([questionId])
+  @@index([sectionId])
 }
 
 model Attempt {
@@ -169,6 +189,11 @@ model Attempt {
   answers         Answer[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+  @@index([mockTestId])
+  @@index([userId, isCompleted])
+  @@index([userId, createdAt])
 }
 
 model Answer {
@@ -187,4 +212,6 @@ model Answer {
   updatedAt        DateTime @updatedAt
 
   @@unique([attemptId, questionId])
+  @@index([attemptId])
+  @@index([questionId])
 }

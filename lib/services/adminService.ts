@@ -1,6 +1,12 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
+import {
+  invalidateQuestionsCache,
+  invalidateExamsCache,
+  invalidateMockTestsCache,
+  CACHE_TAGS,
+} from '../cache';
 import { requireAdmin } from '../auth/permissions';
 import {
   getDatabaseUsers,
@@ -595,6 +601,11 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
 
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/admin/tests');
+  // Bust the cached question list and the specific live-questions entry
+  await invalidateQuestionsCache();
+  if (input.mockTestId && input.mockTestId !== 'ALL') {
+    revalidateTag(CACHE_TAGS.liveQuestions(input.mockTestId));
+  }
   return { success: true, question: newQuestion };
 }
 
@@ -686,6 +697,8 @@ export async function bulkImportQuestionsAction(
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/admin/tests');
   safeRevalidatePath('/admin');
+  // Bust cached question list after bulk import
+  await invalidateQuestionsCache();
   return { success: true, count: importedCount };
 }
 
@@ -836,6 +849,8 @@ export async function updateQuestionAction(
 
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/admin/tests');
+  // Bust cached question list after update
+  await invalidateQuestionsCache();
   return { success: true };
 }
 
@@ -973,6 +988,8 @@ export async function deleteQuestionAction(questionId: string): Promise<{ succes
   }
 
   safeRevalidatePath('/admin/questions');
+  // Bust cached question list after delete
+  await invalidateQuestionsCache();
   return { success: true };
 }
 
@@ -1181,7 +1198,9 @@ export async function createExamAction(input: AdminExamInput): Promise<{ success
   safeRevalidatePath('/exams');
   safeRevalidatePath('/tests');
   safeRevalidatePath('/dashboard');
-
+  // Bust cached exam and mock-test lists
+  await invalidateExamsCache();
+  await invalidateMockTestsCache();
   return { success: true, exam: fullExam };
 }
 
@@ -1250,7 +1269,9 @@ export async function updateExamTitleAction(
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/exams');
   safeRevalidatePath('/tests');
-
+  // Bust cached exam and mock-test lists after title update
+  await invalidateExamsCache();
+  await invalidateMockTestsCache();
   return { success: true };
 }
 
@@ -1748,7 +1769,8 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
   safeRevalidatePath('/admin/tests');
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/tests');
-
+  // Bust cached mock-test list after creation
+  await invalidateMockTestsCache();
   return { success: true, test: newTest };
 }
 
@@ -1862,6 +1884,9 @@ export async function deleteMockTestAction(
   safeRevalidatePath('/admin/tests');
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/tests');
+  // Bust cached mock-test and question lists after deletion
+  await invalidateMockTestsCache();
+  await invalidateQuestionsCache();
   return { success: true, count: deletedQuestionsCount };
 }
 
@@ -1947,7 +1972,9 @@ export async function toggleExamPublishAction(
   safeRevalidatePath('/exams');
   safeRevalidatePath('/tests');
   safeRevalidatePath('/dashboard');
-
+  // Bust cached exam and mock-test lists after publish toggle
+  await invalidateExamsCache();
+  await invalidateMockTestsCache();
   return { success: true, status: newStatus };
 }
 
@@ -1988,7 +2015,8 @@ export async function toggleMockTestPublishAction(
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/tests');
   safeRevalidatePath('/dashboard');
-
+  // Bust cached mock-test list after publish toggle
+  await invalidateMockTestsCache();
   return { success: true, status: newStatus };
 }
 
