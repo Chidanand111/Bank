@@ -119,21 +119,42 @@ export const dedupedGetQuestions = cache(getCachedQuestions);
 // Import and call these from mutation server actions after writes succeed.
 
 export async function invalidateQuestionsCache() {
-  const { revalidateTag } = await import('next/cache');
-  revalidateTag(CACHE_TAGS.questions);
+  const { revalidateTag, updateTag } = await import('next/cache');
+  try {
+    updateTag(CACHE_TAGS.questions);
+  } catch {}
+  try {
+    revalidateTag(CACHE_TAGS.questions, { expire: 0 });
+  } catch {}
 }
 
 export async function invalidateExamsCache() {
-  const { revalidateTag } = await import('next/cache');
-  revalidateTag(CACHE_TAGS.exams);
+  const { revalidateTag, updateTag } = await import('next/cache');
+  try {
+    updateTag(CACHE_TAGS.exams);
+  } catch {}
+  try {
+    revalidateTag(CACHE_TAGS.exams, { expire: 0 });
+  } catch {}
 }
 
 export async function invalidateMockTestsCache() {
-  const { revalidateTag } = await import('next/cache');
-  revalidateTag(CACHE_TAGS.mockTests);
+  const { revalidateTag, updateTag } = await import('next/cache');
+  try {
+    updateTag(CACHE_TAGS.mockTests);
+  } catch {}
+  try {
+    revalidateTag(CACHE_TAGS.mockTests, { expire: 0 });
+  } catch {}
 }
 
 export async function invalidateLiveQuestionsCache(testIdOrSlug: string) {
-  const { revalidateTag } = await import('next/cache');
-  revalidateTag(CACHE_TAGS.liveQuestions(testIdOrSlug));
+  const { revalidateTag, updateTag } = await import('next/cache');
+  const tag = CACHE_TAGS.liveQuestions(testIdOrSlug);
+  try {
+    updateTag(tag);
+  } catch {}
+  try {
+    revalidateTag(tag, { expire: 0 });
+  } catch {}
 }

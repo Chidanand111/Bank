@@ -1,10 +1,11 @@
 'use server';
 
-import { revalidatePath, revalidateTag } from 'next/cache';
+import { revalidatePath } from 'next/cache';
 import {
   invalidateQuestionsCache,
   invalidateExamsCache,
   invalidateMockTestsCache,
+  invalidateLiveQuestionsCache,
   CACHE_TAGS,
 } from '../cache';
 import { requireAdmin } from '../auth/permissions';
@@ -604,7 +605,7 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
   // Bust the cached question list and the specific live-questions entry
   await invalidateQuestionsCache();
   if (input.mockTestId && input.mockTestId !== 'ALL') {
-    revalidateTag(CACHE_TAGS.liveQuestions(input.mockTestId));
+    await invalidateLiveQuestionsCache(input.mockTestId);
   }
   return { success: true, question: newQuestion };
 }
