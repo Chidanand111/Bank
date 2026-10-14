@@ -1,12 +1,17 @@
 import React from 'react';
 import Link from 'next/link';
 import { getExams } from '@/lib/services/testService';
+import { getCurrentUser } from '@/lib/auth/session';
 import { ExamCard } from '@/components/exams/ExamCard';
 import { Badge } from '@/components/ui/Badge';
-import { BookOpen, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { BookOpen, ShieldCheck, CheckCircle2, ShieldAlert } from 'lucide-react';
 
 export default async function ExamsPage() {
-  const exams = await getExams();
+  const user = await getCurrentUser();
+  const isAdmin = user?.role === 'ADMIN';
+  const exams = await getExams(isAdmin);
+
+  const hasDrafts = isAdmin && exams.some(e => e.status === 'created');
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
@@ -27,6 +32,24 @@ export default async function ExamsPage() {
           Explore complete pattern breakdowns, sectional weightages, and high-yield mock test series for Public Sector Banks (IBPS) and State Bank of India (SBI).
         </p>
       </div>
+
+      {/* Admin Draft Preview Notification */}
+      {hasDrafts && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 text-xs">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>Administrator Preview Active:</strong> Unpublished draft exams are visible with a <span className="inline-block bg-amber-200/90 text-amber-950 font-bold px-2 py-0.5 rounded text-[11px] shadow-2xs">Draft Preview</span> badge so you can verify student formatting before publishing. Regular students cannot see these.
+            </span>
+          </div>
+          <Link
+            href="/admin/exams"
+            className="text-amber-800 font-bold hover:underline shrink-0 text-xs"
+          >
+            Manage in Admin ↗
+          </Link>
+        </div>
+      )}
 
       {/* Exam Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

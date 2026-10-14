@@ -1,11 +1,12 @@
 import React from 'react';
 import Link from 'next/link';
 import { getExamBySlug, getMockTests } from '@/lib/services/testService';
+import { getCurrentUser } from '@/lib/auth/session';
 import { PatternTable } from '@/components/exams/PatternTable';
 import { TestCard } from '@/components/tests/TestCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { BookOpen, Clock, FileText, ArrowLeft, PlayCircle, PlusCircle } from 'lucide-react';
+import { BookOpen, Clock, FileText, ArrowLeft, PlayCircle, PlusCircle, ShieldAlert } from 'lucide-react';
 import { notFound } from 'next/navigation';
 
 export interface ExamPageProps {
@@ -14,13 +15,15 @@ export interface ExamPageProps {
 
 export default async function DynamicExamPage({ params }: ExamPageProps) {
   const { slug } = await params;
-  const exam = await getExamBySlug(slug);
+  const user = await getCurrentUser();
+  const isAdmin = user?.role === 'ADMIN';
+  const exam = await getExamBySlug(slug, isAdmin);
 
   if (!exam) {
     return notFound();
   }
 
-  const mockTests = await getMockTests(slug);
+  const mockTests = await getMockTests(slug, isAdmin);
 
   const prelimsPattern = exam.patterns?.find(p => p.stage === 'Prelims') || exam.patterns?.[0];
   const mainsPattern = exam.patterns?.find(p => p.stage === 'Mains');
@@ -28,14 +31,40 @@ export default async function DynamicExamPage({ params }: ExamPageProps) {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
       {/* Navigation Back Link */}
-      <div>
+      <div className="flex items-center justify-between">
         <Link
           href="/exams"
           className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-blue-600 font-medium transition-colors"
         >
           <ArrowLeft className="w-4 h-4" /> Back to All Exams
         </Link>
+        {isAdmin && (
+          <Link
+            href="/admin/exams"
+            className="text-xs font-semibold text-indigo-600 hover:underline"
+          >
+            Open in Admin ↗
+          </Link>
+        )}
       </div>
+
+      {/* Admin Draft Notification */}
+      {isAdmin && exam.status === 'created' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 text-xs">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>Draft Exam Preview:</strong> This exam is currently in draft mode (hidden from students). You are viewing this page with administrator preview privileges.
+            </span>
+          </div>
+          <Link
+            href="/admin/exams"
+            className="text-amber-800 font-bold hover:underline shrink-0"
+          >
+            Publish in Admin ↗
+          </Link>
+        </div>
+      )}
 
       {/* Hero Header */}
       <div className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-xs space-y-4">
@@ -45,8 +74,14 @@ export default async function DynamicExamPage({ params }: ExamPageProps) {
               {exam.category}
             </div>
             <div>
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <Badge variant="blue" size="sm">{exam.category} EXAMINATION</Badge>
+                {exam.status === 'created' && (
+                  <Badge variant="amber" size="sm" className="font-bold flex items-center gap-1 shadow-2xs">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    Draft Preview
+                  </Badge>
+                )}
                 <Badge variant="slate" size="sm">BANKING EXAM PREP</Badge>
               </div>
               <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">{exam.title}</h1>

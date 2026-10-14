@@ -8,36 +8,37 @@ import { recordUserSeenQuestions } from './userQuestionTracker';
 
 const ATTEMPTS_STORAGE_KEY = 'bankmock_attempts';
 
-export async function getExams(): Promise<Exam[]> {
+export async function getExams(includeDrafts = false): Promise<Exam[]> {
   try {
     const { getAdminExams } = await import('./adminService');
     const all = await getAdminExams();
-    return all.filter(e => e.status !== 'created');
+    return includeDrafts ? all : all.filter(e => e.status !== 'created');
   } catch {
-    return EXAMS_DATA.filter(e => e.status !== 'created');
+    return includeDrafts ? EXAMS_DATA : EXAMS_DATA.filter(e => e.status !== 'created');
   }
 }
 
-export async function getExamBySlug(slug: string): Promise<Exam | null> {
-  const exams = await getExams();
+export async function getExamBySlug(slug: string, includeDrafts = false): Promise<Exam | null> {
+  const exams = await getExams(includeDrafts);
   const exam = exams.find(e => e.slug === slug);
   return exam || null;
 }
 
-export async function getMockTests(examSlug?: string): Promise<MockTest[]> {
+export async function getMockTests(examSlug?: string, includeDrafts = false): Promise<MockTest[]> {
   let list = MOCK_TESTS_DATA;
   try {
     const { loadFreshMockTestsFromDb, getAdminExams } = await import('./adminService');
     const [tests, allExams] = await Promise.all([loadFreshMockTestsFromDb(), getAdminExams()]);
-    const publishedExamIds = new Set(allExams.filter(e => e.status !== 'created').map(e => e.id));
-    const publishedExamSlugs = new Set(allExams.filter(e => e.status !== 'created').map(e => e.slug));
+    const allowedExams = includeDrafts ? allExams : allExams.filter(e => e.status !== 'created');
+    const publishedExamIds = new Set(allowedExams.map(e => e.id));
+    const publishedExamSlugs = new Set(allowedExams.map(e => e.slug));
     list = tests.filter(m => {
-      if (m.status === 'created') return false;
+      if (!includeDrafts && m.status === 'created') return false;
       if (m.examId && !publishedExamIds.has(m.examId) && !publishedExamSlugs.has(m.examSlug)) return false;
       return true;
     });
   } catch {
-    list = list.filter(m => m.status !== 'created');
+    list = includeDrafts ? list : list.filter(m => m.status !== 'created');
   }
 
   if (examSlug) {

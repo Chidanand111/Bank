@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useTransition, useRef } from 'react';
 import {
   getAdminQuestions,
   createQuestionAction,
@@ -47,6 +47,23 @@ import {
 } from 'lucide-react';
 
 export type ExamPartition = AdminPartitionInfo;
+
+export const FORMULA_BUTTONS = [
+  { label: '√x', tooltip: 'Square Root: \\sqrt{x}', template: '$\\sqrt{x}$' },
+  { label: 'a/b', tooltip: 'Fraction: \\frac{a}{b}', template: '$\\frac{a}{b}$' },
+  { label: '≤', tooltip: 'Less than or equal: \\le', template: '$\\le$' },
+  { label: '≥', tooltip: 'Greater than or equal: \\ge', template: '$\\ge$' },
+  { label: '≠', tooltip: 'Not equal: \\ne', template: '$\\ne$' },
+  { label: '≈', tooltip: 'Approximately equal: \\approx', template: '$\\approx$' },
+  { label: '×', tooltip: 'Multiplication: \\times', template: '$\\times$' },
+  { label: '÷', tooltip: 'Division: \\div', template: '$\\div$' },
+  { label: 'x²', tooltip: 'Power / Exponent: x^{2}', template: '$x^{2}$' },
+  { label: 'xₙ', tooltip: 'Subscript: x_{1}', template: '$x_{1}$' },
+  { label: '±', tooltip: 'Plus-minus: \\pm', template: '$\\pm$' },
+  { label: 'π', tooltip: 'Pi: \\pi', template: '$\\pi$' },
+  { label: '%', tooltip: 'Percent: \\%', template: '$\\%$' },
+  { label: '$…$', tooltip: 'Inline math wrapper: $...$', template: '$...$' },
+];
 
 const PARTITIONS: ExamPartition[] = [
   {
@@ -235,6 +252,59 @@ export default function AdminQuestionsPage() {
     { text: '', imageUrl: '', isCorrect: false },
     { text: '', imageUrl: '', isCorrect: false },
   ]);
+
+  // Reference for Question Textarea to support formula insertion at cursor
+  const questionTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleInsertFormula = (template: string) => {
+    const textarea = questionTextareaRef.current;
+    if (!textarea) {
+      setFormText(prev => prev + template);
+      return;
+    }
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selected = textarea.value.substring(start, end);
+
+    let insertion = template;
+    let cursorOffset = template.length;
+
+    if (selected) {
+      if (template === '$...$') {
+        insertion = `$${selected}$`;
+        cursorOffset = insertion.length;
+      } else if (template.includes('{x}')) {
+        insertion = template.replace('{x}', `{${selected}}`);
+        cursorOffset = insertion.length;
+      } else if (template.includes('{a}')) {
+        insertion = template.replace('{a}', `{${selected}}`);
+        cursorOffset = insertion.length;
+      } else {
+        insertion = template + selected;
+        cursorOffset = insertion.length;
+      }
+    } else {
+      if (template.includes('{x}')) {
+        cursorOffset = template.indexOf('{x}') + 1;
+      } else if (template.includes('{a}')) {
+        cursorOffset = template.indexOf('{a}') + 1;
+      } else if (template === '$...$') {
+        insertion = '$$';
+        cursorOffset = 1;
+      }
+    }
+
+    const before = textarea.value.substring(0, start);
+    const after = textarea.value.substring(end);
+    setFormText(before + insertion + after);
+
+    setTimeout(() => {
+      textarea.focus();
+      const targetPos = start + cursorOffset;
+      textarea.setSelectionRange(targetPos, targetPos);
+    }, 0);
+  };
 
   // High-performance image file to compressed Base64 converter for direct PostgreSQL database storage
   const handleImageFileChange = async (
@@ -1746,17 +1816,48 @@ export default function AdminQuestionsPage() {
             </div>
 
             <div>
-              <label className="font-semibold text-slate-700 block mb-1">
-                Question Text <span className="text-red-500">*</span>
-              </label>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1.5">
+                <label className="font-semibold text-slate-700 block">
+                  Question Text <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center gap-1 flex-wrap bg-white p-1 rounded-lg border border-slate-200 shadow-2xs">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1">
+                    Formula:
+                  </span>
+                  {FORMULA_BUTTONS.map((f) => (
+                    <button
+                      key={f.label}
+                      type="button"
+                      title={f.tooltip}
+                      onClick={() => handleInsertFormula(f.template)}
+                      className="px-1.5 py-0.5 rounded text-[11px] font-mono font-bold bg-slate-100 hover:bg-indigo-100 hover:text-indigo-700 text-slate-700 border border-slate-200/80 transition-colors cursor-pointer"
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <textarea
+                ref={questionTextareaRef}
                 required
                 rows={3}
                 value={formText}
                 onChange={(e) => setFormText(e.target.value)}
-                placeholder="Enter complete question statement..."
-                className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500"
+                placeholder="Enter complete question statement (supports LaTeX math like $x^2$, $\frac{a}{b}$, $\sqrt{x}$)..."
+                className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-indigo-500 font-normal leading-relaxed"
               />
+
+              {formText && (formText.includes('$') || formText.includes('\\')) && (
+                <div className="mt-1.5 p-2 bg-indigo-50/60 border border-indigo-100 rounded-lg text-xs text-indigo-950 flex items-start gap-2">
+                  <span className="font-bold text-[10px] uppercase tracking-wider text-indigo-700 mt-0.5 shrink-0">
+                    Live Math:
+                  </span>
+                  <div className="flex-1 overflow-x-auto">
+                    <MathRenderer content={formText} />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>

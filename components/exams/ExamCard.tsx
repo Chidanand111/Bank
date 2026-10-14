@@ -18,9 +18,17 @@ export const ExamCard: React.FC<ExamCardProps> = ({ exam }) => {
       <CardContent className="p-6 flex flex-col justify-between flex-1 space-y-5">
         <div>
           <div className="flex justify-between items-start gap-3 mb-3">
-            <Badge variant="blue" size="md">
-              {exam.category} EXAM
-            </Badge>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="blue" size="md">
+                {exam.category} EXAM
+              </Badge>
+              {exam.status === 'created' && (
+                <Badge variant="amber" size="sm" className="font-bold flex items-center gap-1 shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  Draft Preview
+                </Badge>
+              )}
+            </div>
             <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md">
               {exam.totalMockTests} Mocks Available
             </span>
