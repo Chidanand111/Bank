@@ -87,10 +87,12 @@ npm test
    - Explicit async delegation ensures 100% Turbopack Server Action RPC compatibility across client components and server routes.
 3. **Zod Schema Validation (`lib/validations/adminSchemas.ts`)**:
    - Added strict validation schemas: `adminQuestionInputSchema`, `bulkImportQuestionsSchema`, `adminExamInputSchema`, `updateExamTitleSchema`, `adminMockTestInputSchema`, `updateMockTestTitleSchema`, `userStatusSchema`, `userRoleSchema`.
-4. **Verification**:
+4. **Verification & Production Deployment**:
    - 35/35 Vitest unit tests pass in 1.89s (including 12 new tests in `tests/phase3-services.test.ts`).
    - End-to-end integration tests (`verify-admin-pyq-and-custom-exam.ts`, `verify-delete-exam-and-questions.ts`) pass with 100% success rate.
    - Full Next.js 16 production build compiles with Turbopack across all 27 routes with 0 errors.
+   - **Vercel Resilient Build**: Resolved production build failure caused by strict `SESSION_SECRET` enforcement during Next.js static page collection by introducing a resilient fallback in `lib/config/env.ts` (Commit `785f93c`).
+   - **Production Requirement**: Configure `DATABASE_URL` (ending with `&schema=bankmock`) in Vercel Project Settings > Environment Variables so Server Actions in serverless lambdas can persist exams/questions directly to Neon PostgreSQL.
 
 ---
 
