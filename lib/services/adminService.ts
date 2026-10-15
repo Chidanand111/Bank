@@ -498,7 +498,7 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
       }
     }
 
-    let finalExamId = dbExam?.id || input.examId || (await prisma.exam.findFirst())?.id || 'exam-ibps-po';
+    const finalExamId = dbExam?.id || input.examId || (await prisma.exam.findFirst())?.id || 'exam-ibps-po';
     let finalSecId: string;
     let finalTopicId: string;
 

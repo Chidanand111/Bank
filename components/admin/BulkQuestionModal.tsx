@@ -175,7 +175,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
 
   // Normalizes CSV text where entire lines may be wrapped in outer quotes (common export/AI artifact)
   const normalizeCsvText = (rawText: string): string => {
-    let cleanText = rawText.charCodeAt(0) === 0xfeff ? rawText.slice(1) : rawText;
+    const cleanText = rawText.charCodeAt(0) === 0xfeff ? rawText.slice(1) : rawText;
     const lines = cleanText.split(/\r?\n/);
     const nonEmpty = lines.filter((l) => l.trim().length > 0);
 
@@ -202,8 +202,8 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
 
   // Robust CSV parser with delimiter & quotation fallback
   const parseCsvWithFallbacks = (rawText: string): string[][] => {
-    let text = normalizeCsvText(rawText);
-    let rows = parseFullCsv(text, ',');
+    const text = normalizeCsvText(rawText);
+    const rows = parseFullCsv(text, ',');
 
     // Fallback: If only 1 column parsed and semicolon is present, try semicolon
     if (rows.length > 0 && rows[0].length === 1 && rows[0][0].includes(';')) {
