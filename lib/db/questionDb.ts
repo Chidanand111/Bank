@@ -923,26 +923,9 @@ export function deleteExamQuestionsFromStore(examId: string, examTitle?: string)
   return count;
 }
 
-/**
- * Persist custom questions to data/custom_questions.json
- */
 export function saveCustomQuestionsToFile(): void {
-  if (typeof window === 'undefined') {
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const dataDir = path.resolve(process.cwd(), 'data');
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-      }
-      const customQPath = path.resolve(dataDir, 'custom_questions.json');
-      const staticIdSet = new Set(combinedRaw.map(q => String(q.id)));
-      const customOnly = questionStore.filter(q => !staticIdSet.has(String(q.id)));
-      fs.writeFileSync(customQPath, JSON.stringify(customOnly, null, 2), 'utf8');
-    } catch (err) {
-      console.warn('Failed to save custom questions to disk:', err);
-    }
-  }
+  // Phase 2: Filesystem writes permanently eliminated for 100% serverless compliance.
+  // Questions are persisted directly to PostgreSQL via QuestionRepository.
 }
 
 /**

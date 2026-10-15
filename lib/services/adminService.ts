@@ -18,6 +18,11 @@ import { MOCK_TESTS_DATA, saveCustomMockTestsToFile } from '../data/mockTests';
 import { SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
 import { prisma } from '../prisma';
 import {
+  QuestionRepository,
+  ExamRepository,
+  MockTestRepository,
+} from '../db/repositories';
+import {
   getAllQuestions,
   resolveGroupPassages,
   addQuestionToJsonDb,
@@ -457,146 +462,11 @@ export async function createQuestionAction(input: AdminQuestionInput): Promise<{
     negativeMarks: input.negativeMarks,
   });
 
-  // Persist directly to Neon PostgreSQL Database
+  // Persist directly to Neon PostgreSQL Database via QuestionRepository
   try {
-    let dbExam = input.examId
-      ? await prisma.exam.findFirst({
-          where: {
-            OR: [
-              { id: input.examId },
-              { slug: input.examId.replace('exam-', '') },
-            ],
-          },
-          include: { sections: { include: { topics: true } } },
-        })
-      : await prisma.exam.findFirst({
-          include: { sections: { include: { topics: true } } },
-        });
-
-    if (!dbExam && input.examId) {
-      const cleanSlug = input.examId.replace(/^exam-/, '');
-      const allExams = await getAdminExams();
-      const existingExamData = allExams.find(e => e.id === input.examId || e.slug === cleanSlug);
-      const titleToUse = existingExamData?.title || cleanSlug.toUpperCase();
-      try {
-        dbExam = await prisma.exam.upsert({
-          where: { slug: cleanSlug },
-          update: { title: titleToUse },
-          create: {
-            id: input.examId.startsWith('exam-') ? input.examId : `exam-${cleanSlug}`,
-            slug: cleanSlug,
-            title: titleToUse,
-            category: existingExamData?.category || 'PO',
-            description: existingExamData?.description || `${titleToUse} Examination`,
-            isActive: existingExamData?.status === 'published',
-          },
-          include: { sections: { include: { topics: true } } },
-        });
-      } catch (upsertErr) {
-        console.warn('Could not auto-upsert exam in createQuestionAction:', upsertErr);
-      }
-    }
-
-    const finalExamId = dbExam?.id || input.examId || (await prisma.exam.findFirst())?.id || 'exam-ibps-po';
-    let finalSecId: string;
-    let finalTopicId: string;
-
-    if (dbExam) {
-      let existingSec = dbExam.sections?.find(s => s.code === input.sectionCode);
-      if (!existingSec) {
-        const secName = input.sectionCode === 'QUANT' ? 'Quantitative Aptitude'
-          : input.sectionCode === 'ENGLISH' ? 'English Language'
-          : input.sectionCode === 'FINANCIAL_AWARENESS' ? 'General / Banking Awareness'
-          : 'Reasoning Ability';
-        existingSec = await prisma.section.upsert({
-          where: { examId_code: { examId: dbExam.id, code: input.sectionCode } },
-          update: { name: secName },
-          create: {
-            id: `sec-${dbExam.slug}-${input.sectionCode.toLowerCase()}`,
-            name: secName,
-            code: input.sectionCode,
-            examId: dbExam.id,
-          },
-          include: { topics: true },
-        });
-      }
-      finalSecId = existingSec.id;
-
-      let existingTopic = existingSec.topics?.find(t => t.name.toLowerCase() === input.topicName.toLowerCase());
-      if (!existingTopic) {
-        existingTopic = await prisma.topic.create({
-          data: {
-            id: `top-${dbExam.slug}-${input.topicName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
-            name: input.topicName || 'General',
-            sectionId: finalSecId,
-          },
-        });
-      }
-      finalTopicId = existingTopic.id;
-    } else {
-      const fallbackSec = await prisma.section.findFirst({ where: { code: input.sectionCode } }) || await prisma.section.findFirst();
-      finalSecId = fallbackSec?.id || newQuestion.sectionId;
-      const fallbackTopic = await prisma.topic.findFirst({ where: { sectionId: finalSecId } }) || await prisma.topic.findFirst();
-      finalTopicId = fallbackTopic?.id || newQuestion.topicId;
-    }
-
-    await prisma.question.create({
-      data: {
-        id: newQuestionId,
-        text: input.text,
-        imageUrl: input.imageUrl || null,
-        passage: dbPassage,
-        passageImageUrl: dbPassageImageUrl,
-        groupId: gId || null,
-        isPyq: Boolean(input.isPyq),
-        pyqYear: input.pyqYear ? Number(input.pyqYear) : null,
-        pyqExam: input.pyqExam || null,
-        difficulty: input.difficulty,
-        explanation: input.explanation,
-        marks: input.marks,
-        negativeMarks: input.negativeMarks,
-        examId: finalExamId,
-        sectionId: finalSecId,
-        topicId: finalTopicId,
-        options: {
-          create: input.options.map((opt, i) => ({
-            id: `opt-${newQuestionId}-${i + 1}`,
-            text: opt.text || '',
-            imageUrl: opt.imageUrl || null,
-            isCorrect: Boolean(opt.isCorrect),
-            order: i + 1,
-          })),
-        },
-      },
-    });
-
-    // Link question to targeted mock test or PYQ paper in Neon DB
-    const targetMockId = input.mockTestId && input.mockTestId !== 'ALL' ? input.mockTestId : undefined;
-    if (targetMockId || (input.isPyq && input.pyqExam)) {
-      const dbMockTest = await prisma.mockTest.findFirst({
-        where: {
-          OR: [
-            ...(targetMockId ? [{ id: targetMockId }, { slug: targetMockId }, { slug: targetMockId.replace('mock-', '') }] : []),
-            ...(input.pyqExam ? [{ title: input.pyqExam }, { slug: input.pyqExam.toLowerCase().replace(/[^a-z0-9]+/g, '-') }] : []),
-          ],
-        },
-        include: { mockTestQuestions: true },
-      });
-
-      if (dbMockTest) {
-        const orderCount = dbMockTest.mockTestQuestions.length;
-        await prisma.mockTestQuestion.create({
-          data: {
-            mockTestId: dbMockTest.id,
-            questionId: newQuestionId,
-            sectionId: finalSecId,
-            order: orderCount + 1,
-          },
-        });
-      }
-    }
+    await QuestionRepository.create(input, newQuestionId);
   } catch (dbErr) {
-    console.warn('Neon DB async sync on createQuestion:', dbErr);
+    console.warn('QuestionRepository.create error in createQuestionAction:', dbErr);
   }
 
   safeRevalidatePath('/admin/questions');
@@ -786,65 +656,11 @@ export async function updateQuestionAction(
   // Keep in-memory store in sync
   syncQuestionsToStore([updatedQuestion]);
 
-  // Persist directly to Neon PostgreSQL Database via UPSERT
+  // Persist directly to Neon PostgreSQL Database via QuestionRepository
   try {
-    const finalExamId = updatedQuestion.examId;
-    const finalSecId = updatedQuestion.sectionId;
-    const finalTopicId = updatedQuestion.topicId;
-
-    await prisma.question.upsert({
-      where: { id: actualId },
-      update: {
-        text: input.text,
-        imageUrl: input.imageUrl || null,
-        passage: input.passage || null,
-        passageImageUrl: input.passageImageUrl || null,
-        groupId: input.groupId || null,
-        isPyq: Boolean(input.isPyq),
-        pyqYear: input.pyqYear ? Number(input.pyqYear) : null,
-        pyqExam: input.pyqExam || null,
-        difficulty: input.difficulty,
-        explanation: input.explanation,
-        marks: input.marks,
-        negativeMarks: input.negativeMarks,
-      },
-      create: {
-        id: actualId,
-        text: input.text,
-        imageUrl: input.imageUrl || null,
-        passage: input.passage || null,
-        passageImageUrl: input.passageImageUrl || null,
-        groupId: input.groupId || null,
-        isPyq: Boolean(input.isPyq),
-        pyqYear: input.pyqYear ? Number(input.pyqYear) : null,
-        pyqExam: input.pyqExam || null,
-        difficulty: input.difficulty,
-        explanation: input.explanation,
-        marks: input.marks,
-        negativeMarks: input.negativeMarks,
-        examId: finalExamId,
-        sectionId: finalSecId,
-        topicId: finalTopicId,
-      },
-    });
-
-    // Update options in database with images
-    await prisma.option.deleteMany({ where: { questionId: actualId } });
-    for (let i = 0; i < input.options.length; i++) {
-      const opt = input.options[i];
-      await prisma.option.create({
-        data: {
-          id: `opt-${actualId}-${i + 1}`,
-          questionId: actualId,
-          text: opt.text || '',
-          imageUrl: opt.imageUrl || null,
-          isCorrect: opt.isCorrect,
-          order: i + 1,
-        },
-      });
-    }
+    await QuestionRepository.update(actualId, input);
   } catch (dbErr) {
-    console.warn('Neon DB async sync on updateQuestion:', dbErr);
+    console.warn('QuestionRepository.update error in updateQuestionAction:', dbErr);
   }
 
   safeRevalidatePath('/admin/questions');
@@ -979,12 +795,9 @@ export async function deleteQuestionAction(questionId: string): Promise<{ succes
   deleteQuestionsByIdsFromStore([questionId]);
 
   try {
-    await prisma.answer.deleteMany({ where: { questionId } });
-    await prisma.mockTestQuestion.deleteMany({ where: { questionId } });
-    await prisma.option.deleteMany({ where: { questionId } });
-    await prisma.question.delete({ where: { id: questionId } });
+    await QuestionRepository.delete(questionId);
   } catch (dbErr) {
-    console.warn('Neon DB async sync on deleteQuestion:', dbErr);
+    console.warn('QuestionRepository.delete error in deleteQuestionAction:', dbErr);
   }
 
   safeRevalidatePath('/admin/questions');
@@ -1066,51 +879,13 @@ export async function createExamAction(input: AdminExamInput): Promise<{ success
   const description = input.description?.trim() || `${title} Recruitment Examination for Banking Aspirants`;
 
   const newExamId = `exam-${slug}`;
-  const status: ExamStatus = input.status || 'created';
+  const status: ExamStatus = input.status || 'published';
 
-  // Safe Neon PostgreSQL Database sync
+  // Safe Neon PostgreSQL Database sync via ExamRepository
   try {
-    const dbExam = await prisma.exam.upsert({
-      where: { slug },
-      update: {
-        title,
-        category,
-        description,
-        isActive: status === 'published',
-      },
-      create: {
-        id: newExamId,
-        slug,
-        title,
-        category,
-        description,
-        isActive: status === 'published',
-      },
-    });
-
-    // Ensure 4 standard sections for this exam
-    await prisma.section.upsert({
-      where: { examId_code: { examId: dbExam.id, code: 'ENGLISH' } },
-      update: { name: 'English Language', order: 1 },
-      create: { id: `sec-${slug}-eng`, examId: dbExam.id, code: 'ENGLISH', name: 'English Language', order: 1 },
-    });
-    await prisma.section.upsert({
-      where: { examId_code: { examId: dbExam.id, code: 'QUANT' } },
-      update: { name: 'Quantitative Aptitude', order: 2 },
-      create: { id: `sec-${slug}-quant`, examId: dbExam.id, code: 'QUANT', name: 'Quantitative Aptitude', order: 2 },
-    });
-    await prisma.section.upsert({
-      where: { examId_code: { examId: dbExam.id, code: 'REASONING' } },
-      update: { name: 'Reasoning Ability', order: 3 },
-      create: { id: `sec-${slug}-reason`, examId: dbExam.id, code: 'REASONING', name: 'Reasoning Ability', order: 3 },
-    });
-    await prisma.section.upsert({
-      where: { examId_code: { examId: dbExam.id, code: 'FINANCIAL_AWARENESS' } },
-      update: { name: 'General / Banking Awareness', order: 4 },
-      create: { id: `sec-${slug}-ga`, examId: dbExam.id, code: 'FINANCIAL_AWARENESS', name: 'General / Banking Awareness', order: 4 },
-    });
+    await ExamRepository.upsertExam(input);
   } catch (dbErr) {
-    console.warn('Neon DB async sync on createExamAction:', dbErr);
+    console.warn('ExamRepository.upsertExam error in createExamAction:', dbErr);
   }
 
   const defaultMockId = `mock-${slug}-prelims-1`;
@@ -1217,27 +992,9 @@ export async function updateExamTitleAction(
   }
 
   try {
-    const dbExam = await prisma.exam.findFirst({
-      where: {
-        OR: [
-          { id: examIdOrSlug },
-          { slug: examIdOrSlug },
-          { slug: examIdOrSlug.replace(/^exam-/, '') },
-        ],
-      },
-    });
-
-    if (dbExam) {
-      await prisma.exam.update({
-        where: { id: dbExam.id },
-        data: {
-          title: trimmedTitle,
-          ...(description !== undefined ? { description: description.trim() } : {}),
-        },
-      });
-    }
+    await ExamRepository.updateTitle(examIdOrSlug, trimmedTitle, description);
   } catch (dbErr) {
-    console.warn('Neon DB async sync on updateExamTitle:', dbErr);
+    console.warn('ExamRepository.updateTitle error in updateExamTitleAction:', dbErr);
   }
 
   // Update in-memory EXAMS_DATA
@@ -1293,128 +1050,10 @@ export async function deleteExamAction(
   let deletedQuestionsCount = 0;
 
   try {
-    // 1. Locate Exam in Neon PostgreSQL
-    const dbExam = await prisma.exam.findFirst({
-      where: {
-        OR: [
-          { id: examIdOrSlug },
-          { slug: examIdOrSlug },
-          { slug: examIdOrSlug.replace(/^exam-/, '') },
-        ],
-      },
-      include: {
-        questions: { select: { id: true } },
-        mockTests: { select: { id: true } },
-      },
-    });
-
-    const targetExamId = dbExam ? dbExam.id : examIdOrSlug;
-    const targetSlug = dbExam ? dbExam.slug : examIdOrSlug.replace(/^exam-/, '');
-    const examTitle = dbExam ? dbExam.title : EXAMS_DATA.find(e => e.id === examIdOrSlug || e.slug === examIdOrSlug)?.title;
-
-    // 2. Cascade Delete from Neon PostgreSQL
-    if (dbExam) {
-      // Find all mock tests under this exam
-      const mockTests = await prisma.mockTest.findMany({
-        where: {
-          OR: [{ examId: dbExam.id }, { examId: targetExamId }, { examId: targetSlug }],
-        },
-        select: { id: true },
-      });
-      const mockTestIds = mockTests.map(m => m.id);
-
-      // Find all questions associated with this exam (direct or via mock tests or pyqExam)
-      const examQuestions = await prisma.question.findMany({
-        where: {
-          OR: [
-            { examId: dbExam.id },
-            { examId: targetExamId },
-            { examId: targetSlug },
-            ...(examTitle ? [{ pyqExam: examTitle }] : []),
-            ...(mockTestIds.length > 0
-              ? [{ mockTestQuestions: { some: { mockTestId: { in: mockTestIds } } } }]
-              : []),
-          ],
-        },
-        select: { id: true },
-      });
-      const questionIds = Array.from(new Set(examQuestions.map(q => q.id)));
-      deletedQuestionsCount = questionIds.length;
-
-      // Delete student answers for these questions or attempts of these mock tests
-      if (questionIds.length > 0 || mockTestIds.length > 0) {
-        await prisma.answer.deleteMany({
-          where: {
-            OR: [
-              ...(questionIds.length > 0 ? [{ questionId: { in: questionIds } }] : []),
-              ...(mockTestIds.length > 0 ? [{ attempt: { mockTestId: { in: mockTestIds } } }] : []),
-            ],
-          },
-        });
-      }
-
-      // Delete candidate attempts
-      if (mockTestIds.length > 0) {
-        await prisma.attempt.deleteMany({
-          where: { mockTestId: { in: mockTestIds } },
-        });
-      }
-
-      // Delete mockTestQuestions junction links
-      if (mockTestIds.length > 0 || questionIds.length > 0) {
-        await prisma.mockTestQuestion.deleteMany({
-          where: {
-            OR: [
-              ...(mockTestIds.length > 0 ? [{ mockTestId: { in: mockTestIds } }] : []),
-              ...(questionIds.length > 0 ? [{ questionId: { in: questionIds } }] : []),
-            ],
-          },
-        });
-      }
-
-      // Delete question options to reclaim DB space
-      if (questionIds.length > 0) {
-        await prisma.option.deleteMany({
-          where: { questionId: { in: questionIds } },
-        });
-      }
-
-      // Permanently delete questions to reclaim DB space
-      if (questionIds.length > 0) {
-        await prisma.question.deleteMany({
-          where: { id: { in: questionIds } },
-        });
-      }
-
-      // Delete mock tests
-      if (mockTestIds.length > 0) {
-        await prisma.mockTest.deleteMany({
-          where: { id: { in: mockTestIds } },
-        });
-      }
-
-      // Delete topics under sections
-      const sections = await prisma.section.findMany({
-        where: { examId: dbExam.id },
-        select: { id: true },
-      });
-      const sectionIds = sections.map(s => s.id);
-      if (sectionIds.length > 0) {
-        await prisma.topic.deleteMany({
-          where: { sectionId: { in: sectionIds } },
-        });
-        await prisma.section.deleteMany({
-          where: { id: { in: sectionIds } },
-        });
-      }
-
-      // Delete the exam record itself
-      await prisma.exam.delete({
-        where: { id: dbExam.id },
-      });
-    }
+    const delResult = await ExamRepository.deleteCascade(examIdOrSlug);
+    deletedQuestionsCount = delResult.deletedQuestionsCount;
   } catch (dbErr) {
-    console.warn('Neon DB async sync on deleteExamAction:', dbErr);
+    console.warn('ExamRepository.deleteCascade error in deleteExamAction:', dbErr);
   }
 
   const targetExamId = examIdOrSlug.startsWith('exam-') ? examIdOrSlug : `exam-${examIdOrSlug}`;
@@ -1695,8 +1334,7 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
   const targetSections = input.sections && input.sections.length > 0 ? input.sections : defaultSections;
   const totalQuestions = targetSections.reduce((acc, s) => acc + (s.questionCount || 0), 0);
 
-  const parentExam = EXAMS_DATA.find(e => e.id === exam.id || e.slug === exam.slug);
-  const status: ExamStatus = input.status || (parentExam?.status === 'published' ? 'created' : (parentExam?.status || 'created'));
+  const status: ExamStatus = input.status || 'published';
 
   const newTest: MockTest = {
     id: newId,
@@ -1727,41 +1365,9 @@ export async function createMockTestAction(input: AdminMockTestInput): Promise<{
   };
 
   try {
-    await prisma.mockTest.upsert({
-      where: { slug },
-      update: {
-        title,
-        description: input.description,
-        examId: exam.id,
-        durationMinutes: newTest.durationMinutes,
-        totalMarks: newTest.totalMarks,
-        totalQuestions: newTest.totalQuestions,
-        cutoffMarks: newTest.cutoffMarks,
-        isFree: newTest.isFree,
-        isPublished: status === 'published',
-        isFixed: true,
-        isPyq,
-        year,
-      },
-      create: {
-        id: newId,
-        slug,
-        title,
-        description: input.description,
-        examId: exam.id,
-        durationMinutes: newTest.durationMinutes,
-        totalMarks: newTest.totalMarks,
-        totalQuestions: newTest.totalQuestions,
-        cutoffMarks: newTest.cutoffMarks,
-        isFree: newTest.isFree,
-        isPublished: status === 'published',
-        isFixed: true,
-        isPyq,
-        year,
-      },
-    });
+    await MockTestRepository.upsertMockTest(input, exam.id);
   } catch (dbErr) {
-    console.warn('Neon DB sync error in createMockTestAction:', dbErr);
+    console.warn('MockTestRepository.upsertMockTest error in createMockTestAction:', dbErr);
   }
 
   dynamicMockTests.unshift(newTest);
@@ -1786,98 +1392,10 @@ export async function deleteMockTestAction(
   dynamicMockTests = dynamicMockTests.filter(t => t.id !== testId && t.slug !== testId);
 
   try {
-    const dbTest = await prisma.mockTest.findFirst({
-      where: {
-        OR: [
-          { id: testId },
-          { slug: testId },
-          { slug: testId.replace(/^mock-/, '') },
-        ],
-      },
-      include: {
-        mockTestQuestions: { select: { questionId: true } },
-      },
-    });
-
-    if (dbTest) {
-      // 1. Gather all question IDs linked to this mock test
-      const directQIds = dbTest.mockTestQuestions.map(mtq => mtq.questionId);
-
-      // Also gather any questions whose pyqExam matches dbTest.title or groupId matches dbTest.id/slug
-      const relatedQuestions = await prisma.question.findMany({
-        where: {
-          OR: [
-            ...(directQIds.length > 0 ? [{ id: { in: directQIds } }] : []),
-            ...(dbTest.title ? [{ pyqExam: dbTest.title }] : []),
-            { groupId: dbTest.id },
-            { groupId: dbTest.slug },
-          ],
-        },
-        select: { id: true },
-      });
-
-      const questionIds = Array.from(new Set(relatedQuestions.map(q => q.id)));
-      deletedQuestionsCount = questionIds.length;
-
-      // 2. Cascade delete from Neon DB in proper foreign key order
-      if (questionIds.length > 0) {
-        // Delete all student answers for these questions or for attempts of this mock test
-        await prisma.answer.deleteMany({
-          where: {
-            OR: [
-              { questionId: { in: questionIds } },
-              { attempt: { mockTestId: dbTest.id } },
-            ],
-          },
-        });
-
-        // Delete options for these questions
-        await prisma.option.deleteMany({
-          where: { questionId: { in: questionIds } },
-        });
-
-        // Delete mock test question junction links
-        await prisma.mockTestQuestion.deleteMany({
-          where: {
-            OR: [
-              { mockTestId: dbTest.id },
-              { questionId: { in: questionIds } },
-            ],
-          },
-        });
-
-        // Delete candidate attempts for this mock test
-        await prisma.attempt.deleteMany({
-          where: { mockTestId: dbTest.id },
-        });
-
-        // Permanently delete the questions to save DB space
-        await prisma.question.deleteMany({
-          where: { id: { in: questionIds } },
-        });
-      } else {
-        // Just delete mock test junction and attempts if no questions found
-        await prisma.mockTestQuestion.deleteMany({ where: { mockTestId: dbTest.id } });
-        await prisma.attempt.deleteMany({ where: { mockTestId: dbTest.id } });
-      }
-
-      // Delete the mock test record itself
-      await prisma.mockTest.delete({ where: { id: dbTest.id } });
-
-      // 3. Purge from in-memory and local store
-      const deletedIdsSet = new Set(questionIds);
-      dynamicQuestions = dynamicQuestions.filter(q => {
-        if (deletedIdsSet.has(q.id)) return false;
-        if (dbTest.title && q.pyqExam === dbTest.title) return false;
-        if (q.groupId === dbTest.id || q.groupId === dbTest.slug) return false;
-        return true;
-      });
-
-      deletedQuestionsCount += deleteQuestionsByIdsFromStore(questionIds);
-      deletedQuestionsCount += deleteExamQuestionsFromStore(dbTest.id, dbTest.title);
-    }
+    const delResult = await MockTestRepository.deleteCascade(testId);
+    deletedQuestionsCount = delResult.deletedQuestionsCount;
   } catch (dbErr) {
-    console.warn('Neon DB async sync on deleteMockTest:', dbErr);
+    console.warn('MockTestRepository.deleteCascade error in deleteMockTestAction:', dbErr);
   }
 
   saveCustomMockTestsToFile(dynamicMockTests);
@@ -1999,16 +1517,9 @@ export async function toggleMockTestPublishAction(
   saveCustomMockTestsToFile(dynamicMockTests);
 
   try {
-    await prisma.mockTest.updateMany({
-      where: {
-        OR: [{ id: test.id }, { slug: test.slug }],
-      },
-      data: {
-        isPublished: newStatus === 'published',
-      },
-    });
+    await MockTestRepository.togglePublish(test.id, newStatus === 'published');
   } catch (err) {
-    console.warn('Neon DB async sync on toggleMockTestPublishAction:', err);
+    console.warn('MockTestRepository.togglePublish error in toggleMockTestPublishAction:', err);
   }
 
   safeRevalidatePath('/admin/tests');

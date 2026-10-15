@@ -1,8 +1,8 @@
 # BankMock Architecture & Refactoring Roadmap
 
-> **Current Status**: Phase 0 & Phase 1 **COMPLETED & PUSHED** to `origin/main` (`c586684`)  
+> **Current Status**: Phase 0, Phase 1 & Phase 2 **COMPLETED**  
 > **Database Environment**: Neon Serverless PostgreSQL with pooler (`schema=bankmock` isolated)  
-> **Test Status**: 12/12 Vitest unit tests passing | 12/12 end-to-end auth integration tests passing | 0 ESLint errors | Production build passing
+> **Test Status**: 23/23 Vitest unit tests passing | End-to-end integration tests passing | 0 ESLint errors | Production build passing (Turbopack)
 
 ---
 
@@ -14,7 +14,7 @@ When you turn your PC back on and reopen your workspace:
 # 1. Navigate to the project directory
 cd c:\Users\chida\Desktop\bank
 
-# 2. Check current git status (should be clean on branch main)
+# 2. Check current git status
 git status
 
 # 3. Verify PostgreSQL connectivity to Neon
@@ -23,7 +23,7 @@ npm run test:db
 # 4. Run test suites to verify system health
 npm test
 
-# 5. Tell the AI assistant: "Continue to Phase 2"
+# 5. Tell the AI assistant: "Continue to Phase 3"
 ```
 
 ---
@@ -50,25 +50,30 @@ npm test
 
 ---
 
-### ⏳ Phase 2: Data Store Unification & Filesystem Elimination (NEXT)
-**Goal**: Make the application 100% serverless-ready by removing all filesystem writes (`fs.writeFileSync`) in production, directing all reads/writes to PostgreSQL, and maintaining fast cache layers.
-
-1. **Audit Filesystem Writes**:
-   - Inspect `lib/data/exams.ts` (`saveCustomExamsToFile`).
-   - Inspect `lib/data/mockTests.ts` (`saveCustomMockTestsToFile`).
-   - Inspect `lib/db/questionDb.ts` (`addQuestionToJsonDb`, `updateQuestionInJsonDb`, `deleteQuestionFromJsonDb`).
-2. **PostgreSQL Schema Expansion & Prisma Relations**:
-   - Verify `Exam`, `Section`, `Topic`, `Question`, `Option`, `MockTest`, `MockTestQuestion` tables in `bankmock`.
-   - Ensure all relations, cascades, and constraints match existing JSON shape.
-3. **Database Repository Layer**:
-   - Replace JSON file write operations with transactional Prisma queries (`prisma.question.create`, `prisma.exam.upsert`, etc.).
-   - Implement read-through caching using Next.js `unstable_cache` with tag-based invalidation (`revalidateTag`).
-4. **Automated Verification**:
-   - Create test suite validating question creation, editing, deletion, and bulk upload without writing to the disk.
+### ✅ Phase 2: Data Store Unification & Filesystem Elimination (DONE)
+- **Status**: Completed
+- **Delivered**:
+  - **Filesystem Writes Permanently Eliminated**:
+    - Replaced all `fs.writeFileSync` calls across `lib/data/exams.ts`, `lib/data/mockTests.ts`, and `lib/db/questionDb.ts` with zero-write serverless no-ops.
+    - Zero `fs.writeFileSync`, `writeFile`, or `mkdirSync` operations exist in runtime application code (`lib/` and `app/`).
+  - **Modular Database Repository Layer**:
+    - Created `lib/db/repositories/questionRepository.ts` providing transactional Prisma operations for Question and Option CRUD, passage deduplication, and bulk imports.
+    - Created `lib/db/repositories/examRepository.ts` for Exam and Section upserts, title updates, and relational cascade deletions.
+    - Created `lib/db/repositories/mockTestRepository.ts` for Mock Test and PYQ persistence, publishing toggles, and cascade deletions.
+    - Created clean barrel export in `lib/db/repositories/index.ts`.
+  - **Service Layer Alignment**:
+    - Updated `lib/services/adminService.ts` to delegate all mutations directly to the repository layer.
+    - Preserved in-memory mirrors for synchronous request processing while ensuring PostgreSQL is the single source of truth.
+    - Wired Next.js 16 cache invalidations (`invalidateQuestionsCache`, `invalidateExamsCache`, `invalidateMockTestsCache`, `invalidateLiveQuestionsCache`) to surgical mutation triggers.
+  - **Automated Verification**:
+    - Created `tests/phase2-serverless.test.ts` verifying zero `fs.writeFileSync` calls under question creation, updates, and deletion.
+    - Verified all 23 Vitest unit tests pass in 1.26s.
+    - Verified end-to-end integration tests (`verify-delete-exam-and-questions.ts`, `verify-admin-pyq-and-custom-exam.ts`) pass with 100% success rate.
+    - Verified Next.js 16 production build compiles with Turbopack across all 27 routes with 0 errors.
 
 ---
 
-### ⏳ Phase 3: Service Layer Modularization
+### ⏳ Phase 3: Service Layer Modularization (NEXT)
 **Goal**: Deconstruct the monolithic 2,089-line `lib/services/adminService.ts` into single-responsibility, cohesive domain services.
 
 1. **Domain Extraction**:

@@ -254,20 +254,7 @@ if (typeof window === 'undefined') {
   }
 }
 
-export function saveCustomExamsToFile(exams: Exam[]): void {
-  if (typeof window === 'undefined') {
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const dataDir = path.resolve(process.cwd(), 'data');
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-      }
-      const customExamsPath = path.resolve(dataDir, 'custom_exams.json');
-      const customOnly = exams.filter(e => e.id !== 'exam-ibps-po' && e.id !== 'exam-sbi-clerk');
-      fs.writeFileSync(customExamsPath, JSON.stringify(customOnly, null, 2), 'utf8');
-    } catch (err) {
-      console.warn('Failed to save custom exams to disk:', err);
-    }
-  }
+export function saveCustomExamsToFile(_exams: Exam[]): void {
+  // Phase 2: Filesystem writes permanently eliminated for 100% serverless compliance.
+  // Custom exams are persisted directly to PostgreSQL via ExamRepository.
 }

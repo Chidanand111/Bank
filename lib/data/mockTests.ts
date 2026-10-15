@@ -278,27 +278,8 @@ if (typeof window === 'undefined') {
   }
 }
 
-export function saveCustomMockTestsToFile(tests: MockTest[]): void {
-  if (typeof window === 'undefined') {
-    try {
-      const fs = require('fs');
-      const path = require('path');
-      const dataDir = path.resolve(process.cwd(), 'data');
-      if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-      }
-      const customTestsPath = path.resolve(dataDir, 'custom_mock_tests.json');
-      // Save tests that are custom (not part of the initial built-in static list)
-      const builtinIds = new Set([
-        'mock-ibps-po-1', 'mock-ibps-po-2', 'mock-sbi-clerk-1', 'mock-sbi-clerk-2',
-        'mock-sbi-clerk-2024-pyq', 'mock-sbi-clerk-2023-pyq', 'mock-ibps-po-2025-mains-pyq',
-        'mock-ibps-po-2024-pyq', 'mock-ibps-po-2023-pyq', 'mock-ibps-po-2025-pyq'
-      ]);
-      const customOnly = tests.filter(t => !builtinIds.has(t.id));
-      fs.writeFileSync(customTestsPath, JSON.stringify(customOnly, null, 2), 'utf8');
-    } catch (err) {
-      console.warn('Failed to save custom mock tests to disk:', err);
-    }
-  }
+export function saveCustomMockTestsToFile(_tests: MockTest[]): void {
+  // Phase 2: Filesystem writes permanently eliminated for 100% serverless compliance.
+  // Custom mock tests and PYQs are persisted directly to PostgreSQL via MockTestRepository.
 }
 
