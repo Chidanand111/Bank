@@ -6,6 +6,7 @@ import {
   updateDatabaseUserRole,
 } from '../lib/auth/session';
 import { loginAction, adminLoginAction, registerAction } from '../lib/auth/actions';
+import { hashPassword } from '../lib/auth/password';
 
 async function runTests() {
   console.log('=====================================================');
@@ -26,10 +27,20 @@ async function runTests() {
   }
 
   // 1. Initial State Checks
-  const initialUsers = getDatabaseUsers();
+  const initialUsers = await getDatabaseUsers();
   const admin = initialUsers.find(u => u.role === 'ADMIN');
   const student = initialUsers.find(u => u.role === 'USER' && u.status === 'APPROVED');
-  const pending = initialUsers.find(u => u.role === 'USER' && u.status === 'PENDING');
+  let pending = initialUsers.find(u => u.role === 'USER' && u.status === 'PENDING');
+  if (!pending) {
+    const passwordHash = await hashPassword('user123');
+    pending = await createDatabaseUser({
+      name: 'Initial Pending Candidate',
+      email: 'pending@bankmock.com',
+      passwordHash,
+      role: 'USER',
+      status: 'PENDING',
+    });
+  }
 
   assert(Boolean(admin && admin.email === 'admin@bankmock.com'), '1. Admin account exists with ADMIN role');
   assert(Boolean(student && student.email === 'student@bankmock.com' && student.status === 'APPROVED'), '2. Approved student account exists');
@@ -84,14 +95,14 @@ async function runTests() {
     '7. Registration returns pendingApproval: true'
   );
 
-  const registeredUser = findDatabaseUserByEmail(testCandidateEmail);
+  const registeredUser = await findDatabaseUserByEmail(testCandidateEmail);
   assert(
     Boolean(registeredUser && registeredUser.status === 'PENDING' && registeredUser.role === 'USER'),
     '8. Newly registered candidate is stored with status: PENDING and role: USER'
   );
 
   // 6. Admin Approves the Candidate
-  const approvalUpdated = updateDatabaseUserStatus(registeredUser!.id, 'APPROVED');
+  const approvalUpdated = await updateDatabaseUserStatus(registeredUser!.id, 'APPROVED');
   assert(
     Boolean(approvalUpdated && approvalUpdated.status === 'APPROVED'),
     '9. Admin successfully approves candidate -> status becomes APPROVED'
@@ -105,15 +116,16 @@ async function runTests() {
 
   // 8. Reject Workflow
   const testCandidateRejectEmail = `rejected.${Date.now()}@example.com`;
-  createDatabaseUser({
+  const rejectPasswordHash = await hashPassword('secret123');
+  await createDatabaseUser({
     name: 'Test Reject Candidate',
     email: testCandidateRejectEmail,
-    passwordHash: 'secret123',
+    passwordHash: rejectPasswordHash,
     role: 'USER',
     status: 'PENDING',
   });
-  const rejectTarget = findDatabaseUserByEmail(testCandidateRejectEmail);
-  const rejectedUpdated = updateDatabaseUserStatus(rejectTarget!.id, 'REJECTED');
+  const rejectTarget = await findDatabaseUserByEmail(testCandidateRejectEmail);
+  const rejectedUpdated = await updateDatabaseUserStatus(rejectTarget!.id, 'REJECTED');
   assert(
     Boolean(rejectedUpdated && rejectedUpdated.status === 'REJECTED'),
     '11. Admin can reject application -> status becomes REJECTED'

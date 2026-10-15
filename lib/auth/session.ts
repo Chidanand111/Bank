@@ -1,4 +1,6 @@
 import { cookies } from 'next/headers';
+import { prisma } from '../prisma';
+import { UserStatus as PrismaUserStatus, Role as PrismaRole } from '@prisma/client';
 import { AuthUser, Role, UserStatus, SessionPayload } from '@/types';
 import { signSession, verifySession } from './crypto';
 import { INITIAL_USERS, StoredUser } from '../data/users';
@@ -6,63 +8,146 @@ import { INITIAL_USERS, StoredUser } from '../data/users';
 export const SESSION_COOKIE_NAME = 'bankmock_session';
 const SESSION_DURATION_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
-// In-memory / dynamic user store that mirrors the database
-// Changes made during admin operations (e.g. approving/rejecting users or promoting roles) update here
-const liveUsers: StoredUser[] = [...INITIAL_USERS];
+// In-memory fallback cache for development or transient DB disconnects
+const fallbackUsers: StoredUser[] = [...INITIAL_USERS];
 
-export function getDatabaseUsers(): StoredUser[] {
-  return liveUsers;
-}
-
-export function findDatabaseUserById(id: string): StoredUser | null {
-  return liveUsers.find(u => u.id === id) || null;
-}
-
-export function findDatabaseUserByEmail(email: string): StoredUser | null {
-  return liveUsers.find(u => u.email.toLowerCase() === email.toLowerCase()) || null;
-}
-
-export function updateDatabaseUserRole(userId: string, newRole: Role): StoredUser | null {
-  const index = liveUsers.findIndex(u => u.id === userId);
-  if (index === -1) return null;
-
-  liveUsers[index] = {
-    ...liveUsers[index],
-    role: newRole,
+function toStoredUser(u: {
+  id: string;
+  name: string;
+  email: string;
+  password?: string | null;
+  role: string;
+  status?: string | null;
+  createdAt?: Date | string;
+  attempts?: Array<{ id: string }>;
+}): StoredUser {
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    passwordHash: u.password || '',
+    role: u.role as Role,
+    status: (u.status || 'APPROVED') as UserStatus,
+    createdAt: typeof u.createdAt === 'string' ? u.createdAt : u.createdAt?.toISOString() || new Date().toISOString(),
+    attemptCount: Array.isArray(u.attempts) ? u.attempts.length : 0,
   };
-  return liveUsers[index];
 }
 
-export function updateDatabaseUserStatus(userId: string, newStatus: UserStatus): StoredUser | null {
-  const index = liveUsers.findIndex(u => u.id === userId);
-  if (index === -1) return null;
-
-  liveUsers[index] = {
-    ...liveUsers[index],
-    status: newStatus,
-  };
-  return liveUsers[index];
+export async function getDatabaseUsers(): Promise<StoredUser[]> {
+  try {
+    const dbUsers = await prisma.user.findMany({
+      include: { attempts: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (dbUsers.length > 0) {
+      return dbUsers.map(toStoredUser);
+    }
+  } catch (err) {
+    console.warn('Postgres getDatabaseUsers fallback to memory cache:', err);
+  }
+  return fallbackUsers;
 }
 
-export function createDatabaseUser(data: {
+export async function findDatabaseUserById(id: string): Promise<StoredUser | null> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: { attempts: true },
+    });
+    if (user) return toStoredUser(user);
+  } catch (err) {
+    console.warn('Postgres findDatabaseUserById fallback:', err);
+  }
+  return fallbackUsers.find(u => u.id === id) || null;
+}
+
+export async function findDatabaseUserByEmail(email: string): Promise<StoredUser | null> {
+  const normalizedEmail = email.toLowerCase().trim();
+  try {
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      include: { attempts: true },
+    });
+    if (user) return toStoredUser(user);
+  } catch (err) {
+    console.warn('Postgres findDatabaseUserByEmail fallback:', err);
+  }
+  return fallbackUsers.find(u => u.email.toLowerCase() === normalizedEmail) || null;
+}
+
+export async function updateDatabaseUserRole(userId: string, newRole: Role): Promise<StoredUser | null> {
+  try {
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { role: newRole as PrismaRole },
+      include: { attempts: true },
+    });
+    return toStoredUser(updated);
+  } catch (err) {
+    console.warn('Postgres updateDatabaseUserRole fallback:', err);
+    const index = fallbackUsers.findIndex(u => u.id === userId);
+    if (index !== -1) {
+      fallbackUsers[index] = { ...fallbackUsers[index], role: newRole };
+      return fallbackUsers[index];
+    }
+    return null;
+  }
+}
+
+export async function updateDatabaseUserStatus(userId: string, newStatus: UserStatus): Promise<StoredUser | null> {
+  try {
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { status: newStatus as PrismaUserStatus },
+      include: { attempts: true },
+    });
+    return toStoredUser(updated);
+  } catch (err) {
+    console.warn('Postgres updateDatabaseUserStatus fallback:', err);
+    const index = fallbackUsers.findIndex(u => u.id === userId);
+    if (index !== -1) {
+      fallbackUsers[index] = { ...fallbackUsers[index], status: newStatus };
+      return fallbackUsers[index];
+    }
+    return null;
+  }
+}
+
+export async function createDatabaseUser(data: {
   name: string;
   email: string;
   passwordHash: string;
   role?: Role;
   status?: UserStatus;
-}): StoredUser {
-  const newUser: StoredUser = {
-    id: `user-${Date.now()}`,
-    name: data.name,
-    email: data.email.toLowerCase(),
-    passwordHash: data.passwordHash,
-    role: data.role || 'USER',
-    status: data.status || 'PENDING', // All registered candidates require admin approval
-    createdAt: new Date().toISOString(),
-    attemptCount: 0,
-  };
-  liveUsers.push(newUser);
-  return newUser;
+}): Promise<StoredUser> {
+  const normalizedEmail = data.email.toLowerCase().trim();
+  try {
+    const created = await prisma.user.create({
+      data: {
+        name: data.name.trim(),
+        email: normalizedEmail,
+        password: data.passwordHash,
+        role: (data.role || 'USER') as PrismaRole,
+        status: (data.status || 'PENDING') as PrismaUserStatus,
+      },
+      include: { attempts: true },
+    });
+    return toStoredUser(created);
+  } catch (err) {
+    console.warn('Postgres createDatabaseUser fallback to memory cache:', err);
+    const newUser: StoredUser = {
+      id: `user-${Date.now()}`,
+      name: data.name,
+      email: normalizedEmail,
+      passwordHash: data.passwordHash,
+      role: data.role || 'USER',
+      status: data.status || 'PENDING',
+      createdAt: new Date().toISOString(),
+      attemptCount: 0,
+    };
+    fallbackUsers.push(newUser);
+    return newUser;
+  }
 }
 
 // Session Cookie Management
@@ -112,7 +197,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   if (!session) return null;
 
   // Verify against canonical database record
-  const dbUser = findDatabaseUserById(session.userId);
+  const dbUser = await findDatabaseUserById(session.userId);
   if (!dbUser) return null;
 
   return {

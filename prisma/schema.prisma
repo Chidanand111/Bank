@@ -25,14 +25,21 @@ enum Role {
   ADMIN
 }
 
+enum UserStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model User {
-  id        String    @id @default(uuid())
-  email     String    @unique
+  id        String     @id @default(uuid())
+  email     String     @unique
   name      String
   password  String?
-  role      Role      @default(USER)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  role      Role       @default(USER)
+  status    UserStatus @default(PENDING)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
   attempts  Attempt[]
 }
 

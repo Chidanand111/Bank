@@ -1,4 +1,5 @@
-import { PrismaClient, Role, Difficulty, ExamCategory } from '@prisma/client';
+import { PrismaClient, Role, UserStatus, Difficulty, ExamCategory } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -10,17 +11,23 @@ async function main() {
   const userEmail = process.env.DEV_USER_EMAIL || 'student@bankmock.com';
   const userPassword = process.env.DEV_USER_PASSWORD || 'user123';
 
+  const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
+  const hashedUserPassword = await bcrypt.hash(userPassword, 10);
+
   // Seed Admin User
   const admin = await prisma.user.upsert({
     where: { email: adminEmail },
     update: {
       role: Role.ADMIN,
+      status: UserStatus.APPROVED,
+      password: hashedAdminPassword,
     },
     create: {
       email: adminEmail,
       name: 'Platform Admin',
-      password: adminPassword,
+      password: hashedAdminPassword,
       role: Role.ADMIN,
+      status: UserStatus.APPROVED,
     },
   });
 
@@ -29,17 +36,38 @@ async function main() {
     where: { email: userEmail },
     update: {
       role: Role.USER,
+      status: UserStatus.APPROVED,
+      password: hashedUserPassword,
     },
     create: {
       email: userEmail,
       name: 'Rahul Sharma',
-      password: userPassword,
+      password: hashedUserPassword,
       role: Role.USER,
+      status: UserStatus.APPROVED,
     },
   });
 
-  console.log(`Seeded Admin: ${admin.email} (Role: ${admin.role})`);
-  console.log(`Seeded Student: ${student.email} (Role: ${student.role})`);
+  // Seed Pending Candidate User for Approval Flow testing
+  const pending = await prisma.user.upsert({
+    where: { email: 'pending@bankmock.com' },
+    update: {
+      role: Role.USER,
+      status: UserStatus.PENDING,
+      password: hashedUserPassword,
+    },
+    create: {
+      email: 'pending@bankmock.com',
+      name: 'Pooja Verma',
+      password: hashedUserPassword,
+      role: Role.USER,
+      status: UserStatus.PENDING,
+    },
+  });
+
+  console.log(`Seeded Admin: ${admin.email} (Role: ${admin.role}, Status: ${admin.status})`);
+  console.log(`Seeded Student: ${student.email} (Role: ${student.role}, Status: ${student.status})`);
+  console.log(`Seeded Pending: ${pending.email} (Role: ${pending.role}, Status: ${pending.status})`);
 
   // Seed Target Exams
   const ibpsPo = await prisma.exam.upsert({

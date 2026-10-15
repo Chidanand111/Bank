@@ -6,7 +6,6 @@ import {
   invalidateExamsCache,
   invalidateMockTestsCache,
   invalidateLiveQuestionsCache,
-  CACHE_TAGS,
 } from '../cache';
 import { requireAdmin } from '../auth/permissions';
 import {
@@ -67,7 +66,7 @@ const deletedMockTestIds = new Set<string>();
 export async function getAdminStats(): Promise<AdminStats> {
   await requireAdmin();
 
-  const users = getDatabaseUsers();
+  const users = await getDatabaseUsers();
   const totalAdmins = users.filter(u => u.role === 'ADMIN').length;
   const pendingApprovalsCount = users.filter(u => u.status === 'PENDING').length;
   const totalUsers = users.length;
@@ -100,7 +99,7 @@ export async function getAdminStats(): Promise<AdminStats> {
  */
 export async function getAdminUsers(): Promise<AuthUser[]> {
   await requireAdmin();
-  const users = getDatabaseUsers();
+  const users = await getDatabaseUsers();
   return users.map(u => ({
     id: u.id,
     name: u.name,
@@ -115,7 +114,7 @@ export async function getAdminUsers(): Promise<AuthUser[]> {
 export async function approveUserAction(userId: string): Promise<{ success: boolean; error?: string }> {
   await requireAdmin();
 
-  const updated = updateDatabaseUserStatus(userId, 'APPROVED');
+  const updated = await updateDatabaseUserStatus(userId, 'APPROVED');
   if (!updated) {
     return { success: false, error: 'User record not found.' };
   }
@@ -135,7 +134,7 @@ export async function rejectUserAction(userId: string): Promise<{ success: boole
     };
   }
 
-  const updated = updateDatabaseUserStatus(userId, 'REJECTED');
+  const updated = await updateDatabaseUserStatus(userId, 'REJECTED');
   if (!updated) {
     return { success: false, error: 'User record not found.' };
   }
@@ -158,7 +157,7 @@ export async function updateUserStatusAction(
     };
   }
 
-  const updated = updateDatabaseUserStatus(userId, newStatus);
+  const updated = await updateDatabaseUserStatus(userId, newStatus);
   if (!updated) {
     return { success: false, error: 'User record not found.' };
   }

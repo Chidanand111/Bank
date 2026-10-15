@@ -1,7 +1,8 @@
 // Web Crypto API HMAC-SHA256 Token implementation (compatible with Edge and Node.js)
 import { SessionPayload } from '@/types';
+import { env } from '@/lib/config/env';
 
-const SESSION_SECRET = process.env.SESSION_SECRET || 'bankmock_super_secure_session_secret_key_2025_prod_ready';
+const SESSION_SECRET = env.SESSION_SECRET;
 
 async function getCryptoKey(): Promise<CryptoKey> {
   const enc = new TextEncoder();

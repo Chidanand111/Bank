@@ -9,6 +9,7 @@ import {
   createDatabaseUser,
   getDatabaseUsers,
 } from './session';
+import { verifyPassword, hashPassword } from './password';
 import { Role } from '@/types';
 
 export interface AuthActionResult {
@@ -36,8 +37,10 @@ export async function loginAction(
     return { success: false, error: 'Email and password are required.' };
   }
 
-  const user = findDatabaseUserByEmail(email);
-  if (!user || user.passwordHash !== password) {
+  const user = await findDatabaseUserByEmail(email);
+  const isPasswordValid = await verifyPassword(password, user?.passwordHash);
+
+  if (!user || !isPasswordValid) {
     return { success: false, error: 'Invalid email or password credentials.' };
   }
 
@@ -97,7 +100,7 @@ export async function adminLoginAction(
     return { success: false, error: 'Admin email and password are required.' };
   }
 
-  const user = findDatabaseUserByEmail(email);
+  const user = await findDatabaseUserByEmail(email);
 
   // Strict Admin Role Guard: If this is a candidate/student account, reject immediately
   if (user && user.role !== 'ADMIN') {
@@ -108,7 +111,9 @@ export async function adminLoginAction(
     };
   }
 
-  if (!user || user.passwordHash !== password) {
+  const isPasswordValid = await verifyPassword(password, user?.passwordHash);
+
+  if (!user || !isPasswordValid) {
     return { success: false, error: 'Invalid administrator credentials.' };
   }
 
@@ -135,6 +140,7 @@ export async function adminLoginAction(
 /**
  * Candidate Registration Action
  * STRICT RULE: New accounts are assigned USER role and status PENDING.
+ * Passwords are automatically hashed with bcrypt before saving.
  * They DO NOT receive a session cookie automatically; they must wait for admin approval.
  */
 export async function registerAction(
@@ -153,16 +159,19 @@ export async function registerAction(
     return { success: false, error: 'Password must be at least 6 characters long.' };
   }
 
-  const existing = findDatabaseUserByEmail(email);
+  const existing = await findDatabaseUserByEmail(email);
   if (existing) {
     return { success: false, error: 'An account with this email already exists.' };
   }
 
-  // Account created with PENDING approval status
-  createDatabaseUser({
+  // Securely hash password with bcrypt
+  const hashedPassword = await hashPassword(password);
+
+  // Account created with PENDING approval status in database
+  await createDatabaseUser({
     name,
     email,
-    passwordHash: password,
+    passwordHash: hashedPassword,
     role: 'USER',
     status: 'PENDING',
   });
@@ -186,7 +195,7 @@ export async function logoutAction(): Promise<void> {
  * Only available for student evaluation.
  */
 export async function demoStudentLoginAction(): Promise<void> {
-  const users = getDatabaseUsers();
+  const users = await getDatabaseUsers();
   const studentUser = users.find(u => u.role === 'USER' && (u.status === 'APPROVED' || !u.status)) || users[1];
 
   await createSessionCookie({
@@ -206,7 +215,7 @@ export async function demoStudentLoginAction(): Promise<void> {
  * Only available within the dedicated /admin/login portal.
  */
 export async function demoAdminLoginAction(): Promise<void> {
-  const users = getDatabaseUsers();
+  const users = await getDatabaseUsers();
   const adminUser = users.find(u => u.role === 'ADMIN') || users[0];
 
   await createSessionCookie({
