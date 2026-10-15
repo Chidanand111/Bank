@@ -266,7 +266,7 @@ export interface AdminStats {
 }
 
 export interface AdminQuestionInput {
-  examId: string;
+  examId?: string;
   sectionCode: string;
   topicName: string;
   text: string;
@@ -279,7 +279,7 @@ export interface AdminQuestionInput {
   passageImageUrl?: string;
   groupId?: string;
   isPyq?: boolean;
-  pyqYear?: number;
+  pyqYear?: number | null;
   pyqExam?: string;
   mockTestId?: string;
   options: {
@@ -299,24 +299,38 @@ export interface AdminExamInput {
 
 export interface AdminMockTestInput {
   title: string;
-  slug: string;
-  description: string;
+  slug?: string;
+  description?: string;
   examId: string;
   customExamTitle?: string;
   customExamCategory?: ExamCategory;
-  durationMinutes: number;
-  totalMarks: number;
-  cutoffMarks: number;
-  isFree: boolean;
+  durationMinutes?: number;
+  totalMarks?: number;
+  cutoffMarks?: number;
+  isFree?: boolean;
   isPyq?: boolean;
-  year?: number;
+  year?: number | null;
   enableSectionalTimer?: boolean;
   sectionDurationMinutes?: number;
   status?: ExamStatus;
-  sections: {
+  sections?: {
     code: string;
     name: string;
     questionCount: number;
     marks: number;
+    durationMinutes?: number;
   }[];
+}
+
+export interface AdminPartitionInfo {
+  id: string;
+  label: string;
+  badge: string;
+  title: string;
+  isPyq: boolean;
+  pyqYear?: number;
+  examId: string;
+  category: 'ALL' | 'PYQ' | 'MOCK' | 'EXAM';
+  description: string;
+  status?: ExamStatus;
 }

@@ -1,0 +1,563 @@
+'use server';
+
+import {
+  invalidateMockTestsCache,
+  invalidateQuestionsCache,
+} from '../cache';
+import { requireAdmin } from '../auth/permissions';
+import { MOCK_TESTS_DATA, saveCustomMockTestsToFile } from '../data/mockTests';
+import { EXAMS_DATA } from '../data/exams';
+import { prisma } from '../prisma';
+import { MockTestRepository } from '../db/repositories';
+import { safeRevalidatePath } from './common';
+import {
+  adminMockTestInputSchema,
+  updateMockTestTitleSchema,
+  validateInput,
+} from '../validations/adminSchemas';
+import {
+  AdminMockTestInput,
+  AdminPartitionInfo,
+  Difficulty,
+  Exam,
+  ExamStatus,
+  MockTest,
+  Question,
+} from '@/types';
+
+export type { AdminPartitionInfo };
+
+// In-memory working sets for admin modifications
+let dynamicMockTests: MockTest[] = [...MOCK_TESTS_DATA];
+const deletedMockTestIds = new Set<string>();
+
+export async function getDynamicMockTests(): Promise<MockTest[]> {
+  return dynamicMockTests.filter(m => !deletedMockTestIds.has(m.id) && !deletedMockTestIds.has(m.slug));
+}
+
+export async function setDynamicMockTests(tests: MockTest[]): Promise<void> {
+  dynamicMockTests = tests;
+}
+
+export async function addMockTestToMemory(test: MockTest): Promise<void> {
+  if (!dynamicMockTests.some(t => t.id === test.id || t.slug === test.slug)) {
+    dynamicMockTests.unshift(test);
+  }
+  if (!MOCK_TESTS_DATA.some(t => t.id === test.id || t.slug === test.slug)) {
+    MOCK_TESTS_DATA.unshift(test);
+  }
+  saveCustomMockTestsToFile(dynamicMockTests);
+}
+
+export async function removeMockTestsForExam(targetExamId: string, targetSlug: string): Promise<void> {
+  dynamicMockTests = dynamicMockTests.filter(mt => {
+    return mt.examId !== targetExamId && mt.examId !== targetSlug && mt.examSlug !== targetSlug;
+  });
+  saveCustomMockTestsToFile(dynamicMockTests);
+}
+
+export async function updateMockTestsExamTitle(examIdOrSlug: string, newTitle: string): Promise<void> {
+  const normSlug = examIdOrSlug.replace(/^exam-/, '');
+  for (const mt of dynamicMockTests) {
+    if (mt.examId === examIdOrSlug || mt.examSlug === normSlug) {
+      mt.examTitle = newTitle;
+    }
+  }
+  for (const mt of MOCK_TESTS_DATA) {
+    if (mt.examId === examIdOrSlug || mt.examSlug === normSlug) {
+      mt.examTitle = newTitle;
+    }
+  }
+  saveCustomMockTestsToFile(dynamicMockTests);
+}
+
+export async function setMockTestsStatusForExam(
+  examId: string,
+  examSlug: string,
+  status: ExamStatus
+): Promise<void> {
+  for (const t of dynamicMockTests) {
+    if (t.examId === examId || t.examSlug === examSlug) {
+      t.status = status;
+    }
+  }
+  for (const t of MOCK_TESTS_DATA) {
+    if (t.examId === examId || t.examSlug === examSlug) {
+      t.status = status;
+    }
+  }
+  saveCustomMockTestsToFile(dynamicMockTests);
+}
+
+/**
+ * Load latest mock tests and PYQs directly from Neon PostgreSQL
+ */
+export async function loadFreshMockTestsFromDb(): Promise<MockTest[]> {
+  try {
+    const dbTests = await prisma.mockTest.findMany({
+      include: {
+        exam: {
+          include: { sections: true },
+        },
+        mockTestQuestions: {
+          include: {
+            question: {
+              include: {
+                options: true,
+                section: true,
+                topic: true,
+              },
+            },
+            section: true,
+          },
+          orderBy: { order: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (dbTests && dbTests.length > 0) {
+      const mapped: MockTest[] = dbTests.map(t => {
+        const existingTemplate =
+          dynamicMockTests.find(mt => mt.id === t.id || mt.slug === t.slug) ||
+          MOCK_TESTS_DATA.find(mt => mt.id === t.id || mt.slug === t.slug);
+
+        const liveQuestions: Question[] = t.mockTestQuestions.map(mtq => {
+          const q = mtq.question;
+          return {
+            id: q.id,
+            text: q.text,
+            imageUrl: q.imageUrl || undefined,
+            passage: q.passage || undefined,
+            passageImageUrl: q.passageImageUrl || undefined,
+            groupId: q.groupId || undefined,
+            isPyq: q.isPyq,
+            pyqYear: q.pyqYear || undefined,
+            pyqExam: q.pyqExam || undefined,
+            difficulty: (q.difficulty as Difficulty) || 'MEDIUM',
+            explanation: q.explanation || '',
+            marks: q.marks ?? 1.0,
+            negativeMarks: q.negativeMarks ?? 0.25,
+            examId: q.examId,
+            sectionId: q.sectionId,
+            sectionCode: mtq.section?.code || q.section?.code || 'GENERAL',
+            sectionName: mtq.section?.name || q.section?.name || 'General',
+            topicId: q.topicId,
+            topicName: q.topic?.name || 'General',
+            options: (q.options || []).map(opt => ({
+              id: opt.id,
+              questionId: opt.questionId,
+              text: opt.text,
+              imageUrl: opt.imageUrl || undefined,
+              isCorrect: opt.isCorrect,
+              order: opt.order,
+            })),
+          };
+        });
+
+        const sections =
+          existingTemplate?.sections ||
+          (t.exam?.sections && t.exam.sections.length > 0
+            ? t.exam.sections.map(s => ({
+                id: s.id,
+                code: s.code,
+                name: s.name,
+                questionCount: s.code === 'FINANCIAL_AWARENESS' ? 40 : 35,
+                marks: s.code === 'FINANCIAL_AWARENESS' ? 40 : 35,
+                durationMinutes: s.code === 'FINANCIAL_AWARENESS' ? 35 : 20,
+              }))
+            : [
+                {
+                  id: `sec-${t.slug}-eng`,
+                  code: 'ENGLISH',
+                  name: 'English Language',
+                  questionCount: 30,
+                  marks: 30,
+                  durationMinutes: 20,
+                },
+                {
+                  id: `sec-${t.slug}-quant`,
+                  code: 'QUANT',
+                  name: 'Quantitative Aptitude',
+                  questionCount: 35,
+                  marks: 35,
+                  durationMinutes: 20,
+                },
+                {
+                  id: `sec-${t.slug}-reason`,
+                  code: 'REASONING',
+                  name: 'Reasoning Ability',
+                  questionCount: 35,
+                  marks: 35,
+                  durationMinutes: 20,
+                },
+              ]);
+
+        return {
+          id: t.id,
+          slug: t.slug,
+          title: t.title,
+          description: t.description,
+          examId: t.examId,
+          examSlug: t.exam?.slug || 'other',
+          examTitle: t.exam?.title || 'Banking Exam',
+          durationMinutes: t.durationMinutes,
+          totalMarks: t.totalMarks,
+          totalQuestions: liveQuestions.length || t.totalQuestions,
+          cutoffMarks: t.cutoffMarks ?? 50,
+          isFree: t.isFree,
+          isFixed: t.isFixed,
+          isPyq: t.isPyq,
+          year: t.year ?? undefined,
+          sections,
+          questions: liveQuestions,
+        };
+      });
+
+      const merged: MockTest[] = mapped.filter(
+        m => !deletedMockTestIds.has(m.id) && !deletedMockTestIds.has(m.slug)
+      );
+      for (const st of MOCK_TESTS_DATA) {
+        if (deletedMockTestIds.has(st.id) || deletedMockTestIds.has(st.slug)) continue;
+        if (!merged.some(m => m.id === st.id || m.slug === st.slug)) {
+          merged.push(st);
+        }
+      }
+      dynamicMockTests = merged;
+      return merged;
+    }
+  } catch (err) {
+    console.warn('Neon DB query in mockTestService.loadFreshMockTestsFromDb:', err);
+  }
+  return dynamicMockTests.filter(
+    m => !deletedMockTestIds.has(m.id) && !deletedMockTestIds.has(m.slug)
+  );
+}
+
+/**
+ * Server-side Mock Test & PYQ Management for Administrators
+ */
+export async function getAdminMockTests(): Promise<MockTest[]> {
+  await requireAdmin();
+  return await loadFreshMockTestsFromDb();
+}
+
+/**
+ * Creates a mock test or PYQ paper with Zod input validation and database sync
+ */
+export async function createMockTestAction(
+  input: AdminMockTestInput
+): Promise<{ success: boolean; test?: MockTest; error?: string }> {
+  await requireAdmin();
+
+  const validated = validateInput(adminMockTestInputSchema, input);
+  if (!validated.success) {
+    return { success: false, error: validated.error };
+  }
+  const validData = validated.data;
+
+  let targetExamId = validData.examId;
+  let customExamObj: Exam | undefined;
+
+  // Support "create new exam he can title it anything"
+  if (validData.customExamTitle?.trim()) {
+    const { createExamAction } = await import('./examService');
+    const examRes = await createExamAction({
+      title: validData.customExamTitle.trim(),
+      category: validData.customExamCategory || 'OTHER',
+      description: `${validData.customExamTitle.trim()} Examination Papers`,
+    });
+    if (examRes.success && examRes.exam) {
+      targetExamId = examRes.exam.id;
+      customExamObj = examRes.exam;
+    } else {
+      return { success: false, error: examRes.error || 'Failed to create custom exam.' };
+    }
+  }
+
+  // Find or fallback exam
+  let dbExam = null;
+  try {
+    dbExam = await prisma.exam.findFirst({
+      where: { OR: [{ id: targetExamId }, { slug: targetExamId.replace('exam-', '') }] },
+    });
+  } catch (dbErr) {
+    console.warn('Neon DB query fallback in createMockTestAction:', dbErr);
+  }
+  const exam =
+    customExamObj ||
+    dbExam ||
+    EXAMS_DATA.find(e => e.id === targetExamId || e.slug === targetExamId.replace('exam-', '')) ||
+    EXAMS_DATA[0];
+
+  const title = validData.title.trim();
+  const rawSlug =
+    validData.slug?.trim() ||
+    title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = validData.isPyq && !rawSlug.includes('pyq') ? `${rawSlug}-pyq` : rawSlug;
+  const newId = `mock-${slug}`;
+
+  const isPyq = Boolean(validData.isPyq);
+  const year = validData.year
+    ? Number(validData.year)
+    : isPyq
+    ? new Date().getFullYear()
+    : undefined;
+
+  const defaultSections = [
+    { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30 },
+    { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35 },
+    { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35 },
+  ];
+  const targetSections =
+    validData.sections && validData.sections.length > 0 ? validData.sections : defaultSections;
+  const totalQuestions = targetSections.reduce((acc, s) => acc + (s.questionCount || 0), 0);
+  const status: ExamStatus = validData.status || 'published';
+
+  const newTest: MockTest = {
+    id: newId,
+    slug,
+    title,
+    description: validData.description || `${title} Examination Practice Paper`,
+    examId: exam.id,
+    examSlug: exam.slug,
+    examTitle: exam.title,
+    durationMinutes: validData.durationMinutes || 60,
+    totalMarks: validData.totalMarks || 100,
+    totalQuestions,
+    cutoffMarks: validData.cutoffMarks || 60,
+    isFree: validData.isFree ?? true,
+    isFixed: true,
+    isPyq,
+    year,
+    status,
+    sections: targetSections.map(s => ({
+      id: `sec-${s.code.toLowerCase()}`,
+      code: s.code,
+      name: s.name,
+      questionCount: s.questionCount,
+      marks: s.marks,
+      durationMinutes: s.code === 'FINANCIAL_AWARENESS' ? 35 : s.questionCount >= 40 ? 45 : 20,
+    })),
+    questions: [],
+  };
+
+  try {
+    await MockTestRepository.upsertMockTest(validData, exam.id);
+  } catch (dbErr) {
+    console.warn('MockTestRepository.upsertMockTest error in createMockTestAction:', dbErr);
+  }
+
+  dynamicMockTests.unshift(newTest);
+  saveCustomMockTestsToFile(dynamicMockTests);
+  safeRevalidatePath('/admin/tests');
+  safeRevalidatePath('/admin/questions');
+  safeRevalidatePath('/tests');
+  // Bust cached mock-test list after creation
+  await invalidateMockTestsCache();
+  return { success: true, test: newTest };
+}
+
+/**
+ * Updates a mock test title with Zod validation and cache invalidation
+ */
+export async function updateMockTestTitleAction(
+  testIdOrSlug: string,
+  newTitle: string,
+  description?: string
+): Promise<{ success: boolean; error?: string }> {
+  await requireAdmin();
+
+  const validated = validateInput(updateMockTestTitleSchema, {
+    testIdOrSlug,
+    newTitle,
+    description,
+  });
+  if (!validated.success) {
+    return { success: false, error: validated.error };
+  }
+  const { newTitle: validTitle, description: validDesc } = validated.data;
+  const trimmedTitle = validTitle.trim();
+
+  try {
+    const dbTest = await prisma.mockTest.findFirst({
+      where: {
+        OR: [
+          { id: testIdOrSlug },
+          { slug: testIdOrSlug },
+          { slug: testIdOrSlug.replace(/^mock-/, '') },
+        ],
+      },
+    });
+
+    if (dbTest) {
+      await prisma.mockTest.update({
+        where: { id: dbTest.id },
+        data: {
+          title: trimmedTitle,
+          ...(validDesc !== undefined ? { description: validDesc.trim() } : {}),
+        },
+      });
+    }
+
+    // Update in-memory dynamicMockTests
+    const inMem = dynamicMockTests.find(
+      t => t.id === testIdOrSlug || t.slug === testIdOrSlug || (dbTest && t.id === dbTest.id)
+    );
+    if (inMem) {
+      inMem.title = trimmedTitle;
+      if (validDesc) inMem.description = validDesc.trim();
+    }
+
+    const staticMem = MOCK_TESTS_DATA.find(
+      t => t.id === testIdOrSlug || t.slug === testIdOrSlug || (dbTest && t.id === dbTest.id)
+    );
+    if (staticMem) {
+      staticMem.title = trimmedTitle;
+      if (validDesc) staticMem.description = validDesc.trim();
+    }
+    saveCustomMockTestsToFile(dynamicMockTests);
+
+    safeRevalidatePath('/admin/tests');
+    safeRevalidatePath('/admin/questions');
+    safeRevalidatePath('/tests');
+
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to update mock test title:', err);
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Permanently deletes a mock test across Neon PostgreSQL and in-memory store
+ */
+export async function deleteMockTestAction(
+  testId: string
+): Promise<{ success: boolean; count?: number; error?: string }> {
+  await requireAdmin();
+
+  if (!testId?.trim()) {
+    return { success: false, error: 'Test ID is required.' };
+  }
+
+  deletedMockTestIds.add(testId);
+  deletedMockTestIds.add(testId.replace(/^mock-/, ''));
+
+  let deletedQuestionsCount = 0;
+  dynamicMockTests = dynamicMockTests.filter(t => t.id !== testId && t.slug !== testId);
+
+  try {
+    const delResult = await MockTestRepository.deleteCascade(testId);
+    deletedQuestionsCount = delResult.deletedQuestionsCount;
+  } catch (dbErr) {
+    console.warn('MockTestRepository.deleteCascade error in deleteMockTestAction:', dbErr);
+  }
+
+  saveCustomMockTestsToFile(dynamicMockTests);
+  safeRevalidatePath('/admin/tests');
+  safeRevalidatePath('/admin/questions');
+  safeRevalidatePath('/tests');
+  // Bust cached mock-test and question lists after deletion
+  await invalidateMockTestsCache();
+  await invalidateQuestionsCache();
+  return { success: true, count: deletedQuestionsCount };
+}
+
+/**
+ * Toggle or update Mock Test / Partition Published State
+ */
+export async function toggleMockTestPublishAction(
+  testIdOrSlug: string,
+  targetStatus?: ExamStatus
+): Promise<{ success: boolean; status?: ExamStatus; error?: string }> {
+  await requireAdmin();
+
+  if (!testIdOrSlug?.trim()) {
+    return { success: false, error: 'Test ID is required.' };
+  }
+
+  const test =
+    dynamicMockTests.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug) ||
+    MOCK_TESTS_DATA.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug);
+  if (!test) {
+    return { success: false, error: 'Mock test not found.' };
+  }
+
+  const newStatus: ExamStatus = targetStatus || (test.status === 'published' ? 'created' : 'published');
+  test.status = newStatus;
+  saveCustomMockTestsToFile(dynamicMockTests);
+
+  try {
+    await MockTestRepository.togglePublish(test.id, newStatus === 'published');
+  } catch (err) {
+    console.warn('MockTestRepository.togglePublish error in toggleMockTestPublishAction:', err);
+  }
+
+  safeRevalidatePath('/admin/tests');
+  safeRevalidatePath('/admin/questions');
+  safeRevalidatePath('/tests');
+  safeRevalidatePath('/dashboard');
+  // Bust cached mock-test list after publish toggle
+  await invalidateMockTestsCache();
+  return { success: true, status: newStatus };
+}
+
+/**
+ * Returns dynamic partitions consolidating default papers and any custom PYQ papers from DB
+ */
+export async function getAdminPartitions(): Promise<AdminPartitionInfo[]> {
+  const { getAdminExams } = await import('./examService');
+  const [allTests, allExams] = await Promise.all([
+    loadFreshMockTestsFromDb(),
+    getAdminExams(),
+  ]);
+
+  const basePartitions: AdminPartitionInfo[] = [
+    {
+      id: 'ALL',
+      label: 'All Questions',
+      badge: 'Repository (All)',
+      title: 'Complete Question Bank Repository',
+      isPyq: false,
+      examId: 'ALL',
+      category: 'ALL',
+      status: 'published',
+      description: 'Browse, search, and manage all questions across all exams and subjects in the database.',
+    },
+  ];
+
+  const examPartitions: AdminPartitionInfo[] = allExams.map(e => ({
+    id: e.id,
+    label: e.title,
+    badge: e.status === 'created' ? 'Draft Exam' : 'Published Exam',
+    title: `${e.title} - Question Bank`,
+    isPyq: false,
+    examId: e.id,
+    category: 'EXAM',
+    status: e.status || 'published',
+    description: `All practice and dedicated questions mapped to ${e.title}.`,
+  }));
+
+  const testPartitions: AdminPartitionInfo[] = allTests.map(t => ({
+    id: t.id,
+    label: t.isPyq ? (t.year ? `${t.examTitle.split('(')[0].trim()} ${t.year} PYQ` : t.title) : t.title,
+    badge: t.isPyq ? `Official Paper (${t.totalQuestions} Qs)` : `Fixed Exam (${t.totalQuestions} Qs)`,
+    title: t.title,
+    isPyq: Boolean(t.isPyq),
+    pyqYear: t.year,
+    examId: t.examId,
+    category: t.isPyq ? 'PYQ' : 'MOCK',
+    status: t.status || 'published',
+    description: t.description || `${t.title} with dedicated questions.`,
+  }));
+
+  const map = new Map<string, AdminPartitionInfo>();
+  for (const p of [...basePartitions, ...examPartitions, ...testPartitions]) {
+    if (!map.has(p.id)) {
+      map.set(p.id, p);
+    }
+  }
+
+  return Array.from(map.values());
+}

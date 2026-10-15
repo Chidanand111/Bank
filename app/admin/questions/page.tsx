@@ -14,10 +14,16 @@ import {
   deleteExamAction,
   toggleExamPublishAction,
   toggleMockTestPublishAction,
-  AdminPartitionInfo,
 } from '@/lib/services/adminService';
 import { AdminNav } from '@/components/admin/AdminNav';
-import { AdminMockTestInput, AdminQuestionInput, Difficulty, Exam, Question } from '@/types';
+import {
+  AdminMockTestInput,
+  AdminPartitionInfo,
+  AdminQuestionInput,
+  Difficulty,
+  Exam,
+  Question,
+} from '@/types';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';

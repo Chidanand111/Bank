@@ -248,7 +248,7 @@ export class MockTestRepository {
         id: newId,
         slug,
         title,
-        description: input.description,
+        description: input.description || `${title} Examination Practice Paper`,
         examId: resolvedExamId,
         durationMinutes: input.durationMinutes || 60,
         totalMarks: input.totalMarks || 100,

@@ -73,19 +73,24 @@ npm test
 
 ---
 
-### ⏳ Phase 3: Service Layer Modularization (NEXT)
-**Goal**: Deconstruct the monolithic 2,089-line `lib/services/adminService.ts` into single-responsibility, cohesive domain services.
+### ✅ Phase 3: Service Layer Modularization (COMPLETED - 2026-10-15)
+**Goal**: Deconstruct the monolithic 1,600-line `lib/services/adminService.ts` into single-responsibility, cohesive domain services with strict Zod validation.
 
 1. **Domain Extraction**:
-   - `lib/services/questionService.ts`: CRUD, bulk CSV/JSON import, AI generation parsing, validation.
-   - `lib/services/examService.ts`: Exam categories, section configuration, time limits.
-   - `lib/services/mockTestService.ts`: Mock test generation, question partitioning, difficulty balance.
-   - `lib/services/attemptService.ts`: Candidate attempt tracking, answer submission, score evaluation.
-   - `lib/services/userService.ts`: User approvals, role management, audit logs.
-2. **Re-export Facade**:
-   - Keep `lib/services/adminService.ts` as a thin backward-compatible re-export layer so existing UI components do not break during transition.
-3. **Zod Schema Validation**:
-   - Add strong input validation schemas for all Server Actions and admin mutations.
+   - `lib/services/userService.ts`: User listing, approval/rejection actions, role mutations, self-protection guards.
+   - `lib/services/examService.ts`: Exam categories, section configuration, pattern initialization, title updates, cascade deletion.
+   - `lib/services/mockTestService.ts`: Mock test and PYQ persistence, dynamic partition computation, publish toggling.
+   - `lib/services/questionService.ts`: Question CRUD, transactional bulk CSV/JSON import, group passage deduplication, live exam question queries.
+   - `lib/services/attemptService.ts`: Candidate attempt tracking and admin attempt logs.
+2. **Re-export Facade & Server Action RPC Compliance**:
+   - Refactored `lib/services/adminService.ts` from 1,600 lines down to ~260 lines of clean asynchronous delegations and top-level `getAdminStats()` aggregation.
+   - Explicit async delegation ensures 100% Turbopack Server Action RPC compatibility across client components and server routes.
+3. **Zod Schema Validation (`lib/validations/adminSchemas.ts`)**:
+   - Added strict validation schemas: `adminQuestionInputSchema`, `bulkImportQuestionsSchema`, `adminExamInputSchema`, `updateExamTitleSchema`, `adminMockTestInputSchema`, `updateMockTestTitleSchema`, `userStatusSchema`, `userRoleSchema`.
+4. **Verification**:
+   - 35/35 Vitest unit tests pass in 1.89s (including 12 new tests in `tests/phase3-services.test.ts`).
+   - End-to-end integration tests (`verify-admin-pyq-and-custom-exam.ts`, `verify-delete-exam-and-questions.ts`) pass with 100% success rate.
+   - Full Next.js 16 production build compiles with Turbopack across all 27 routes with 0 errors.
 
 ---
 
