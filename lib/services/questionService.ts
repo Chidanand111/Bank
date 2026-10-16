@@ -106,6 +106,8 @@ export async function loadFreshQuestionsFromDb(): Promise<Question[]> {
         marks: q.marks ?? 1.0,
         negativeMarks: q.negativeMarks ?? 0.25,
         examId: q.examId,
+        examSlug: q.exam?.slug,
+        examTitle: q.exam?.title,
         sectionId: q.sectionId,
         sectionCode: q.section?.code || 'GENERAL',
         sectionName: q.section?.name || 'General',
@@ -160,12 +162,14 @@ export async function getAdminQuestions(filters?: {
 
   if (filters?.partition && filters.partition !== 'ALL') {
     try {
+      const cleanMockSlug = filters.partition.replace(/^mock-/, '');
       const dbMockTest = await prisma.mockTest.findFirst({
         where: {
           OR: [
             { id: filters.partition },
             { slug: filters.partition },
-            { slug: filters.partition.replace(/^mock-/, '') },
+            { slug: cleanMockSlug },
+            { id: `mock-${cleanMockSlug}` },
           ],
         },
         include: {
@@ -180,15 +184,78 @@ export async function getAdminQuestions(filters?: {
                   topic: true,
                 },
               },
+              section: true,
             },
           },
         },
       });
 
-      if (dbMockTest && dbMockTest.mockTestQuestions.length > 0) {
-        list = dbMockTest.mockTestQuestions.map(mtq => {
-          const q = mtq.question;
-          return {
+      if (dbMockTest) {
+        if (dbMockTest.mockTestQuestions.length > 0) {
+          list = dbMockTest.mockTestQuestions.map(mtq => {
+            const q = mtq.question;
+            return {
+              id: q.id,
+              text: q.text,
+              imageUrl: q.imageUrl || undefined,
+              passage: q.passage || undefined,
+              passageImageUrl: q.passageImageUrl || undefined,
+              groupId: q.groupId || undefined,
+              isPyq: q.isPyq,
+              pyqYear: q.pyqYear || undefined,
+              pyqExam: q.pyqExam || undefined,
+              difficulty: (q.difficulty as Difficulty) || 'MEDIUM',
+              explanation: q.explanation || '',
+              marks: q.marks ?? 1.0,
+              negativeMarks: q.negativeMarks ?? 0.25,
+              examId: q.examId,
+              examSlug: q.exam?.slug,
+              examTitle: q.exam?.title,
+              sectionId: q.sectionId,
+              sectionCode: mtq.section?.code || q.section?.code || 'GENERAL',
+              sectionName: mtq.section?.name || q.section?.name || 'General',
+              topicId: q.topicId,
+              topicName: q.topic?.name || 'General',
+              options: (q.options || []).map(opt => ({
+                id: opt.id,
+                questionId: opt.questionId,
+                text: opt.text,
+                imageUrl: opt.imageUrl || undefined,
+                isCorrect: opt.isCorrect,
+                order: opt.order,
+              })),
+            };
+          });
+        } else {
+          list = [];
+        }
+      } else {
+        // Query as an Exam partition in Neon PostgreSQL
+        const cleanExamSlug = filters.partition.replace(/^exam-/, '');
+        const dbExam = await prisma.exam.findFirst({
+          where: {
+            OR: [
+              { id: filters.partition },
+              { slug: filters.partition },
+              { slug: cleanExamSlug },
+              { id: `exam-${cleanExamSlug}` },
+            ],
+          },
+          include: {
+            questions: {
+              orderBy: { id: 'asc' },
+              include: {
+                options: { orderBy: { order: 'asc' } },
+                exam: true,
+                section: true,
+                topic: true,
+              },
+            },
+          },
+        });
+
+        if (dbExam) {
+          list = dbExam.questions.map(q => ({
             id: q.id,
             text: q.text,
             imageUrl: q.imageUrl || undefined,
@@ -203,12 +270,14 @@ export async function getAdminQuestions(filters?: {
             marks: q.marks ?? 1.0,
             negativeMarks: q.negativeMarks ?? 0.25,
             examId: q.examId,
+            examSlug: q.exam?.slug,
+            examTitle: q.exam?.title,
             sectionId: q.sectionId,
             sectionCode: q.section?.code || 'GENERAL',
             sectionName: q.section?.name || 'General',
             topicId: q.topicId,
             topicName: q.topic?.name || 'General',
-            options: q.options.map(opt => ({
+            options: (q.options || []).map(opt => ({
               id: opt.id,
               questionId: opt.questionId,
               text: opt.text,
@@ -216,12 +285,10 @@ export async function getAdminQuestions(filters?: {
               isCorrect: opt.isCorrect,
               order: opt.order,
             })),
-          };
-        });
-      } else if (dbMockTest && dbMockTest.mockTestQuestions.length === 0) {
-        list = [];
-      } else {
-        list = partitionQuestionsListSync(sourceQuestions, filters.partition);
+          }));
+        } else {
+          list = partitionQuestionsListSync(sourceQuestions, filters.partition);
+        }
       }
     } catch {
       list = partitionQuestionsListSync(sourceQuestions, filters.partition);
@@ -375,9 +442,19 @@ export async function createQuestionAction(
 
   // Persist directly to Neon PostgreSQL Database via QuestionRepository
   try {
-    await QuestionRepository.create(input, newQuestionId);
+    const dbCreated = await QuestionRepository.create(validData, newQuestionId);
+    if (dbCreated) {
+      newQuestion.examSlug = dbCreated.examSlug;
+      newQuestion.examTitle = dbCreated.examTitle;
+      newQuestion.sectionId = dbCreated.sectionId;
+      newQuestion.topicId = dbCreated.topicId;
+    }
   } catch (dbErr) {
-    console.warn('QuestionRepository.create error in createQuestionAction:', dbErr);
+    console.error('QuestionRepository.create error in createQuestionAction:', dbErr);
+    return {
+      success: false,
+      error: dbErr instanceof Error ? dbErr.message : 'Database error creating question',
+    };
   }
 
   safeRevalidatePath('/admin/questions');
@@ -406,6 +483,52 @@ export async function bulkImportQuestionsAction(
   const validated = validateInput(bulkImportQuestionsSchema, questions);
   if (!validated.success) {
     return { success: false, count: 0, error: validated.error };
+  }
+
+  // Pre-resolve partitionId to targetExamId and targetMockTestId against DB
+  let resolvedExamId: string | undefined = undefined;
+  let resolvedMockTestId: string | undefined = undefined;
+
+  if (partitionId && partitionId !== 'ALL') {
+    const cleanSlug = partitionId.replace(/^(exam|mock)-/, '');
+
+    // Check if partition matches an Exam in DB
+    const dbExam = await prisma.exam.findFirst({
+      where: {
+        OR: [
+          { id: partitionId },
+          { slug: partitionId },
+          { slug: cleanSlug },
+          { id: `exam-${cleanSlug}` },
+        ],
+      },
+    });
+
+    if (dbExam) {
+      resolvedExamId = dbExam.id;
+    } else {
+      // Check if partition matches a MockTest in DB
+      const dbMock = await prisma.mockTest.findFirst({
+        where: {
+          OR: [
+            { id: partitionId },
+            { slug: partitionId },
+            { slug: cleanSlug },
+            { id: `mock-${cleanSlug}` },
+          ],
+        },
+        include: { exam: true },
+      });
+
+      if (dbMock) {
+        resolvedMockTestId = dbMock.id;
+        resolvedExamId = dbMock.examId || (dbMock.exam ? dbMock.exam.id : undefined);
+      } else if (partitionId.startsWith('exam-')) {
+        resolvedExamId = partitionId;
+      } else {
+        resolvedMockTestId = partitionId;
+      }
+    }
   }
 
   // Registry to track group passages across the imported batch so they are saved only once
@@ -468,26 +591,19 @@ export async function bulkImportQuestionsAction(
         }
       }
 
-      // If a specific partition is provided, assign it to question and associate target examId
-      if (partitionId && partitionId !== 'ALL') {
-        if (partitionId.startsWith('exam-')) {
-          inputToUse.examId = partitionId;
-          inputToUse.mockTestId = undefined;
-        } else {
-          inputToUse.mockTestId = partitionId;
-          if (!inputToUse.examId || inputToUse.examId === 'ALL') {
-            if (partitionId.toLowerCase().includes('sbi') || partitionId.toLowerCase().includes('clerk')) {
-              inputToUse.examId = 'exam-sbi-clerk';
-            } else {
-              inputToUse.examId = 'exam-ibps-po';
-            }
-          }
-        }
+      // Assign pre-resolved partition and exam associations
+      if (resolvedExamId) {
+        inputToUse.examId = resolvedExamId;
+      }
+      if (resolvedMockTestId) {
+        inputToUse.mockTestId = resolvedMockTestId;
       }
 
       const res = await createQuestionAction(inputToUse);
       if (res.success && res.question) {
         importedCount++;
+      } else {
+        console.warn('createQuestionAction error in bulkImport:', res.error);
       }
     } catch (e) {
       console.error('Error importing question row in questionService:', e);
@@ -500,7 +616,14 @@ export async function bulkImportQuestionsAction(
   safeRevalidatePath('/admin');
   // Bust cached question list after bulk import
   await invalidateQuestionsCache();
-  return { success: true, count: importedCount };
+  if (resolvedMockTestId) {
+    await invalidateLiveQuestionsCache(resolvedMockTestId);
+  }
+  return {
+    success: importedCount > 0,
+    count: importedCount,
+    error: importedCount === 0 ? 'No questions could be saved to database.' : undefined,
+  };
 }
 
 /**

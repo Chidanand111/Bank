@@ -121,6 +121,9 @@ export async function loadFreshMockTestsFromDb(): Promise<MockTest[]> {
         const existingTemplate =
           dynamicMockTests.find(mt => mt.id === t.id || mt.slug === t.slug) ||
           MOCK_TESTS_DATA.find(mt => mt.id === t.id || mt.slug === t.slug);
+        if (existingTemplate) {
+          existingTemplate.status = (t.isPublished ? 'published' : 'created') as ExamStatus;
+        }
 
         const liveQuestions: Question[] = t.mockTestQuestions.map(mtq => {
           const q = mtq.question;
@@ -209,6 +212,7 @@ export async function loadFreshMockTestsFromDb(): Promise<MockTest[]> {
           isFixed: t.isFixed,
           isPyq: t.isPyq,
           year: t.year ?? undefined,
+          status: (t.isPublished ? 'published' : 'created') as ExamStatus,
           sections,
           questions: liveQuestions,
         };
@@ -477,19 +481,36 @@ export async function toggleMockTestPublishAction(
     return { success: false, error: 'Test ID is required.' };
   }
 
-  const test =
-    dynamicMockTests.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug) ||
-    MOCK_TESTS_DATA.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug);
-  if (!test) {
+  const cleanSlug = testIdOrSlug.replace(/^mock-/, '');
+  let test =
+    dynamicMockTests.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug || t.slug === cleanSlug) ||
+    MOCK_TESTS_DATA.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug || t.slug === cleanSlug);
+
+  const dbTest = await prisma.mockTest.findFirst({
+    where: {
+      OR: [
+        { id: testIdOrSlug },
+        { slug: testIdOrSlug },
+        { slug: cleanSlug },
+        { id: `mock-${cleanSlug}` },
+      ],
+    },
+  });
+
+  if (!test && !dbTest) {
     return { success: false, error: 'Mock test not found.' };
   }
 
-  const newStatus: ExamStatus = targetStatus || (test.status === 'published' ? 'created' : 'published');
-  test.status = newStatus;
+  const currentIsPublished = dbTest !== null ? dbTest.isPublished : test?.status === 'published';
+  const newStatus: ExamStatus = targetStatus || (currentIsPublished ? 'created' : 'published');
+
+  if (test) {
+    test.status = newStatus;
+  }
   saveCustomMockTestsToFile(dynamicMockTests);
 
   try {
-    await MockTestRepository.togglePublish(test.id, newStatus === 'published');
+    await MockTestRepository.togglePublish(dbTest?.id || test?.id || testIdOrSlug, newStatus === 'published');
   } catch (err) {
     console.warn('MockTestRepository.togglePublish error in toggleMockTestPublishAction:', err);
   }

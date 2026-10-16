@@ -697,12 +697,6 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
               targetExamId = rowExam.startsWith('exam-')
                 ? rowExam
                 : `exam-${rowExam.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
-            } else if (selectedPartition && selectedPartition !== 'ALL') {
-              if (selectedPartition.toLowerCase().includes('sbi') || selectedPartition.toLowerCase().includes('clerk')) {
-                targetExamId = 'exam-sbi-clerk';
-              } else if (selectedPartition.startsWith('exam-')) {
-                targetExamId = selectedPartition;
-              }
             }
 
             questions.push({

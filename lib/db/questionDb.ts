@@ -577,12 +577,15 @@ export function partitionQuestionsList(rawAll: Question[], partitionKey: string)
     const cleanNorm = normKey.replace(/^exam-/, '');
     const matched = all.filter(q => {
       const qExamId = (q.examId || '').toLowerCase().trim();
-      const qExamSlug = qExamId.replace(/^exam-/, '');
+      const qExamSlug = (q.examSlug || qExamId.replace(/^exam-/, '')).toLowerCase().trim();
+      const qExamTitle = (q.examTitle || '').toLowerCase().trim();
       const qMockId = (q.mockTestId || '').toLowerCase().trim();
       return (
         qExamId === normKey ||
         qExamSlug === cleanNorm ||
         qExamId === cleanNorm ||
+        qExamSlug === normKey ||
+        (qExamTitle && (qExamTitle === cleanNorm || cleanNorm.includes(qExamTitle) || qExamTitle.includes(cleanNorm))) ||
         qMockId === normKey ||
         qMockId === cleanNorm
       );
@@ -764,6 +767,11 @@ export function partitionQuestionsList(rawAll: Question[], partitionKey: string)
       ...sliceSection(quantPool, 35, 35, 'QUANT', 'Numerical Ability'),
       ...sliceSection(reasonPool, 0, 35, 'REASONING', 'Reasoning Ability'),
     ];
+  }
+
+  // If a specific partition or exam was requested but had no matching questions, return []
+  if (normKey !== 'all') {
+    return [];
   }
 
   return [

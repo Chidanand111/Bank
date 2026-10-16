@@ -7,7 +7,7 @@ import {
 import { requireAdmin } from '../auth/permissions';
 import { EXAMS_DATA, saveCustomExamsToFile } from '../data/exams';
 import { prisma } from '../prisma';
-import { ExamRepository } from '../db/repositories';
+import { ExamRepository, MockTestRepository } from '../db/repositories';
 import { safeRevalidatePath } from './common';
 import {
   adminExamInputSchema,
@@ -39,7 +39,10 @@ export async function getAdminExams(): Promise<Exam[]> {
     if (dbExams && dbExams.length > 0) {
       const mapped: Exam[] = dbExams.map(e => {
         const existing = EXAMS_DATA.find(ex => ex.id === e.id || ex.slug === e.slug);
-        const status = existing?.status || (e.isActive ? 'published' : 'created');
+        const status: ExamStatus = e.isActive ? 'published' : 'created';
+        if (existing) {
+          existing.status = status;
+        }
         return {
           id: e.id,
           slug: e.slug,
@@ -115,13 +118,44 @@ export async function createExamAction(
   const status: ExamStatus = validData.status || 'published';
 
   // Safe Neon PostgreSQL Database sync via ExamRepository
+  let dbExam: Exam;
   try {
-    await ExamRepository.upsertExam(validData);
+    dbExam = await ExamRepository.upsertExam({
+      title,
+      slug,
+      category,
+      description,
+      status,
+    });
   } catch (dbErr) {
-    console.warn('ExamRepository.upsertExam error in createExamAction:', dbErr);
+    console.error('ExamRepository.upsertExam error in createExamAction:', dbErr);
+    return {
+      success: false,
+      error: dbErr instanceof Error ? dbErr.message : 'Database error creating exam',
+    };
   }
 
   const defaultMockId = `mock-${slug}-prelims-1`;
+
+  // Upsert initial practice mock test in Neon PostgreSQL as well
+  try {
+    await MockTestRepository.upsertMockTest(
+      {
+        examId: dbExam.id,
+        title: `${title} Prelims Practice Mock 1`,
+        slug: `${slug}-prelims-1`,
+        description: `Full-length preliminary practice mock test for ${title}. Features sectional timers, TCS iON question palette, and detailed explanations.`,
+        durationMinutes: 60,
+        totalMarks: 100,
+        cutoffMarks: 60,
+        isFree: true,
+        status,
+      },
+      dbExam.id
+    );
+  } catch (mockErr) {
+    console.warn('MockTestRepository.upsertMockTest error in createExamAction:', mockErr);
+  }
 
   const fullExam: Exam = {
     id: newExamId,
@@ -407,52 +441,98 @@ export async function toggleExamPublishAction(
 ): Promise<{ success: boolean; status?: ExamStatus; error?: string }> {
   await requireAdmin();
 
-  if (!examIdOrSlug?.trim()) {
-    return { success: false, error: 'Exam ID or slug is required.' };
-  }
+  const cleanSlug = examIdOrSlug.replace(/^exam-/, '');
+
+  // Look up in Neon PostgreSQL first to guarantee accuracy
+  let dbExam = await prisma.exam.findFirst({
+    where: {
+      OR: [
+        { id: examIdOrSlug },
+        { slug: examIdOrSlug },
+        { slug: cleanSlug },
+        { id: `exam-${cleanSlug}` },
+      ],
+    },
+  });
 
   let exam = EXAMS_DATA.find(
     e =>
       e.id === examIdOrSlug ||
       e.slug === examIdOrSlug ||
-      e.slug === examIdOrSlug.replace(/^exam-/, '')
+      e.slug === cleanSlug
   );
-  if (!exam) {
+
+  if (!exam && dbExam) {
+    exam = {
+      id: dbExam.id,
+      slug: dbExam.slug,
+      title: dbExam.title,
+      category: dbExam.category,
+      description: dbExam.description,
+      shortDescription: dbExam.description,
+      totalMockTests: 1,
+      status: dbExam.isActive ? 'published' : 'created',
+      patterns: [],
+    };
+    EXAMS_DATA.push(exam);
+  }
+
+  if (!exam && !dbExam) {
     const allExams = await getAdminExams();
     exam = allExams.find(
       e =>
         e.id === examIdOrSlug ||
         e.slug === examIdOrSlug ||
-        e.slug === examIdOrSlug.replace(/^exam-/, '')
+        e.slug === cleanSlug
     );
-    if (exam && !EXAMS_DATA.some(e => e.id === exam!.id)) {
-      EXAMS_DATA.push(exam);
-    }
   }
-  if (!exam) {
+
+  if (!exam && !dbExam) {
     return { success: false, error: 'Exam not found.' };
   }
 
+  const currentStatus: ExamStatus = dbExam
+    ? (dbExam.isActive ? 'published' : 'created')
+    : (exam?.status || 'published');
+
   const newStatus: ExamStatus =
-    targetStatus || (exam.status === 'published' ? 'created' : 'published');
-  exam.status = newStatus;
+    targetStatus || (currentStatus === 'published' ? 'created' : 'published');
+
+  if (exam) {
+    exam.status = newStatus;
+  }
   saveCustomExamsToFile(EXAMS_DATA);
 
-  // Sync associated mock tests to match exam state
-  await setMockTestsStatusForExam(exam.id, exam.slug, newStatus);
+  // Sync associated mock tests in memory to match exam state
+  const targetExamId = dbExam?.id || exam?.id || examIdOrSlug;
+  const targetSlug = dbExam?.slug || exam?.slug || cleanSlug;
+  await setMockTestsStatusForExam(targetExamId, targetSlug, newStatus);
 
   try {
     await prisma.exam.updateMany({
       where: {
-        OR: [{ id: exam.id }, { slug: exam.slug }],
+        OR: [
+          { id: targetExamId },
+          { slug: targetSlug },
+          { id: examIdOrSlug },
+          { slug: examIdOrSlug },
+          { slug: cleanSlug },
+          { id: `exam-${cleanSlug}` },
+        ],
       },
       data: {
         isActive: newStatus === 'published',
       },
     });
+
     await prisma.mockTest.updateMany({
       where: {
-        OR: [{ examId: exam.id }, { exam: { slug: exam.slug } }],
+        OR: [
+          { examId: targetExamId },
+          { examId: examIdOrSlug },
+          { examId: `exam-${targetSlug}` },
+          { exam: { slug: targetSlug } },
+        ],
       },
       data: {
         isPublished: newStatus === 'published',

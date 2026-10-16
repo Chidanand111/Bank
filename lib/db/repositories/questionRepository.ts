@@ -132,7 +132,9 @@ export class QuestionRepository {
           where: {
             OR: [
               { id: input.examId },
-              { slug: input.examId.replace('exam-', '') },
+              { slug: input.examId },
+              { slug: input.examId.replace(/^exam-/, '') },
+              { id: `exam-${input.examId.replace(/^exam-/, '')}` },
             ],
           },
           include: { sections: { include: { topics: true } } },
@@ -174,11 +176,15 @@ export class QuestionRepository {
           : input.sectionCode === 'ENGLISH' ? 'English Language'
           : input.sectionCode === 'FINANCIAL_AWARENESS' ? 'General / Banking Awareness'
           : 'Reasoning Ability';
+        const candidateSecId = `sec-${dbExam.slug}-${input.sectionCode.toLowerCase()}`;
+        const existingSecById = await prisma.section.findUnique({ where: { id: candidateSecId } });
+        const finalCandidateSecId = existingSecById ? `${candidateSecId}-${Date.now().toString(36)}` : candidateSecId;
+
         existingSec = await prisma.section.upsert({
           where: { examId_code: { examId: dbExam.id, code: input.sectionCode } },
           update: { name: secName },
           create: {
-            id: `sec-${dbExam.slug}-${input.sectionCode.toLowerCase()}`,
+            id: finalCandidateSecId,
             name: secName,
             code: input.sectionCode,
             examId: dbExam.id,
@@ -210,6 +216,16 @@ export class QuestionRepository {
     const dbPassage = input.passage?.trim() || null;
     const dbPassageImageUrl = input.passageImageUrl?.trim() || null;
 
+    const diffToUse: Difficulty =
+      String(input.difficulty || '').toUpperCase() === 'EASY'
+        ? 'EASY'
+        : String(input.difficulty || '').toUpperCase() === 'HARD'
+        ? 'HARD'
+        : 'MEDIUM';
+    const marksToUse = typeof input.marks === 'number' ? input.marks : Number(input.marks) || 1.0;
+    const negMarksToUse = typeof input.negativeMarks === 'number' ? input.negativeMarks : Number(input.negativeMarks) >= 0 ? Number(input.negativeMarks) : 0.25;
+    const pyqYearToUse = input.pyqYear ? Number(input.pyqYear) : null;
+
     // Transactional question + options creation
     const created = await prisma.question.create({
       data: {
@@ -220,12 +236,12 @@ export class QuestionRepository {
         passageImageUrl: dbPassageImageUrl,
         groupId: gId,
         isPyq: Boolean(input.isPyq),
-        pyqYear: input.pyqYear ? Number(input.pyqYear) : null,
+        pyqYear: pyqYearToUse,
         pyqExam: input.pyqExam || null,
-        difficulty: input.difficulty,
-        explanation: input.explanation,
-        marks: input.marks,
-        negativeMarks: input.negativeMarks,
+        difficulty: diffToUse,
+        explanation: input.explanation || '',
+        marks: marksToUse,
+        negativeMarks: negMarksToUse,
         examId: finalExamId,
         sectionId: finalSecId,
         topicId: finalTopicId,
@@ -251,10 +267,11 @@ export class QuestionRepository {
     const targetMockId = input.mockTestId && input.mockTestId !== 'ALL' ? input.mockTestId : undefined;
     if (targetMockId || (input.isPyq && input.pyqExam)) {
       try {
+        const cleanMockSlug = targetMockId ? targetMockId.replace(/^mock-/, '') : '';
         const dbMockTest = await prisma.mockTest.findFirst({
           where: {
             OR: [
-              ...(targetMockId ? [{ id: targetMockId }, { slug: targetMockId }, { slug: targetMockId.replace('mock-', '') }] : []),
+              ...(targetMockId ? [{ id: targetMockId }, { slug: targetMockId }, { slug: cleanMockSlug }] : []),
               ...(input.pyqExam ? [{ title: input.pyqExam }, { slug: input.pyqExam.toLowerCase().replace(/[^a-z0-9]+/g, '-') }] : []),
             ],
           },
@@ -263,8 +280,15 @@ export class QuestionRepository {
 
         if (dbMockTest) {
           const orderCount = dbMockTest.mockTestQuestions.length;
-          await prisma.mockTestQuestion.create({
-            data: {
+          await prisma.mockTestQuestion.upsert({
+            where: {
+              mockTestId_questionId: {
+                mockTestId: dbMockTest.id,
+                questionId: newQuestionId,
+              },
+            },
+            update: { order: orderCount + 1 },
+            create: {
               mockTestId: dbMockTest.id,
               questionId: newQuestionId,
               sectionId: finalSecId,
@@ -292,6 +316,8 @@ export class QuestionRepository {
       marks: created.marks ?? 1.0,
       negativeMarks: created.negativeMarks ?? 0.25,
       examId: created.examId,
+      examSlug: created.exam?.slug,
+      examTitle: created.exam?.title,
       sectionId: created.sectionId,
       sectionCode: created.section?.code || input.sectionCode,
       sectionName: created.section?.name || (input.sectionCode === 'QUANT' ? 'Quantitative Aptitude' : input.sectionCode === 'ENGLISH' ? 'English Language' : 'Reasoning Ability'),

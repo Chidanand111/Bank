@@ -53,6 +53,8 @@ export interface Question {
   marks: number;
   negativeMarks: number;
   examId: string;
+  examSlug?: string;
+  examTitle?: string;
   sectionId: string;
   sectionCode: string; // e.g. "QUANT", "REASONING", "ENGLISH", "GA"
   sectionName: string;
@@ -266,7 +268,7 @@ export interface AdminStats {
 }
 
 export interface AdminQuestionInput {
-  examId?: string;
+  examId?: string | null;
   sectionCode: string;
   topicName: string;
   text: string;
@@ -274,18 +276,20 @@ export interface AdminQuestionInput {
   explanation: string;
   marks: number;
   negativeMarks: number;
-  imageUrl?: string;
-  passage?: string;
-  passageImageUrl?: string;
-  groupId?: string;
+  imageUrl?: string | null;
+  passage?: string | null;
+  passageImageUrl?: string | null;
+  groupId?: string | null;
   isPyq?: boolean;
   pyqYear?: number | null;
-  pyqExam?: string;
-  mockTestId?: string;
+  pyqExam?: string | null;
+  mockTestId?: string | null;
   options: {
+    id?: string;
     text: string;
-    imageUrl?: string;
+    imageUrl?: string | null;
     isCorrect: boolean;
+    order?: number;
   }[];
 }
 

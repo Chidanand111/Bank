@@ -509,23 +509,26 @@ export default function AdminQuestionsPage() {
     });
   };
 
-  const handlePublishActivePartition = () => {
+  const handleToggleActivePartitionStatus = (targetStatus: 'created' | 'published') => {
     if (!activePartition || activePartition.id === 'ALL') return;
 
     startTransition(async () => {
       let res;
-      if (activePartition.id.startsWith('exam-')) {
-        res = await toggleExamPublishAction(activePartition.id, 'published');
+      const isExam = activePartition.category === 'EXAM' || activePartition.id.startsWith('exam-');
+      if (isExam) {
+        res = await toggleExamPublishAction(activePartition.id, targetStatus);
       } else {
-        res = await toggleMockTestPublishAction(activePartition.id, 'published');
-        if (activePartition.examId && activePartition.examId !== 'ALL') {
+        res = await toggleMockTestPublishAction(activePartition.id, targetStatus);
+        if (targetStatus === 'published' && activePartition.examId && activePartition.examId !== 'ALL') {
           await toggleExamPublishAction(activePartition.examId, 'published');
         }
       }
 
       if (res && res.success) {
         setFeedback({
-          text: `Exam "${activePartition.title}" has been published and is now live for students!`,
+          text: targetStatus === 'published'
+            ? `Exam "${activePartition.title}" has been published and is now live for students!`
+            : `Exam "${activePartition.title}" has been set to Draft (hidden from students).`,
           type: 'success',
         });
         const [freshParts, freshExams] = await Promise.all([
@@ -536,12 +539,14 @@ export default function AdminQuestionsPage() {
         if (freshExams) setExams(freshExams);
       } else {
         setFeedback({
-          text: res?.error || 'Failed to publish exam.',
+          text: res?.error || `Failed to update status to ${targetStatus}.`,
           type: 'error',
         });
       }
     });
   };
+
+  const handlePublishActivePartition = () => handleToggleActivePartitionStatus('published');
 
   const openEditPartitionModal = (part: ExamPartition) => {
     setEditingPartition(part);
@@ -1064,7 +1069,10 @@ export default function AdminQuestionsPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               startTransition(async () => {
-                                const res = await toggleExamPublishAction(partition.id, 'published');
+                                const isExam = partition.category === 'EXAM' || partition.id.startsWith('exam-');
+                                const res = isExam
+                                  ? await toggleExamPublishAction(partition.id, 'published')
+                                  : await toggleMockTestPublishAction(partition.id, 'published');
                                 if (res?.success) {
                                   setFeedback({
                                     text: `Exam "${partition.label}" has been published and is now live for students!`,
@@ -1274,7 +1282,8 @@ export default function AdminQuestionsPage() {
                           onClick={(e) => {
                             e.stopPropagation();
                             startTransition(async () => {
-                              const res = partition.id.startsWith('exam-')
+                              const isExam = partition.category === 'EXAM' || partition.id.startsWith('exam-');
+                              const res = isExam
                                 ? await toggleExamPublishAction(partition.id, 'published')
                                 : await toggleMockTestPublishAction(partition.id, 'published');
                               if (res?.success) {
@@ -1375,16 +1384,27 @@ export default function AdminQuestionsPage() {
             </div>
 
             <div className="shrink-0 flex items-center gap-2.5 flex-wrap">
-              {activePartition.status === 'created' && (
+              {activePartition.status === 'created' ? (
                 <Button
                   variant="primary"
                   size="md"
                   disabled={isPending}
-                  onClick={handlePublishActivePartition}
+                  onClick={() => handleToggleActivePartitionStatus('published')}
                   className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black border-none shadow-sm flex items-center gap-1.5 cursor-pointer"
                   title="Publish this exam so students can view and attempt it"
                 >
                   <Globe className="w-4 h-4 text-emerald-950" /> Publish Exam
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="md"
+                  disabled={isPending}
+                  onClick={() => handleToggleActivePartitionStatus('created')}
+                  className="bg-white/10 hover:bg-amber-500/20 text-white hover:text-amber-200 border-white/30 hover:border-amber-400/50 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
+                  title="Set this exam to Draft (hide from students)"
+                >
+                  <EyeOff className="w-4 h-4 text-amber-300" /> Set to Draft
                 </Button>
               )}
               <Button
