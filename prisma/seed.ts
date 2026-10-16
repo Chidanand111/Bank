@@ -92,7 +92,18 @@ async function main() {
     },
   });
 
-  console.log('Exams seeded successfully:', ibpsPo.title, sbiClerk.title);
+  const sscCgl = await prisma.exam.upsert({
+    where: { slug: 'ssc-cgl' },
+    update: {},
+    create: {
+      slug: 'ssc-cgl',
+      title: 'SSC CGL (Combined Graduate Level)',
+      category: ExamCategory.SSC,
+      description: 'Staff Selection Commission Combined Graduate Level Examination for premier Central Government Ministries and Department recruitments.',
+    },
+  });
+
+  console.log('Exams seeded successfully:', ibpsPo.title, sbiClerk.title, sscCgl.title);
 
   // Seed Sections for IBPS PO
   const secReasoning = await prisma.section.upsert({
@@ -143,7 +154,56 @@ async function main() {
     },
   });
 
-  console.log('Sections seeded for IBPS PO');
+  // Seed Sections for SSC CGL (25 Qs, 50 Marks, 15 min each)
+  const secSscReason = await prisma.section.upsert({
+    where: { examId_code: { examId: sscCgl.id, code: 'REASONING' } },
+    update: {},
+    create: {
+      id: 'sec-ssc-cgl-reason',
+      name: 'General Intelligence & Reasoning',
+      code: 'REASONING',
+      examId: sscCgl.id,
+      order: 1,
+    },
+  });
+
+  const secSscGA = await prisma.section.upsert({
+    where: { examId_code: { examId: sscCgl.id, code: 'GA' } },
+    update: {},
+    create: {
+      id: 'sec-ssc-cgl-ga',
+      name: 'General Awareness',
+      code: 'GA',
+      examId: sscCgl.id,
+      order: 2,
+    },
+  });
+
+  const secSscQuant = await prisma.section.upsert({
+    where: { examId_code: { examId: sscCgl.id, code: 'QUANT' } },
+    update: {},
+    create: {
+      id: 'sec-ssc-cgl-quant',
+      name: 'Quantitative Aptitude',
+      code: 'QUANT',
+      examId: sscCgl.id,
+      order: 3,
+    },
+  });
+
+  const secSscEnglish = await prisma.section.upsert({
+    where: { examId_code: { examId: sscCgl.id, code: 'ENGLISH' } },
+    update: {},
+    create: {
+      id: 'sec-ssc-cgl-eng',
+      name: 'English Comprehension',
+      code: 'ENGLISH',
+      examId: sscCgl.id,
+      order: 4,
+    },
+  });
+
+  console.log('Sections seeded for IBPS PO and SSC CGL');
 
   // Seed Questions & Options directly from the JSON database
   const { getAllQuestions } = await import('../lib/db/questionDb');
@@ -243,13 +303,11 @@ async function main() {
     },
   });
 
-  // Link questions to Mock Test
-  const { generateRandomizedMockTest } = await import('../lib/db/questionDb');
-  const { MOCK_TESTS_DATA } = await import('../lib/data/mockTests');
-  const template = MOCK_TESTS_DATA[0];
-  const dynamicTest = generateRandomizedMockTest(template);
+  // Link questions to IBPS PO Mock Test
+  const { getFixedQuestionsForMockTest } = await import('../lib/db/questionDb');
+  const ibpsQuestions = getFixedQuestionsForMockTest(mockTest.slug);
 
-  const mockTestQuestionData = dynamicTest.questions.map((q, idx) => {
+  const mockTestQuestionData = ibpsQuestions.map((q, idx) => {
     const sectionId =
       q.sectionCode === 'REASONING'
         ? secReasoning.id
@@ -270,6 +328,63 @@ async function main() {
   });
 
   console.log(`Linked ${mockTestQuestionData.length} questions to Mock Test: ${mockTest.title}`);
+
+  // Seed SSC CGL Mock Test (100 Qs, 200 Marks, 60 Mins, 15m / section)
+  const sscMock = await prisma.mockTest.upsert({
+    where: { slug: 'ssc-cgl-tier-1-full-mock-1' },
+    update: {
+      durationMinutes: 60,
+      totalMarks: 200,
+      totalQuestions: 100,
+      cutoffMarks: 135.0,
+      timerType: 'OVERALL_COMPOSITE',
+      allowSectionSwitch: true,
+      negativeMarkRatio: 0.50,
+      stage: 'Tier-1',
+    },
+    create: {
+      id: 'mock-ssc-cgl-tier1-1',
+      slug: 'ssc-cgl-tier-1-full-mock-1',
+      title: 'SSC CGL Tier-1 Full Mock Test 1',
+      description: 'Official pattern 100-Question mock test for SSC CGL Tier-1: 25 Reasoning (50 marks, 15 min), 25 General Awareness (50 marks, 15 min), 25 Quantitative Aptitude (50 marks, 15 min), 25 English (50 marks, 15 min) (+2 marks, -0.50 negative, 60 mins composite timer).',
+      examId: sscCgl.id,
+      durationMinutes: 60,
+      totalMarks: 200,
+      totalQuestions: 100,
+      cutoffMarks: 135.0,
+      isFree: true,
+      isPublished: true,
+      timerType: 'OVERALL_COMPOSITE',
+      allowSectionSwitch: true,
+      negativeMarkRatio: 0.50,
+      stage: 'Tier-1',
+    },
+  });
+
+  const sscQuestions = getFixedQuestionsForMockTest(sscMock.slug);
+  const sscMockQuestionData = sscQuestions.map((q, idx) => {
+    const sectionId =
+      q.sectionCode === 'REASONING'
+        ? secSscReason.id
+        : q.sectionCode === 'GA'
+        ? secSscGA.id
+        : q.sectionCode === 'QUANT'
+        ? secSscQuant.id
+        : secSscEnglish.id;
+
+    return {
+      mockTestId: sscMock.id,
+      questionId: q.id,
+      sectionId: sectionId,
+      order: idx + 1,
+    };
+  });
+
+  await prisma.mockTestQuestion.createMany({
+    data: sscMockQuestionData,
+  });
+
+  console.log(`Linked ${sscMockQuestionData.length} questions to SSC CGL Mock Test: ${sscMock.title}`);
 }
 
 main()

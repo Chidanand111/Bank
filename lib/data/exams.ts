@@ -237,11 +237,11 @@ export const EXAMS_DATA: Exam[] = [
     category: 'SSC',
     description: 'Staff Selection Commission Combined Graduate Level Examination for premier Central Government Ministries and Department recruitments.',
     shortDescription: 'Official SSC CGL Tier-1 & Tier-2 mock test series with composite timing and negative marking.',
-    totalMockTests: 1,
+    totalMockTests: 2,
     status: 'published',
     patterns: [
       {
-        stage: 'Prelims',
+        stage: 'Tier-1',
         totalQuestions: 100,
         totalMarks: 200,
         totalDurationMinutes: 60,

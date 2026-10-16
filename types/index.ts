@@ -76,7 +76,7 @@ export interface SectionPattern {
 }
 
 export interface ExamPattern {
-  stage: 'Prelims' | 'Mains';
+  stage: 'Prelims' | 'Mains' | 'Tier-1' | 'Tier-2' | 'CBT-1' | 'CBT-2' | string;
   sections: SectionPattern[];
   totalQuestions: number;
   totalMarks: number;

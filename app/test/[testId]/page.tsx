@@ -249,7 +249,8 @@ export default function TestPage({ params }: TestPageProps) {
   }, [test, isSubmitting, sectionTimers, responses, storageKey, testId, router]);
 
   // Active section remaining seconds
-  const activeSectionRemainingSeconds = sectionTimers[currentSectionCode] ?? 1200;
+  const activeSectionDefaultSecs = ((test?.sections.find(s => s.code === currentSectionCode)?.durationMinutes) || 20) * 60;
+  const activeSectionRemainingSeconds = sectionTimers[currentSectionCode] ?? activeSectionDefaultSecs;
 
   // Total remaining seconds across all unexpired sections
   const totalRemainingSeconds = Object.values(sectionTimers).reduce((sum, secVal) => sum + secVal, 0);

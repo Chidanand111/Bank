@@ -56,7 +56,7 @@ export default function AdminTestsPage() {
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [totalMarks, setTotalMarks] = useState(100);
   const [cutoffMarks, setCutoffMarks] = useState(60);
-  const [sectionPreset, setSectionPreset] = useState<'PRELIMS_3' | 'MAINS_4' | 'SSC_TIER1_4' | 'RRB_NTPC_3' | 'CUSTOM'>('PRELIMS_3');
+  const [sectionPreset, setSectionPreset] = useState<'PRELIMS_3' | 'MAINS_4' | 'SSC_TIER1_4' | 'SSC_TIER1_SECTIONAL' | 'RRB_NTPC_3' | 'CUSTOM'>('PRELIMS_3');
 
   const [isPending, startTransition] = useTransition();
 
@@ -93,7 +93,7 @@ export default function AdminTestsPage() {
   };
 
   // Auto-adjust duration and marks on preset change
-  const handlePresetChange = (preset: 'PRELIMS_3' | 'MAINS_4' | 'SSC_TIER1_4' | 'RRB_NTPC_3' | 'CUSTOM') => {
+  const handlePresetChange = (preset: 'PRELIMS_3' | 'MAINS_4' | 'SSC_TIER1_4' | 'SSC_TIER1_SECTIONAL' | 'RRB_NTPC_3' | 'CUSTOM') => {
     setSectionPreset(preset);
     if (preset === 'PRELIMS_3') {
       setDurationMinutes(60);
@@ -103,7 +103,7 @@ export default function AdminTestsPage() {
       setDurationMinutes(180);
       setTotalMarks(200);
       setCutoffMarks(75);
-    } else if (preset === 'SSC_TIER1_4') {
+    } else if (preset === 'SSC_TIER1_4' || preset === 'SSC_TIER1_SECTIONAL') {
       setDurationMinutes(60);
       setTotalMarks(200);
       setCutoffMarks(130);
@@ -151,6 +151,17 @@ export default function AdminTestsPage() {
       ];
       isComposite = true;
       timerType = 'OVERALL_COMPOSITE';
+      negativeMarkRatio = 0.50;
+      stage = 'Tier-1';
+    } else if (sectionPreset === 'SSC_TIER1_SECTIONAL') {
+      sections = [
+        { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 25, marks: 50, durationMinutes: 15 },
+        { code: 'GA', name: 'General Awareness', questionCount: 25, marks: 50, durationMinutes: 15 },
+        { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 25, marks: 50, durationMinutes: 15 },
+        { code: 'ENGLISH', name: 'English Comprehension', questionCount: 25, marks: 50, durationMinutes: 15 },
+      ];
+      isComposite = false;
+      timerType = 'SECTIONAL_LOCKED';
       negativeMarkRatio = 0.50;
       stage = 'Tier-1';
     } else if (sectionPreset === 'RRB_NTPC_3') {
@@ -520,9 +531,10 @@ export default function AdminTestsPage() {
               onChange={(e) => handlePresetChange(e.target.value as any)}
               className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold"
             >
-              <option value="PRELIMS_3">Banking Prelims Standard (3 Sections: English 30, Quant 35, Reasoning 35 — 100 Qs / 60 Mins Sectional)</option>
+              <option value="PRELIMS_3">Banking Prelims Standard (3 Sections: English 30, Quant 35, Reasoning 35 — 100 Qs / 60 Mins Sectional 20m)</option>
               <option value="MAINS_4">Banking Mains Standard (4 Sections: Reasoning 45, English 35, Quant/DI 35, GA 40 — 155 Qs / 180 Mins)</option>
-              <option value="SSC_TIER1_4">SSC CGL / CHSL Tier-1 (4 Sections: Reasoning 25, GA 25, Quant 25, English 25 — 100 Qs / 200 Marks / 60 Mins Composite + Free Nav)</option>
+              <option value="SSC_TIER1_4">SSC CGL Tier-1 Composite (4 Sections: Reasoning 25, GA 25, Quant 25, English 25 — 100 Qs / 200 Marks / 60 Mins Composite + Free Nav, 15m suggested)</option>
+              <option value="SSC_TIER1_SECTIONAL">SSC CGL Tier-1 Sectional Timed (4 Sections: Reasoning 25, GA 25, Quant 25, English 25 — 100 Qs / 200 Marks / 15 Mins Each Auto-Locked)</option>
               <option value="RRB_NTPC_3">RRB NTPC CBT-1 (3 Sections: GA 40, Math 30, Reasoning 30 — 100 Qs / 100 Marks / 90 Mins Composite + Free Nav)</option>
               <option value="CUSTOM">Custom Timing & Marks</option>
             </select>

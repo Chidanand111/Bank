@@ -8,6 +8,9 @@ import {
 } from '@/lib/exam-engine/policies/timerPolicy';
 import { calculateAttemptResult } from '@/lib/scoring/scoreCalculator';
 import { MockTest, Question, UserResponseState } from '@/types';
+import { MOCK_TESTS_DATA } from '@/lib/data/mockTests';
+import { EXAMS_DATA } from '@/lib/data/exams';
+import { getFixedQuestionsForMockTest } from '@/lib/db/questionDb';
 
 function createMockQuestion(overrides: Partial<Question>): Question {
   return {
@@ -269,5 +272,66 @@ describe('Dynamic Scoring for SSC and Railway', () => {
     expect(result.correctCount).toBe(1);
     expect(result.incorrectCount).toBe(1);
     expect(result.unansweredCount).toBe(1);
+  });
+
+  it('validates official SSC CGL timing and question structure (25 Qs / 50 Marks / 15m per section, 100 Qs / 200 Marks / 60m total)', () => {
+    // 1. Verify Exam Pattern in EXAMS_DATA
+    const sscExam = EXAMS_DATA.find((e: any) => e.slug === 'ssc-cgl')!;
+    expect(sscExam).toBeDefined();
+    const tier1Pattern = sscExam.patterns.find((p: any) => p.stage === 'Tier-1')!;
+    expect(tier1Pattern).toBeDefined();
+    expect(tier1Pattern.totalQuestions).toBe(100);
+    expect(tier1Pattern.totalMarks).toBe(200);
+    expect(tier1Pattern.totalDurationMinutes).toBe(60);
+
+    const expectedSections = [
+      { code: 'REASONING', name: 'General Intelligence & Reasoning', numQuestions: 25, maxMarks: 50, durationMinutes: 15 },
+      { code: 'GA', name: 'General Awareness', numQuestions: 25, maxMarks: 50, durationMinutes: 15 },
+      { code: 'QUANT', name: 'Quantitative Aptitude', numQuestions: 25, maxMarks: 50, durationMinutes: 15 },
+      { code: 'ENGLISH', name: 'English Comprehension', numQuestions: 25, maxMarks: 50, durationMinutes: 15 },
+    ];
+
+    expect(tier1Pattern.sections).toHaveLength(4);
+    expectedSections.forEach(expected => {
+      const match = tier1Pattern.sections.find((s: any) => s.code === expected.code)!;
+      expect(match).toBeDefined();
+      expect(match.name).toBe(expected.name);
+      expect(match.numQuestions).toBe(expected.numQuestions);
+      expect(match.maxMarks).toBe(expected.maxMarks);
+      expect(match.durationMinutes).toBe(expected.durationMinutes);
+    });
+
+    // 2. Verify Mock Test Configuration in MOCK_TESTS_DATA
+    const sscMock = MOCK_TESTS_DATA.find((m: any) => m.slug === 'ssc-cgl-tier-1-full-mock-1')!;
+    expect(sscMock).toBeDefined();
+    expect(sscMock.totalQuestions).toBe(100);
+    expect(sscMock.totalMarks).toBe(200);
+    expect(sscMock.durationMinutes).toBe(60);
+    expect(sscMock.negativeMarkRatio).toBe(0.50);
+
+    sscMock.sections.forEach((sec: any) => {
+      expect(sec.questionCount).toBe(25);
+      expect(sec.marks).toBe(50);
+      expect(sec.durationMinutes).toBe(15);
+    });
+
+    // 3. Verify Deterministic Question Slicer in questionDb
+    const sliced = getFixedQuestionsForMockTest('ssc-cgl-tier-1-full-mock-1');
+    expect(sliced).toHaveLength(100);
+    const reasoningQs = sliced.filter((q: any) => q.sectionCode === 'REASONING');
+    const gaQs = sliced.filter((q: any) => q.sectionCode === 'GA');
+    const quantQs = sliced.filter((q: any) => q.sectionCode === 'QUANT');
+    const englishQs = sliced.filter((q: any) => q.sectionCode === 'ENGLISH');
+
+    expect(reasoningQs).toHaveLength(25);
+    expect(gaQs).toHaveLength(25);
+    expect(quantQs).toHaveLength(25);
+    expect(englishQs).toHaveLength(25);
+
+    // Each SSC question must carry +2.0 marks and -0.50 negative penalty
+    sliced.forEach((q: any) => {
+      expect(q.marks).toBe(2.0);
+      expect(q.negativeMarks).toBe(0.50);
+    });
   });
 });

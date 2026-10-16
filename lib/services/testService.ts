@@ -82,11 +82,13 @@ export async function getMockTestById(
         if (data.success && Array.isArray(data.questions) && data.questions.length > 0) {
           const liveQuestions = data.questions;
           const updatedSections = test.sections.map(sec => {
-            const count = liveQuestions.filter((q: Question) => q.sectionCode === sec.code).length;
+            const secQuestions = liveQuestions.filter((q: Question) => q.sectionCode === sec.code);
+            const count = secQuestions.length;
+            const secMarks = secQuestions.reduce((acc: number, q: Question) => acc + (q.marks || 1), 0);
             return {
               ...sec,
               questionCount: count || sec.questionCount,
-              marks: count || sec.marks,
+              marks: count > 0 ? secMarks : sec.marks,
             };
           });
 
@@ -113,11 +115,13 @@ export async function getMockTestById(
       const liveQuestions = await getLiveExamQuestionsAction(targetKey);
       if (liveQuestions && liveQuestions.length > 0) {
         const updatedSections = test.sections.map(sec => {
-          const count = liveQuestions.filter(q => q.sectionCode === sec.code).length;
+          const secQuestions = liveQuestions.filter(q => q.sectionCode === sec.code);
+          const count = secQuestions.length;
+          const secMarks = secQuestions.reduce((acc, q) => acc + (q.marks || 1), 0);
           return {
             ...sec,
             questionCount: count || sec.questionCount,
-            marks: count || sec.marks,
+            marks: count > 0 ? secMarks : sec.marks,
           };
         });
 

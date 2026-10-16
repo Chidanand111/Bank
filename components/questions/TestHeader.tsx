@@ -7,7 +7,7 @@ import { ShieldCheck, Send, Lock, CheckCircle2, LogOut } from 'lucide-react';
 
 export interface TestHeaderProps {
   testTitle: string;
-  sections: { code: string; name: string }[];
+  sections: { code: string; name: string; durationMinutes?: number }[];
   currentSectionCode: string;
   lockedSectionCodes?: string[];
   onSelectSection: (code: string) => void;
@@ -41,6 +41,8 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
   onExitClick,
 }) => {
   const isComposite = timerType === 'OVERALL_COMPOSITE' || allowSectionSwitch;
+  const currentSectionObj = sections.find(s => s.code === currentSectionCode);
+  const sectionDurationMin = currentSectionObj?.durationMinutes || 20;
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs select-none">
@@ -61,7 +63,7 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
                   </span>
                 ) : isSectionalTimer ? (
                   <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
-                    20m / Section (Official IBPS Pattern)
+                    {sectionDurationMin}m / Section Auto-Lock
                   </span>
                 ) : null}
               </div>
@@ -173,7 +175,7 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
             </span>
           ) : isSectionalTimer ? (
             <span className="text-[11px] text-slate-500 italic ml-auto hidden md:inline">
-              20m section lock active • Auto-advances to next section when timer concludes
+              {sectionDurationMin}m section lock active • Auto-advances to next section when timer concludes
             </span>
           ) : null}
         </div>

@@ -67,8 +67,23 @@ export default async function DynamicExamPage({ params }: ExamPageProps) {
 
   const mockTests = await getMockTests(slug, isAdmin);
 
-  const prelimsPattern = exam.patterns?.find(p => p.stage === 'Prelims') || exam.patterns?.[0];
-  const mainsPattern = exam.patterns?.find(p => p.stage === 'Mains');
+  const prelimsPattern = exam.patterns?.find(p => p.stage === 'Prelims' || p.stage === 'Tier-1' || p.stage === 'CBT-1') || exam.patterns?.[0];
+  const mainsPattern = exam.patterns?.find(p => p.stage === 'Mains' || p.stage === 'Tier-2' || p.stage === 'CBT-2');
+
+  const negativeMarkText = exam.category === 'SSC'
+    ? '-0.50 Per Wrong (+2.0 Correct)'
+    : exam.category === 'RAILWAY'
+    ? '-0.333 Per Wrong (1/3rd)'
+    : '-0.25 Per Wrong';
+
+  const categorySubBadge = exam.category === 'SSC'
+    ? 'SSC EXAM PREP'
+    : exam.category === 'RAILWAY'
+    ? 'RAILWAYS EXAM PREP'
+    : 'BANKING EXAM PREP';
+
+  const firstStageLabel = exam.category === 'SSC' ? 'Tier-1 Pattern' : exam.category === 'RAILWAY' ? 'CBT-1 Pattern' : 'Prelims Pattern';
+  const secondStageLabel = exam.category === 'SSC' ? 'Tier-2 Pattern' : exam.category === 'RAILWAY' ? 'CBT-2 Pattern' : 'Mains Pattern';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
@@ -124,7 +139,7 @@ export default async function DynamicExamPage({ params }: ExamPageProps) {
                     Draft Preview
                   </Badge>
                 )}
-                <Badge variant="slate" size="sm">BANKING EXAM PREP</Badge>
+                <Badge variant="slate" size="sm">{categorySubBadge}</Badge>
               </div>
               <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">{exam.title}</h1>
             </div>
@@ -143,20 +158,20 @@ export default async function DynamicExamPage({ params }: ExamPageProps) {
         {/* Quick Stats Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2 text-xs">
           <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-            <span className="text-slate-500 font-medium block">Prelims Pattern</span>
+            <span className="text-slate-500 font-medium block">{firstStageLabel}</span>
             <span className="text-lg font-bold text-slate-900">
               {prelimsPattern ? `${prelimsPattern.totalQuestions} Qs (${prelimsPattern.totalDurationMinutes} Mins)` : '100 Qs (60 Mins)'}
             </span>
           </div>
           <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-            <span className="text-slate-500 font-medium block">Mains Pattern</span>
+            <span className="text-slate-500 font-medium block">{secondStageLabel}</span>
             <span className="text-lg font-bold text-slate-900">
               {mainsPattern ? `${mainsPattern.totalQuestions} Qs (${mainsPattern.totalDurationMinutes} Mins)` : 'Phase 2 Breakdown'}
             </span>
           </div>
           <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
             <span className="text-slate-500 font-medium block">Negative Marking</span>
-            <span className="text-lg font-bold text-red-600">-0.25 Per Wrong</span>
+            <span className="text-lg font-bold text-red-600">{negativeMarkText}</span>
           </div>
           <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
             <span className="text-slate-500 font-medium block">Available Mocks</span>

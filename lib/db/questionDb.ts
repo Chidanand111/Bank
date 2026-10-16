@@ -556,6 +556,67 @@ export function getFixedQuestionsForMockTest(testIdOrSlug: string): Question[] {
     ];
   }
 
+  // 10. SSC CGL Tier-1 Mock Papers (Official pattern: 25 Reasoning, 25 GA, 25 Quant, 25 English — 100 Qs / 200 Marks / 60 Mins, +2 marks, -0.50 negative)
+  if (norm.includes('ssc-cgl') || (norm.includes('ssc') && (norm.includes('tier') || norm.includes('mock')))) {
+    const gaPool = allQuestions.filter(q => q.sectionCode === 'GA' || q.sectionCode === 'FINANCIAL_AWARENESS');
+    
+    const sliceSscSection = (pool: Question[], start: number, count: number, secCode: string, secName: string): Question[] => {
+      const list: Question[] = [];
+      const sourcePool = pool.length > 0 ? pool : nonPyqQuestions;
+      for (let i = 0; i < count; i++) {
+        const item = sourcePool[(start + i) % (sourcePool.length || 1)];
+        if (item) {
+          list.push({
+            ...item,
+            id: `ssc-${norm}-${secCode.toLowerCase()}-q${i + 1}`,
+            sectionCode: secCode,
+            sectionName: secName,
+            marks: 2.0,
+            negativeMarks: 0.50,
+          });
+        }
+      }
+      return list;
+    };
+
+    return [
+      ...sliceSscSection(reasonPool, 0, 25, 'REASONING', 'General Intelligence & Reasoning'),
+      ...sliceSscSection(gaPool, 0, 25, 'GA', 'General Awareness'),
+      ...sliceSscSection(quantPool, 0, 25, 'QUANT', 'Quantitative Aptitude'),
+      ...sliceSscSection(engPool, 0, 25, 'ENGLISH', 'English Comprehension'),
+    ];
+  }
+
+  // 11. RRB NTPC CBT-1 Mock Papers (Official pattern: 40 GA, 30 Math, 30 Reasoning — 100 Qs / 100 Marks / 90 Mins, +1 mark, -0.333 negative)
+  if (norm.includes('rrb') || norm.includes('ntpc')) {
+    const gaPool = allQuestions.filter(q => q.sectionCode === 'GA' || q.sectionCode === 'FINANCIAL_AWARENESS');
+    
+    const sliceRailwaySection = (pool: Question[], start: number, count: number, secCode: string, secName: string): Question[] => {
+      const list: Question[] = [];
+      const sourcePool = pool.length > 0 ? pool : nonPyqQuestions;
+      for (let i = 0; i < count; i++) {
+        const item = sourcePool[(start + i) % (sourcePool.length || 1)];
+        if (item) {
+          list.push({
+            ...item,
+            id: `rrb-${norm}-${secCode.toLowerCase()}-q${i + 1}`,
+            sectionCode: secCode,
+            sectionName: secName,
+            marks: 1.0,
+            negativeMarks: 0.333,
+          });
+        }
+      }
+      return list;
+    };
+
+    return [
+      ...sliceRailwaySection(gaPool, 0, 40, 'GA', 'General Awareness'),
+      ...sliceRailwaySection(quantPool, 0, 30, 'QUANT', 'Mathematics'),
+      ...sliceRailwaySection(reasonPool, 0, 30, 'REASONING', 'General Intelligence & Reasoning'),
+    ];
+  }
+
   // Default fallback: 100 fixed questions
   return [
     ...sliceSection(engPool, 0, 30, 'ENGLISH', 'English Language'),
