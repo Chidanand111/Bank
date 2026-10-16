@@ -308,24 +308,30 @@ export async function createMockTestAction(
     ? new Date().getFullYear()
     : undefined;
 
-  const defaultSections =
+  const defaultSections: {
+    code: string;
+    name: string;
+    questionCount: number;
+    marks: number;
+    durationMinutes?: number;
+  }[] =
     exam.category === 'RAILWAY'
       ? [
-          { code: 'GA', name: 'General Awareness', questionCount: 40, marks: 40 },
-          { code: 'QUANT', name: 'Mathematics', questionCount: 30, marks: 30 },
-          { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 30, marks: 30 },
+          { code: 'GA', name: 'General Awareness', questionCount: 40, marks: 40, durationMinutes: 30 },
+          { code: 'QUANT', name: 'Mathematics', questionCount: 30, marks: 30, durationMinutes: 30 },
+          { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 30, marks: 30, durationMinutes: 30 },
         ]
       : exam.category === 'SSC'
       ? [
-          { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 25, marks: 50 },
-          { code: 'GA', name: 'General Awareness', questionCount: 25, marks: 50 },
-          { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 25, marks: 50 },
-          { code: 'ENGLISH', name: 'English Comprehension', questionCount: 25, marks: 50 },
+          { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 25, marks: 50, durationMinutes: 15 },
+          { code: 'GA', name: 'General Awareness', questionCount: 25, marks: 50, durationMinutes: 15 },
+          { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 25, marks: 50, durationMinutes: 15 },
+          { code: 'ENGLISH', name: 'English Comprehension', questionCount: 25, marks: 50, durationMinutes: 15 },
         ]
       : [
-          { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30 },
-          { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35 },
-          { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35 },
+          { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30, durationMinutes: 20 },
+          { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35, durationMinutes: 20 },
+          { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35, durationMinutes: 20 },
         ];
 
   const targetSections =
@@ -367,7 +373,7 @@ export async function createMockTestAction(
       name: s.name,
       questionCount: s.questionCount,
       marks: s.marks,
-      durationMinutes: isOverallTimer ? 0 : s.code === 'FINANCIAL_AWARENESS' ? 35 : s.questionCount >= 40 ? 45 : 20,
+      durationMinutes: s.durationMinutes !== undefined ? s.durationMinutes : (exam.category === 'SSC' ? 15 : s.code === 'FINANCIAL_AWARENESS' ? 35 : s.questionCount >= 40 ? 45 : 20),
     })),
     questions: [],
   };

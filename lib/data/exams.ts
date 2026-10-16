@@ -252,7 +252,7 @@ export const EXAMS_DATA: Exam[] = [
             code: 'REASONING',
             numQuestions: 25,
             maxMarks: 50,
-            durationMinutes: 0,
+            durationMinutes: 15,
             topics: ['Analogies', 'Classification', 'Series', 'Venn Diagrams', 'Coding-Decoding']
           },
           {
@@ -261,7 +261,7 @@ export const EXAMS_DATA: Exam[] = [
             code: 'GA',
             numQuestions: 25,
             maxMarks: 50,
-            durationMinutes: 0,
+            durationMinutes: 15,
             topics: ['Current Affairs', 'History', 'Polity', 'Geography', 'Economics', 'General Science']
           },
           {
@@ -270,7 +270,7 @@ export const EXAMS_DATA: Exam[] = [
             code: 'QUANT',
             numQuestions: 25,
             maxMarks: 50,
-            durationMinutes: 0,
+            durationMinutes: 15,
             topics: ['Arithmetic', 'Algebra', 'Geometry', 'Trigonometry', 'Data Interpretation']
           },
           {
@@ -279,7 +279,7 @@ export const EXAMS_DATA: Exam[] = [
             code: 'ENGLISH',
             numQuestions: 25,
             maxMarks: 50,
-            durationMinutes: 0,
+            durationMinutes: 15,
             topics: ['Reading Comprehension', 'Error Spotting', 'Active/Passive Voice', 'Direct/Indirect Speech']
           }
         ]

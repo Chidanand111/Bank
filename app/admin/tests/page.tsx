@@ -117,10 +117,16 @@ export default function AdminTestsPage() {
   const handleCreateTest = (e: React.FormEvent) => {
     e.preventDefault();
 
-    let sections = [
-      { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30 },
-      { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35 },
-      { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35 },
+    let sections: {
+      code: string;
+      name: string;
+      questionCount: number;
+      marks: number;
+      durationMinutes?: number;
+    }[] = [
+      { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30, durationMinutes: 20 },
+      { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35, durationMinutes: 20 },
+      { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35, durationMinutes: 20 },
     ];
 
     let isComposite = false;
@@ -138,10 +144,10 @@ export default function AdminTestsPage() {
       stage = 'Mains';
     } else if (sectionPreset === 'SSC_TIER1_4') {
       sections = [
-        { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 25, marks: 50 },
-        { code: 'GA', name: 'General Awareness', questionCount: 25, marks: 50 },
-        { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 25, marks: 50 },
-        { code: 'ENGLISH', name: 'English Comprehension', questionCount: 25, marks: 50 },
+        { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 25, marks: 50, durationMinutes: 15 },
+        { code: 'GA', name: 'General Awareness', questionCount: 25, marks: 50, durationMinutes: 15 },
+        { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 25, marks: 50, durationMinutes: 15 },
+        { code: 'ENGLISH', name: 'English Comprehension', questionCount: 25, marks: 50, durationMinutes: 15 },
       ];
       isComposite = true;
       timerType = 'OVERALL_COMPOSITE';

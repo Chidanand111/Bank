@@ -69,15 +69,23 @@ export class MockTestRepository {
         };
       });
 
+      const isSsc = t.exam?.category === 'SSC';
       const sections = t.exam?.sections && t.exam.sections.length > 0
         ? t.exam.sections.map(s => ({
             id: s.id,
             code: s.code,
             name: s.name,
-            questionCount: s.code === 'FINANCIAL_AWARENESS' ? 40 : 35,
-            marks: s.code === 'FINANCIAL_AWARENESS' ? 40 : 35,
-            durationMinutes: s.code === 'FINANCIAL_AWARENESS' ? 35 : 20,
+            questionCount: isSsc ? 25 : s.code === 'FINANCIAL_AWARENESS' ? 40 : 35,
+            marks: isSsc ? 50 : s.code === 'FINANCIAL_AWARENESS' ? 40 : 35,
+            durationMinutes: isSsc ? 15 : s.code === 'FINANCIAL_AWARENESS' ? 35 : 20,
           }))
+        : isSsc
+        ? [
+            { id: `sec-${t.slug}-reason`, code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 25, marks: 50, durationMinutes: 15 },
+            { id: `sec-${t.slug}-ga`, code: 'GA', name: 'General Awareness', questionCount: 25, marks: 50, durationMinutes: 15 },
+            { id: `sec-${t.slug}-quant`, code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 25, marks: 50, durationMinutes: 15 },
+            { id: `sec-${t.slug}-eng`, code: 'ENGLISH', name: 'English Comprehension', questionCount: 25, marks: 50, durationMinutes: 15 },
+          ]
         : [
             { id: `sec-${t.slug}-eng`, code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30, durationMinutes: 20 },
             { id: `sec-${t.slug}-quant`, code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35, durationMinutes: 20 },
@@ -180,15 +188,23 @@ export class MockTestRepository {
       };
     });
 
+    const isSsc = t.exam?.category === 'SSC';
     const sections = t.exam?.sections && t.exam.sections.length > 0
       ? t.exam.sections.map(s => ({
           id: s.id,
           code: s.code,
           name: s.name,
-          questionCount: s.code === 'FINANCIAL_AWARENESS' ? 40 : 35,
-          marks: s.code === 'FINANCIAL_AWARENESS' ? 40 : 35,
-          durationMinutes: s.code === 'FINANCIAL_AWARENESS' ? 35 : 20,
+          questionCount: isSsc ? 25 : s.code === 'FINANCIAL_AWARENESS' ? 40 : 35,
+          marks: isSsc ? 50 : s.code === 'FINANCIAL_AWARENESS' ? 40 : 35,
+          durationMinutes: isSsc ? 15 : s.code === 'FINANCIAL_AWARENESS' ? 35 : 20,
         }))
+      : isSsc
+      ? [
+          { id: `sec-${t.slug}-reason`, code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 25, marks: 50, durationMinutes: 15 },
+          { id: `sec-${t.slug}-ga`, code: 'GA', name: 'General Awareness', questionCount: 25, marks: 50, durationMinutes: 15 },
+          { id: `sec-${t.slug}-quant`, code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 25, marks: 50, durationMinutes: 15 },
+          { id: `sec-${t.slug}-eng`, code: 'ENGLISH', name: 'English Comprehension', questionCount: 25, marks: 50, durationMinutes: 15 },
+        ]
       : [
           { id: `sec-${t.slug}-eng`, code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30, durationMinutes: 20 },
           { id: `sec-${t.slug}-quant`, code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35, durationMinutes: 20 },

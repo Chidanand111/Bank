@@ -72,10 +72,10 @@ describe('TimerPolicy Engine', () => {
     allowSectionSwitch: true,
     negativeMarkRatio: 0.50,
     sections: [
-      { id: 's1', code: 'REASONING', name: 'General Intelligence', durationMinutes: 0, questionCount: 1, marks: 50 },
-      { id: 's2', code: 'GA', name: 'General Awareness', durationMinutes: 0, questionCount: 1, marks: 50 },
-      { id: 's3', code: 'QUANT', name: 'Quantitative Aptitude', durationMinutes: 0, questionCount: 1, marks: 50 },
-      { id: 's4', code: 'ENGLISH', name: 'English Comprehension', durationMinutes: 0, questionCount: 1, marks: 50 },
+      { id: 's1', code: 'REASONING', name: 'General Intelligence', durationMinutes: 15, questionCount: 25, marks: 50 },
+      { id: 's2', code: 'GA', name: 'General Awareness', durationMinutes: 15, questionCount: 25, marks: 50 },
+      { id: 's3', code: 'QUANT', name: 'Quantitative Aptitude', durationMinutes: 15, questionCount: 25, marks: 50 },
+      { id: 's4', code: 'ENGLISH', name: 'English Comprehension', durationMinutes: 15, questionCount: 25, marks: 50 },
     ],
     questions: [],
   };
@@ -164,6 +164,20 @@ describe('TimerPolicy Engine', () => {
       expect(overallCompositeTimerPolicy.canNavigateToSection(state, 'GA', sscMockTest)).toBe(true);
       expect(overallCompositeTimerPolicy.canNavigateToSection(state, 'QUANT', sscMockTest)).toBe(true);
       expect(overallCompositeTimerPolicy.canNavigateToSection(state, 'ENGLISH', sscMockTest)).toBe(true);
+
+      // Verify exact section allocations: 25 Qs, 50 Marks, 15 Mins per section
+      expect(sscMockTest.sections).toHaveLength(4);
+      sscMockTest.sections.forEach(sec => {
+        expect(sec.questionCount).toBe(25);
+        expect(sec.marks).toBe(50);
+        expect(sec.durationMinutes).toBe(15);
+      });
+      const totalSecTime = sscMockTest.sections.reduce((sum, s) => sum + (s.durationMinutes || 0), 0);
+      const totalSecMarks = sscMockTest.sections.reduce((sum, s) => sum + s.marks, 0);
+      const totalSecQuestions = sscMockTest.sections.reduce((sum, s) => sum + s.questionCount, 0);
+      expect(totalSecTime).toBe(60);
+      expect(totalSecMarks).toBe(200);
+      expect(totalSecQuestions).toBe(100);
     });
 
     it('initializes 90-minute countdown for Railway NTPC', () => {
