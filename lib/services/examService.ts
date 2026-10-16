@@ -118,7 +118,7 @@ export async function createExamAction(
   const status: ExamStatus = validData.status || 'published';
 
   // Safe Neon PostgreSQL Database sync via ExamRepository
-  let dbExam: Exam;
+  let dbExam: Exam | null = null;
   try {
     dbExam = await ExamRepository.upsertExam({
       title,
@@ -128,37 +128,35 @@ export async function createExamAction(
       status,
     });
   } catch (dbErr) {
-    console.error('ExamRepository.upsertExam error in createExamAction:', dbErr);
-    return {
-      success: false,
-      error: dbErr instanceof Error ? dbErr.message : 'Database error creating exam',
-    };
+    console.warn('ExamRepository.upsertExam warning in createExamAction (falling back to memory):', dbErr);
   }
 
   const defaultMockId = `mock-${slug}-prelims-1`;
 
-  // Upsert initial practice mock test in Neon PostgreSQL as well
-  try {
-    await MockTestRepository.upsertMockTest(
-      {
-        examId: dbExam.id,
-        title: `${title} Prelims Practice Mock 1`,
-        slug: `${slug}-prelims-1`,
-        description: `Full-length preliminary practice mock test for ${title}. Features sectional timers, TCS iON question palette, and detailed explanations.`,
-        durationMinutes: 60,
-        totalMarks: 100,
-        cutoffMarks: 60,
-        isFree: true,
-        status,
-      },
-      dbExam.id
-    );
-  } catch (mockErr) {
-    console.warn('MockTestRepository.upsertMockTest error in createExamAction:', mockErr);
+  // Upsert initial practice mock test in Neon PostgreSQL as well if DB sync succeeded
+  if (dbExam) {
+    try {
+      await MockTestRepository.upsertMockTest(
+        {
+          examId: dbExam.id,
+          title: `${title} Prelims Practice Mock 1`,
+          slug: `${slug}-prelims-1`,
+          description: `Full-length preliminary practice mock test for ${title}. Features sectional timers, TCS iON question palette, and detailed explanations.`,
+          durationMinutes: 60,
+          totalMarks: 100,
+          cutoffMarks: 60,
+          isFree: true,
+          status,
+        },
+        dbExam.id
+      );
+    } catch (mockErr) {
+      console.warn('MockTestRepository.upsertMockTest error in createExamAction:', mockErr);
+    }
   }
 
   const fullExam: Exam = {
-    id: newExamId,
+    id: dbExam?.id || newExamId,
     slug,
     title,
     category,

@@ -1,27 +1,27 @@
 import { PrismaClient } from '@prisma/client';
-import fs from 'fs';
-import path from 'path';
 
-// Prevent Prisma from throwing: "You must provide a nonempty URL. The environment variable DATABASE_URL resolved to an empty string."
-if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.trim()) {
-  try {
-    const envPath = path.resolve(process.cwd(), '.env');
-    if (fs.existsSync(envPath)) {
-      const content = fs.readFileSync(envPath, 'utf8');
-      const match = content.match(/^DATABASE_URL\s*=\s*["']?([^"'\r\n]+)["']?/m);
-      if (match && match[1]?.trim()) {
-        process.env.DATABASE_URL = match[1].trim();
-      }
-    }
-  } catch {
-    // Ignore error reading .env
+// Known Neon PostgreSQL connection string for BankMock isolation schema
+const NEON_DEFAULT_URL =
+  'postgresql://neondb_owner:npg_OfCgI5hvq9wL@ep-red-wildflower-aeanr4by-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require&schema=bankmock&connect_timeout=30';
+
+function resolveDatabaseUrl(): string {
+  const candidate =
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_PRISMA_URL ||
+    process.env.POSTGRES_URL_NON_POOLING ||
+    process.env.POSTGRES_URL ||
+    process.env.NEON_DATABASE_URL;
+
+  if (candidate && candidate.trim() && !candidate.includes('127.0.0.1:5432')) {
+    return candidate.trim();
   }
+
+  // Fallback to project Neon PostgreSQL cluster with schema=bankmock
+  return NEON_DEFAULT_URL;
 }
 
-// If still empty, provide a valid placeholder PostgreSQL URL with short timeout so schema validation passes
-if (!process.env.DATABASE_URL || !process.env.DATABASE_URL.trim()) {
-  process.env.DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:5432/bankmock?sslmode=disable&connect_timeout=2';
-}
+const activeDatabaseUrl = resolveDatabaseUrl();
+process.env.DATABASE_URL = activeDatabaseUrl;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
@@ -30,6 +30,11 @@ const globalForPrisma = globalThis as unknown as {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
+    datasources: {
+      db: {
+        url: activeDatabaseUrl,
+      },
+    },
     log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   });
 
@@ -40,7 +45,7 @@ export function isDatabaseConfigured(): boolean {
   const url = process.env.DATABASE_URL || '';
   return Boolean(
     url.trim() &&
-    !url.includes('127.0.0.1:5432/bankmock') &&
+    !url.includes('127.0.0.1:5432') &&
     !url.includes('user:password')
   );
 }

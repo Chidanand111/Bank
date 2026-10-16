@@ -129,27 +129,36 @@ export class ExamRepository {
       include: { sections: { include: { topics: true } } },
     });
 
-    // Ensure 4 standard sections exist for this exam
-    await prisma.section.upsert({
-      where: { examId_code: { examId: dbExam.id, code: 'ENGLISH' } },
-      update: { name: 'English Language', order: 1 },
-      create: { id: `sec-${slug}-eng`, examId: dbExam.id, code: 'ENGLISH', name: 'English Language', order: 1 },
-    });
-    await prisma.section.upsert({
-      where: { examId_code: { examId: dbExam.id, code: 'QUANT' } },
-      update: { name: 'Quantitative Aptitude', order: 2 },
-      create: { id: `sec-${slug}-quant`, examId: dbExam.id, code: 'QUANT', name: 'Quantitative Aptitude', order: 2 },
-    });
-    await prisma.section.upsert({
-      where: { examId_code: { examId: dbExam.id, code: 'REASONING' } },
-      update: { name: 'Reasoning Ability', order: 3 },
-      create: { id: `sec-${slug}-reason`, examId: dbExam.id, code: 'REASONING', name: 'Reasoning Ability', order: 3 },
-    });
-    await prisma.section.upsert({
-      where: { examId_code: { examId: dbExam.id, code: 'FINANCIAL_AWARENESS' } },
-      update: { name: 'General / Banking Awareness', order: 4 },
-      create: { id: `sec-${slug}-ga`, examId: dbExam.id, code: 'FINANCIAL_AWARENESS', name: 'General / Banking Awareness', order: 4 },
-    });
+    // Ensure 4 standard sections exist for this exam safely
+    const ensureSection = async (code: string, name: string, order: number) => {
+      const existing = await prisma.section.findFirst({
+        where: { examId: dbExam.id, code },
+      });
+      if (!existing) {
+        const candidateId = `sec-${slug}-${code.toLowerCase()}`;
+        const idExists = await prisma.section.findUnique({ where: { id: candidateId } });
+        const finalId = idExists ? `${candidateId}-${Date.now().toString(36)}` : candidateId;
+        await prisma.section.create({
+          data: {
+            id: finalId,
+            examId: dbExam.id,
+            code,
+            name,
+            order,
+          },
+        });
+      } else {
+        await prisma.section.update({
+          where: { id: existing.id },
+          data: { name, order },
+        });
+      }
+    };
+
+    await ensureSection('ENGLISH', 'English Language', 1);
+    await ensureSection('QUANT', 'Quantitative Aptitude', 2);
+    await ensureSection('REASONING', 'Reasoning Ability', 3);
+    await ensureSection('FINANCIAL_AWARENESS', 'General / Banking Awareness', 4);
 
     const updated = await this.findByIdOrSlug(dbExam.id);
     return updated!;
