@@ -1,6 +1,7 @@
 import React from 'react';
 import { requireUser } from '@/lib/auth/permissions';
 import { getDashboardStats } from '@/lib/services/testService';
+import { getUserAttemptsAction } from '@/lib/services/adminService';
 import { RecentAttemptCard } from '@/components/dashboard/RecentAttemptCard';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -9,7 +10,9 @@ import Link from 'next/link';
 
 export default async function MyResultsPage() {
   const user = await requireUser('/my-results');
+  const dbAttempts = await getUserAttemptsAction(user.id);
   const stats = getDashboardStats();
+  const attempts = dbAttempts.length > 0 ? dbAttempts : stats.recentAttempts;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
@@ -40,13 +43,13 @@ export default async function MyResultsPage() {
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
             <FileCheck2 className="w-5 h-5 text-blue-600" />
-            Completed Test Attempts ({stats.recentAttempts.length})
+            Completed Test Attempts ({attempts.length})
           </h2>
         </div>
 
-        {stats.recentAttempts.length > 0 ? (
+        {attempts.length > 0 ? (
           <div className="space-y-4">
-            {stats.recentAttempts.map((attempt) => (
+            {attempts.map((attempt) => (
               <RecentAttemptCard key={attempt.id} attempt={attempt} />
             ))}
           </div>

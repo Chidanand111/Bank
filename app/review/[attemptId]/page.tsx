@@ -3,6 +3,7 @@
 import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getAttemptResultById } from '@/lib/services/testService';
+import { getAttemptByIdAction } from '@/lib/services/adminService';
 import { AttemptResult, Question } from '@/types';
 import { QuestionCard } from '@/components/questions/QuestionCard';
 import { Button } from '@/components/ui/Button';
@@ -21,8 +22,16 @@ export default function ReviewPage({ params }: ReviewPageProps) {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CORRECT' | 'INCORRECT' | 'UNATTEMPTED'>('ALL');
 
   useEffect(() => {
+    // 1. Try local storage for instant hydration
     const data = getAttemptResultById(attemptId);
-    if (data) setResult(data);
+    if (data) {
+      setResult(data);
+    } else {
+      // 2. Fall back to Neon PostgreSQL Database
+      getAttemptByIdAction(attemptId).then(dbData => {
+        if (dbData) setResult(dbData);
+      });
+    }
   }, [attemptId]);
 
   if (!result || !result.questionDetails || result.questionDetails.length === 0) {

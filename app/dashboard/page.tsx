@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getDashboardStats } from '@/lib/services/testService';
+import { getUserAttemptsAction } from '@/lib/services/adminService';
 import { DashboardStats } from '@/types';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { RecentAttemptCard } from '@/components/dashboard/RecentAttemptCard';
@@ -26,8 +27,33 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
   useEffect(() => {
-    const data = getDashboardStats();
-    setStats(data);
+    const localData = getDashboardStats();
+    getUserAttemptsAction()
+      .then(dbAttempts => {
+        if (dbAttempts && dbAttempts.length > 0) {
+          const totalTests = dbAttempts.length;
+          const totalScore = dbAttempts.reduce((acc, a) => acc + a.score, 0);
+          const avgScore = parseFloat((totalScore / totalTests).toFixed(1));
+          const avgAcc = parseFloat((dbAttempts.reduce((acc, a) => acc + a.accuracy, 0) / totalTests).toFixed(1));
+          const totalTime = dbAttempts.reduce((acc, a) => acc + a.timeTakenSeconds, 0);
+          const bestScore = Math.max(...dbAttempts.map(a => a.score), 0);
+          setStats({
+            totalTestsAttempted: totalTests,
+            averageScore: avgScore,
+            bestScore,
+            averageAccuracy: avgAcc,
+            totalTimeSpentMinutes: Math.round(totalTime / 60),
+            recentAttempts: dbAttempts,
+            sectionPerformance: localData.sectionPerformance,
+            weakTopics: localData.weakTopics,
+          });
+        } else {
+          setStats(localData);
+        }
+      })
+      .catch(() => {
+        setStats(localData);
+      });
   }, []);
 
   if (!stats) {

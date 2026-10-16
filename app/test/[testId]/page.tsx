@@ -3,6 +3,7 @@
 import React, { useState, useEffect, use, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getMockTestById, saveAttemptResult } from '@/lib/services/testService';
+import { saveAttemptAction } from '@/lib/services/adminService';
 import { calculateAttemptResult } from '@/lib/scoring/scoreCalculator';
 import { MockTest, Question, QuestionStatus, UserResponseState } from '@/types';
 import { TestHeader } from '@/components/questions/TestHeader';
@@ -173,27 +174,6 @@ export default function TestPage({ params }: TestPageProps) {
     loadTest();
   }, [testId, storageKey]);
 
-  // Clean up in-progress answers on exit without submitting
-  useEffect(() => {
-    const handleUnloadExit = () => {
-      if (!isSubmittedRef.current) {
-        try {
-          localStorage.removeItem(storageKey);
-          localStorage.removeItem(`bankmock_proctoring_strikes_${testId}`);
-        } catch {
-          // ignore
-        }
-      }
-    };
-
-    window.addEventListener('beforeunload', handleUnloadExit);
-    window.addEventListener('pagehide', handleUnloadExit);
-    return () => {
-      window.removeEventListener('beforeunload', handleUnloadExit);
-      window.removeEventListener('pagehide', handleUnloadExit);
-    };
-  }, [storageKey, testId]);
-
   // Autosave responses, timers, and locks to localStorage
   useEffect(() => {
     if (!test || loading || isSubmittedRef.current) return;
@@ -229,7 +209,7 @@ export default function TestPage({ params }: TestPageProps) {
     testId,
   ]);
 
-  // Submit Test logic
+  // Submit Test logic with server-side Neon PostgreSQL persistence
   const executeSubmission = useCallback(() => {
     if (!test || isSubmitting) return;
     isSubmittedRef.current = true;
@@ -243,10 +223,15 @@ export default function TestPage({ params }: TestPageProps) {
     const attemptId = `att-${Date.now()}`;
     const result = calculateAttemptResult(test, responses, totalTimeTaken, attemptId);
 
-    // Save result to localStorage
+    // 1. Save result to localStorage for instant local render & offline resilience
     saveAttemptResult(result);
 
-    // Clear saved progress
+    // 2. Persist to Neon PostgreSQL Database asynchronously
+    saveAttemptAction(result).catch(err => {
+      console.warn('Background Neon DB attempt persistence error:', err);
+    });
+
+    // 3. Clear in-progress exam session state
     try {
       localStorage.removeItem(storageKey);
       localStorage.removeItem(`bankmock_proctoring_strikes_${testId}`);

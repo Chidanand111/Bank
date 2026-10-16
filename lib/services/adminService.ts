@@ -222,6 +222,20 @@ export async function getAdminAllAttempts(): Promise<AttemptResult[]> {
   return attemptService.getAdminAllAttempts();
 }
 
+export async function saveAttemptAction(
+  result: AttemptResult
+): Promise<{ success: boolean; attemptId?: string; error?: string }> {
+  return attemptService.saveAttemptAction(result);
+}
+
+export async function getAttemptByIdAction(attemptId: string): Promise<AttemptResult | null> {
+  return attemptService.getAttemptByIdAction(attemptId);
+}
+
+export async function getUserAttemptsAction(userId?: string): Promise<AttemptResult[]> {
+  return attemptService.getUserAttemptsAction(userId);
+}
+
 // ============================================================================
 // Admin Statistics Aggregator
 // ============================================================================

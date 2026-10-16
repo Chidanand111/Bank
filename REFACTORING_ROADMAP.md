@@ -1,8 +1,8 @@
 # BankMock Architecture & Refactoring Roadmap
 
-> **Current Status**: Phase 0, Phase 1 & Phase 2 **COMPLETED**  
+> **Current Status**: Phase 0, Phase 1, Phase 2, Phase 3 & Phase 4 **COMPLETED**  
 > **Database Environment**: Neon Serverless PostgreSQL with pooler (`schema=bankmock` isolated)  
-> **Test Status**: 23/23 Vitest unit tests passing | End-to-end integration tests passing | 0 ESLint errors | Production build passing (Turbopack)
+> **Test Status**: 42/42 Vitest unit tests passing | End-to-end integration tests passing | 0 ESLint errors | Production build passing (Turbopack)
 
 ---
 
@@ -96,18 +96,25 @@ npm test
 
 ---
 
-### ⏳ Phase 4: Exam Engine Robustness & Player Invariants
+### ✅ Phase 4: Exam Engine Robustness & Player Invariants (COMPLETED - 2026-10-16)
 **Goal**: Ensure bulletproof exam simulation integrity for high-stakes banking exam aspirants.
 
-1. **Invariants Enforcement**:
-   - Total duration: Strictly 60 minutes.
-   - Section Locks: 3 × 20-minute non-transferable section timers (English, Quant, Reasoning).
-   - Scoring Invariant: Exactly +1.0 for correct answers, -0.25 for incorrect answers, 0 for unattempted.
-2. **Attempt State Synchronization**:
-   - Periodic auto-save of candidate answers to PostgreSQL or session store to prevent data loss on browser refresh.
-   - Server-side validation of time limits on submission to prevent client-side timer manipulation.
-3. **KaTeX Math & Symbol Rendering**:
-   - Ensure math equations, currency symbols, and fractions render crisply without SSR layout shifts.
+1. **Invariants Enforcement & Section Locking**:
+   - Strictly enforced 60 minutes overall exam duration with 3 × 20-minute non-transferable section locks (English: 20m, Quant: 20m, Reasoning: 20m).
+   - Once a section concludes or candidate advances, the section is permanently locked with `CheckCircle2` indicators, auto-transition modals, and strict navigation guards.
+   - Enforced canonical banking marking scheme (+1.0 for correct, -0.25 for incorrect, 0 for unattempted), validated via unit tests in `tests/phase4-engine.test.ts`.
+2. **Browser Refresh Resilience (Zero Data Loss)**:
+   - Eliminated premature `beforeunload`/`pagehide` storage wipeouts in `app/test/[testId]/page.tsx`.
+   - On accidental browser refresh or disconnect, candidate selected responses, visited states, sectional timer seconds, and proctoring strikes are seamlessly restored.
+   - Session storage is only cleared upon explicit candidate exam exit or verified final submission.
+3. **Neon PostgreSQL Attempt & Answer Persistence**:
+   - Created `saveAttemptAction` in `lib/services/attemptService.ts` creating `prisma.attempt` records and transactional `prisma.answer` entries with server-side time bounds validation.
+   - Created `getAttemptByIdAction` and `getUserAttemptsAction` enabling cross-device access to exam scorecards (`/result/[attemptId]`) and review solutions (`/review/[attemptId]`).
+   - Realigned candidate dashboard (`/dashboard`) and personal scorecards (`/my-results`) to hydrate real attempts from Neon PostgreSQL with offline fallback.
+4. **Verification**:
+   - 42/42 Vitest unit tests pass in 1.64s (`tests/phase4-engine.test.ts`).
+   - End-to-end integration test (`scripts/verify-phase4-engine-and-attempts.ts`) passes 100%.
+   - Full production build compiles with Turbopack across all 27 routes with 0 errors.
 
 ---
 
