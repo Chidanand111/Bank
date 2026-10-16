@@ -490,8 +490,12 @@ export default function AdminQuestionsPage() {
     startTransition(async () => {
       const res = await createMockTestAction(inputData);
       if (res.success && res.test) {
-        const parts = await getAdminPartitions();
-        setPartitions(parts);
+        const [parts, freshExams] = await Promise.all([
+          getAdminPartitions(),
+          getAdminExams(),
+        ]);
+        if (parts) setPartitions(parts);
+        if (freshExams) setExams(freshExams);
         setActivePartitionId(res.test.id);
         setIsCreatePyqModalOpen(false);
         setPromptExamTitle(res.test.title);

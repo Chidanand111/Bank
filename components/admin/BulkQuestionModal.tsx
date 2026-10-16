@@ -4,8 +4,12 @@ import React, { useState, useEffect, useTransition } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { AdminQuestionInput, Difficulty } from '@/types';
-import { bulkImportQuestionsAction } from '@/lib/services/adminService';
+import { AdminQuestionInput, AdminPartitionInfo, Difficulty, Exam } from '@/types';
+import {
+  bulkImportQuestionsAction,
+  getAdminPartitions,
+  getAdminExams,
+} from '@/lib/services/adminService';
 import { MathRenderer } from '../ui/MathRenderer';
 import { compressDataUrl } from '@/lib/utils/imageCompressor';
 import {
@@ -23,7 +27,7 @@ export interface BulkQuestionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: (count: number) => void;
-  partitions: { id: string; label: string }[];
+  partitions: { id: string; label: string; category?: string; isPyq?: boolean; pyqYear?: number }[];
   currentPartitionId: string;
   exams?: { id: string; title: string; category?: string }[];
 }
@@ -56,6 +60,9 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
   currentPartitionId,
   exams = [],
 }) => {
+  const [modalPartitions, setModalPartitions] = useState<AdminPartitionInfo[]>(partitions as any);
+  const [modalExams, setModalExams] = useState(exams);
+
   const [selectedExamId, setSelectedExamId] = useState<string>(
     exams[0]?.id || 'exam-ibps-po'
   );
@@ -65,19 +72,51 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      // 1. Immediately fetch fresh live partitions and exams from database so newly added items appear instantly
+      Promise.all([getAdminPartitions(), getAdminExams()])
+        .then(([freshParts, freshExams]) => {
+          if (freshParts && freshParts.length > 0) {
+            setModalPartitions(freshParts);
+          }
+          if (freshExams && freshExams.length > 0) {
+            setModalExams(freshExams);
+          }
+        })
+        .catch((err) => console.warn('Could not refresh partitions/exams on modal open:', err));
+
       if (currentPartitionId && currentPartitionId !== 'ALL') {
         setSelectedPartition(currentPartitionId);
         if (currentPartitionId.startsWith('exam-')) {
           setSelectedExamId(currentPartitionId);
         } else {
-          const matchingExam = exams.find(e => e.id === currentPartitionId);
+          const matchingExam = exams.find((e) => e.id === currentPartitionId);
           if (matchingExam) setSelectedExamId(matchingExam.id);
         }
       } else if (exams && exams.length > 0) {
         setSelectedExamId(exams[0].id);
       }
     }
-  }, [isOpen, currentPartitionId, exams]);
+  }, [isOpen, currentPartitionId, exams, partitions]);
+
+  const handlePartitionChange = (partId: string) => {
+    setSelectedPartition(partId);
+    const found = modalPartitions.find((p) => p.id === partId);
+    if (found) {
+      if (found.category === 'EXAM') {
+        setSelectedExamId(found.id);
+      } else if (found.examId && found.examId !== 'ALL') {
+        setSelectedExamId(found.examId);
+      }
+    }
+  };
+
+  const handleExamChange = (newExamId: string) => {
+    setSelectedExamId(newExamId);
+    const matchingExamPart = modalPartitions.find((p) => p.id === newExamId);
+    if (matchingExamPart) {
+      setSelectedPartition(matchingExamPart.id);
+    }
+  };
 
   const [parsedQuestions, setParsedQuestions] = useState<AdminQuestionInput[]>([]);
   const [parseErrors, setParseErrors] = useState<string[]>([]);
@@ -728,17 +767,17 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
 
         {/* Step 2: Target Exam & Partition Selection */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {exams && exams.length > 0 && (
+          {modalExams && modalExams.length > 0 && (
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 block">
                 Target Banking Exam:
               </label>
               <select
                 value={selectedExamId}
-                onChange={(e) => setSelectedExamId(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+                onChange={(e) => handleExamChange(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
               >
-                {exams.map((ex) => (
+                {modalExams.map((ex) => (
                   <option key={ex.id} value={ex.id}>
                     {ex.title}
                   </option>
@@ -753,14 +792,46 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
             </label>
             <select
               value={selectedPartition}
-              onChange={(e) => setSelectedPartition(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
+              onChange={(e) => handlePartitionChange(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
             >
-              {partitions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label} {p.id === 'ALL' ? '(Master Question Bank)' : ''}
-                </option>
-              ))}
+              <option value="ALL">🌐 All Questions (Master Question Bank)</option>
+
+              {modalPartitions.filter(p => p.category === 'EXAM' || p.id.startsWith('exam-')).length > 0 && (
+                <optgroup label="🏛️ Target Banking Exams">
+                  {modalPartitions
+                    .filter(p => p.category === 'EXAM' || p.id.startsWith('exam-'))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+
+              {modalPartitions.filter(p => p.category === 'PYQ' || p.isPyq).length > 0 && (
+                <optgroup label="★ Official Previous Year Papers (PYQ)">
+                  {modalPartitions
+                    .filter(p => p.category === 'PYQ' || p.isPyq)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label} {p.pyqYear ? `(${p.pyqYear})` : ''}
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+
+              {modalPartitions.filter(p => p.id !== 'ALL' && !p.isPyq && p.category !== 'EXAM' && !p.id.startsWith('exam-')).length > 0 && (
+                <optgroup label="🎯 Full Practice Mock Tests">
+                  {modalPartitions
+                    .filter(p => p.id !== 'ALL' && !p.isPyq && p.category !== 'EXAM' && !p.id.startsWith('exam-'))
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.label}
+                      </option>
+                    ))}
+                </optgroup>
+              )}
             </select>
           </div>
         </div>
