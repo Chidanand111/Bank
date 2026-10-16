@@ -1453,6 +1453,11 @@ export default function AdminQuestionsPage() {
                   {ex.title}
                 </option>
               ))}
+              {examId && examId !== 'ALL' && !exams.some((ex) => ex.id === examId) && (
+                <option value={examId}>
+                  {partitions.find((p) => p.id === examId)?.label || examId}
+                </option>
+              )}
             </select>
           </div>
 
@@ -2557,11 +2562,21 @@ export default function AdminQuestionsPage() {
       <BulkQuestionModal
         isOpen={isBulkModalOpen}
         onClose={() => setIsBulkModalOpen(false)}
-        onSuccess={(count) => {
+        onSuccess={async (count) => {
           setFeedback({
             text: `Successfully bulk imported ${count} questions into the question repository.`,
             type: 'success',
           });
+          try {
+            const [freshParts, freshExams] = await Promise.all([
+              getAdminPartitions(),
+              getAdminExams(),
+            ]);
+            if (freshParts && freshParts.length > 0) setPartitions(freshParts);
+            if (freshExams && freshExams.length > 0) setExams(freshExams);
+          } catch (e) {
+            console.warn('Failed to refresh partitions/exams after bulk import:', e);
+          }
           loadQuestions();
         }}
         partitions={partitions}

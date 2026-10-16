@@ -143,11 +143,11 @@ export class QuestionRepository {
 
     if (!dbExam && input.examId) {
       const cleanSlug = input.examId.replace(/^exam-/, '');
-      const titleToUse = cleanSlug.toUpperCase();
+      const titleToUse = cleanSlug.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
       try {
         dbExam = await prisma.exam.upsert({
           where: { slug: cleanSlug },
-          update: { title: titleToUse },
+          update: { isActive: true },
           create: {
             id: input.examId.startsWith('exam-') ? input.examId : `exam-${cleanSlug}`,
             slug: cleanSlug,

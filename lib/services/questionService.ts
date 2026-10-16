@@ -475,10 +475,12 @@ export async function bulkImportQuestionsAction(
           inputToUse.mockTestId = undefined;
         } else {
           inputToUse.mockTestId = partitionId;
-          if (partitionId.toLowerCase().includes('sbi') || partitionId.toLowerCase().includes('clerk')) {
-            inputToUse.examId = 'exam-sbi-clerk';
-          } else if (!inputToUse.examId) {
-            inputToUse.examId = 'exam-ibps-po';
+          if (!inputToUse.examId || inputToUse.examId === 'ALL') {
+            if (partitionId.toLowerCase().includes('sbi') || partitionId.toLowerCase().includes('clerk')) {
+              inputToUse.examId = 'exam-sbi-clerk';
+            } else {
+              inputToUse.examId = 'exam-ibps-po';
+            }
           }
         }
       }

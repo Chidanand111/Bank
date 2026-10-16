@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -63,6 +63,31 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
   const [modalPartitions, setModalPartitions] = useState<AdminPartitionInfo[]>(partitions as any);
   const [modalExams, setModalExams] = useState(exams);
 
+  // Merge modalExams and all exam partitions from modalPartitions to ensure 100% presence of all exams
+  const combinedExams = useMemo(() => {
+    const list: { id: string; title: string; category?: string; slug?: string }[] = [...modalExams];
+    for (const p of modalPartitions) {
+      if (p.category === 'EXAM' || p.id.startsWith('exam-')) {
+        const cleanSlug = p.id.replace(/^exam-/, '');
+        const alreadyExists = list.some(
+          (ex) =>
+            ex.id === p.id ||
+            ex.slug === cleanSlug ||
+            ex.title.toLowerCase().trim() === p.label.toLowerCase().trim()
+        );
+        if (!alreadyExists) {
+          list.push({
+            id: p.id,
+            slug: cleanSlug,
+            title: p.label,
+            category: 'PO',
+          });
+        }
+      }
+    }
+    return list;
+  }, [modalExams, modalPartitions]);
+
   const [selectedExamId, setSelectedExamId] = useState<string>(
     exams[0]?.id || 'exam-ibps-po'
   );
@@ -80,6 +105,35 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
           }
           if (freshExams && freshExams.length > 0) {
             setModalExams(freshExams);
+          }
+
+          const targetPartId = currentPartitionId && currentPartitionId !== 'ALL'
+            ? currentPartitionId
+            : undefined;
+
+          if (targetPartId) {
+            setSelectedPartition(targetPartId);
+            const foundPart = (freshParts || []).find((p) => p.id === targetPartId);
+            if (foundPart) {
+              if (foundPart.category === 'EXAM' || foundPart.id.startsWith('exam-')) {
+                const match = (freshExams || []).find(
+                  (e) =>
+                    e.id === foundPart.id ||
+                    e.slug === foundPart.id.replace(/^exam-/, '') ||
+                    e.title.toLowerCase().trim() === foundPart.label.toLowerCase().trim()
+                );
+                setSelectedExamId(match ? match.id : foundPart.id);
+              } else if (foundPart.examId && foundPart.examId !== 'ALL') {
+                const match = (freshExams || []).find(
+                  (e) =>
+                    e.id === foundPart.examId ||
+                    e.slug === foundPart.examId.replace(/^exam-/, '')
+                );
+                setSelectedExamId(match ? match.id : foundPart.examId);
+              }
+            } else if (targetPartId.startsWith('exam-')) {
+              setSelectedExamId(targetPartId);
+            }
           }
         })
         .catch((err) => console.warn('Could not refresh partitions/exams on modal open:', err));
@@ -102,17 +156,37 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     setSelectedPartition(partId);
     const found = modalPartitions.find((p) => p.id === partId);
     if (found) {
-      if (found.category === 'EXAM') {
-        setSelectedExamId(found.id);
+      if (found.category === 'EXAM' || found.id.startsWith('exam-')) {
+        const matchingEx = combinedExams.find(
+          (ex) =>
+            ex.id === found.id ||
+            ex.slug === found.id.replace(/^exam-/, '') ||
+            ex.title.toLowerCase().trim() === found.label.toLowerCase().trim()
+        );
+        setSelectedExamId(matchingEx ? matchingEx.id : found.id);
       } else if (found.examId && found.examId !== 'ALL') {
-        setSelectedExamId(found.examId);
+        const matchingEx = combinedExams.find(
+          (ex) =>
+            ex.id === found.examId ||
+            ex.slug === found.examId.replace(/^exam-/, '') ||
+            ex.title.toLowerCase().trim() === (found.label || '').toLowerCase().trim()
+        );
+        setSelectedExamId(matchingEx ? matchingEx.id : found.examId);
       }
     }
   };
 
   const handleExamChange = (newExamId: string) => {
     setSelectedExamId(newExamId);
-    const matchingExamPart = modalPartitions.find((p) => p.id === newExamId);
+    const exObj = combinedExams.find((ex) => ex.id === newExamId);
+    const matchingExamPart = modalPartitions.find(
+      (p) =>
+        p.id === newExamId ||
+        (exObj &&
+          (p.id === `exam-${exObj.slug}` ||
+            p.id === exObj.slug ||
+            p.label.toLowerCase().trim() === exObj.title.toLowerCase().trim()))
+    );
     if (matchingExamPart) {
       setSelectedPartition(matchingExamPart.id);
     }
@@ -767,7 +841,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
 
         {/* Step 2: Target Exam & Partition Selection */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {modalExams && modalExams.length > 0 && (
+          {combinedExams && combinedExams.length > 0 && (
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 block">
                 Target Banking Exam:
@@ -777,11 +851,16 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                 onChange={(e) => handleExamChange(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
               >
-                {modalExams.map((ex) => (
+                {combinedExams.map((ex) => (
                   <option key={ex.id} value={ex.id}>
                     {ex.title}
                   </option>
                 ))}
+                {selectedExamId && !combinedExams.some((ex) => ex.id === selectedExamId) && (
+                  <option value={selectedExamId}>
+                    {modalPartitions.find((p) => p.id === selectedExamId)?.label || selectedExamId}
+                  </option>
+                )}
               </select>
             </div>
           )}
@@ -831,6 +910,12 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                       </option>
                     ))}
                 </optgroup>
+              )}
+
+              {selectedPartition && selectedPartition !== 'ALL' && !modalPartitions.some((p) => p.id === selectedPartition) && (
+                <option value={selectedPartition}>
+                  {combinedExams.find((ex) => ex.id === selectedPartition)?.title || selectedPartition}
+                </option>
               )}
             </select>
           </div>

@@ -572,88 +572,6 @@ export function partitionQuestionsList(rawAll: Question[], partitionKey: string)
   const all = resolveGroupPassages(rawAll);
   if (normKey === 'all') return all;
 
-  // 1. IBPS PO Mains 2025 PYQ (155 Authentic Questions)
-  if (normKey.includes('mains') && (normKey.includes('2025') || normKey === 'mock-ibps-po-2025-mains-pyq' || normKey === 'ibps-po-mains-2025-pyq')) {
-    return all
-      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Mains 2025') || String(q.id).toLowerCase().includes('ibps-po-2025-mains')))
-      .sort((a, b) => {
-        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
-        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
-        const numA = matchA ? parseInt(matchA[1], 10) : 0;
-        const numB = matchB ? parseInt(matchB[1], 10) : 0;
-        return numA - numB;
-      });
-  }
-
-  // 1b. IBPS PO Prelims 2025 PYQ (100 Authentic Questions)
-  if (normKey === 'mock-ibps-po-2025-pyq' || normKey === 'ibps-po-prelims-2025-pyq' || (normKey.includes('ibps') && normKey.includes('2025') && !normKey.includes('mains'))) {
-    return all
-      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2025') || String(q.id).toLowerCase().includes('ibps-po-2025-prelims')))
-      .sort((a, b) => {
-        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
-        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
-        const numA = matchA ? parseInt(matchA[1], 10) : 0;
-        const numB = matchB ? parseInt(matchB[1], 10) : 0;
-        return numA - numB;
-      });
-  }
-
-  // 2. IBPS PO Prelims 2024 PYQ (100 Authentic Questions)
-  if ((normKey.includes('ibps') && normKey.includes('2024')) || normKey === 'mock-ibps-po-2024-pyq' || normKey === 'ibps-po-prelims-2024-pyq') {
-    return all
-      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2024') || String(q.id).toLowerCase().includes('ibps-po-2024')))
-      .sort((a, b) => {
-        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
-        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
-        const numA = matchA ? parseInt(matchA[1], 10) : 0;
-        const numB = matchB ? parseInt(matchB[1], 10) : 0;
-        return numA - numB;
-      });
-  }
-
-  // 3. IBPS PO Prelims 2023 PYQ (100 Authentic Questions)
-  if ((normKey.includes('ibps') && normKey.includes('2023')) || normKey === 'mock-ibps-po-2023-pyq' || normKey === 'ibps-po-prelims-2023-pyq') {
-    return all
-      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2023') || String(q.id).toLowerCase().includes('ibps-po-2023')))
-      .sort((a, b) => {
-        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
-        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
-        const numA = matchA ? parseInt(matchA[1], 10) : 0;
-        const numB = matchB ? parseInt(matchB[1], 10) : 0;
-        return numA - numB;
-      });
-  }
-
-  // 4. SBI Clerk 2024 PYQ (100 Authentic Questions)
-  if (
-    normKey.includes('sbi') && (normKey.includes('2024') || normKey === 'mock-sbi-clerk-2024-pyq' || normKey === 'sbi-clerk-prelims-2024-pyq')
-  ) {
-    return all
-      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('SBI Clerk') || String(q.id).toLowerCase().includes('sbi')) && (q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
-      .sort((a, b) => {
-        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
-        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
-        const numA = matchA ? parseInt(matchA[1], 10) : 0;
-        const numB = matchB ? parseInt(matchB[1], 10) : 0;
-        return numA - numB;
-      });
-  }
-
-  // 5. SBI Clerk 2023-24 PYQ (100 Authentic Questions)
-  if (
-    normKey.includes('sbi') && (normKey.includes('2023') || normKey === 'mock-sbi-clerk-2023-pyq' || normKey === 'sbi-clerk-prelims-2023-pyq')
-  ) {
-    return all
-      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('SBI Clerk') || String(q.id).toLowerCase().includes('sbi')) && (q.pyqYear === 2023 || q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
-      .sort((a, b) => {
-        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
-        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
-        const numA = matchA ? parseInt(matchA[1], 10) : 0;
-        const numB = matchB ? parseInt(matchB[1], 10) : 0;
-        return numA - numB;
-      });
-  }
-
   // Targeted Exam partition (e.g. exam-ibps-po, exam-sbi-clerk, or any admin created exams)
   if (normKey.startsWith('exam-')) {
     const cleanNorm = normKey.replace(/^exam-/, '');
@@ -676,6 +594,88 @@ export function partitionQuestionsList(rawAll: Question[], partitionKey: string)
       const numB = matchB ? parseInt(matchB[1], 10) : 0;
       return numA - numB;
     });
+  }
+
+  // 1. IBPS PO Mains 2025 PYQ (155 Authentic Questions)
+  if (normKey.includes('mains') && (normKey.includes('2025') || normKey === 'mock-ibps-po-2025-mains-pyq' || normKey === 'ibps-po-mains-2025-pyq')) {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Mains 2025') || String(q.id).toLowerCase().includes('ibps-po-2025-mains')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+  }
+
+  // 1b. IBPS PO Prelims 2025 PYQ (100 Authentic Questions)
+  if (normKey === 'mock-ibps-po-2025-pyq' || normKey === 'ibps-po-prelims-2025-pyq' || (normKey.includes('ibps') && normKey.includes('2025') && (normKey.includes('pyq') || normKey.includes('prelims')) && !normKey.includes('mains'))) {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2025') || String(q.id).toLowerCase().includes('ibps-po-2025-prelims')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+  }
+
+  // 2. IBPS PO Prelims 2024 PYQ (100 Authentic Questions)
+  if (normKey === 'mock-ibps-po-2024-pyq' || normKey === 'ibps-po-prelims-2024-pyq' || (normKey.includes('ibps') && normKey.includes('2024') && (normKey.includes('pyq') || normKey.includes('prelims')))) {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2024') || String(q.id).toLowerCase().includes('ibps-po-2024')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+  }
+
+  // 3. IBPS PO Prelims 2023 PYQ (100 Authentic Questions)
+  if (normKey === 'mock-ibps-po-2023-pyq' || normKey === 'ibps-po-prelims-2023-pyq' || (normKey.includes('ibps') && normKey.includes('2023') && (normKey.includes('pyq') || normKey.includes('prelims')))) {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('IBPS PO Prelims 2023') || String(q.id).toLowerCase().includes('ibps-po-2023')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+  }
+
+  // 4. SBI Clerk 2024 PYQ (100 Authentic Questions)
+  if (
+    normKey === 'mock-sbi-clerk-2024-pyq' || normKey === 'sbi-clerk-prelims-2024-pyq' || (normKey.includes('sbi') && normKey.includes('2024') && (normKey.includes('pyq') || normKey.includes('prelims')))
+  ) {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('SBI Clerk') || String(q.id).toLowerCase().includes('sbi')) && (q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
+  }
+
+  // 5. SBI Clerk 2023-24 PYQ (100 Authentic Questions)
+  if (
+    normKey === 'mock-sbi-clerk-2023-pyq' || normKey === 'sbi-clerk-prelims-2023-pyq' || (normKey.includes('sbi') && normKey.includes('2023') && (normKey.includes('pyq') || normKey.includes('prelims')))
+  ) {
+    return all
+      .filter(q => Boolean(q.isPyq) && (q.pyqExam?.includes('SBI Clerk') || String(q.id).toLowerCase().includes('sbi')) && (q.pyqYear === 2023 || q.pyqYear === 2024 || String(q.id).toLowerCase().includes('2024')))
+      .sort((a, b) => {
+        const matchA = String(a.id).match(/-q(\d+)$/i) || String(a.id).match(/(\d+)$/);
+        const matchB = String(b.id).match(/-q(\d+)$/i) || String(b.id).match(/(\d+)$/);
+        const numA = matchA ? parseInt(matchA[1], 10) : 0;
+        const numB = matchB ? parseInt(matchB[1], 10) : 0;
+        return numA - numB;
+      });
   }
 
   // Dynamic match for any custom-created PYQ or Mock Test partition
