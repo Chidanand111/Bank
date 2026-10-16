@@ -50,6 +50,10 @@ import {
   Download,
   Globe,
   EyeOff,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 
 export type ExamPartition = AdminPartitionInfo;
@@ -225,6 +229,12 @@ export default function AdminQuestionsPage() {
   const [examId, setExamId] = useState('ALL');
   const [sectionCode, setSectionCode] = useState('ALL');
   const [difficulty, setDifficulty] = useState('ALL');
+
+  // Virtualized Pagination & Large Dataset Rendering
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number | 'ALL'>(25);
+  const [jumpPageInput, setJumpPageInput] = useState<string>('');
+  const questionListRef = useRef<HTMLDivElement>(null);
 
   // Modals
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -437,6 +447,11 @@ export default function AdminQuestionsPage() {
   useEffect(() => {
     loadQuestions();
   }, [activePartitionId, search, examId, sectionCode, difficulty]);
+
+  // Reset pagination to first page whenever filtering or partition changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activePartitionId, search, examId, sectionCode, difficulty, pageSize]);
 
   const handleCreatePyqFromModal = (e: React.FormEvent) => {
     e.preventDefault();
@@ -757,6 +772,54 @@ export default function AdminQuestionsPage() {
         setFeedback({ text: res.error || 'Failed to delete question.', type: 'error' });
       }
     });
+  };
+
+  const totalQuestions = questions.length;
+  const effectivePageSize = pageSize === 'ALL' ? (totalQuestions || 1) : pageSize;
+  const totalPages = pageSize === 'ALL' ? 1 : Math.max(1, Math.ceil(totalQuestions / effectivePageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+  const startIndex = totalQuestions === 0 ? 0 : (safeCurrentPage - 1) * effectivePageSize;
+  const endIndex = pageSize === 'ALL' ? totalQuestions : Math.min(startIndex + effectivePageSize, totalQuestions);
+  const visibleQuestions = totalQuestions === 0
+    ? []
+    : pageSize === 'ALL'
+      ? questions
+      : questions.slice(startIndex, endIndex);
+
+  const handlePageChange = (newPage: number) => {
+    const target = Math.min(Math.max(1, newPage), totalPages);
+    setCurrentPage(target);
+    if (questionListRef.current) {
+      questionListRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleJumpSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const parsed = parseInt(jumpPageInput, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= totalPages) {
+      handlePageChange(parsed);
+      setJumpPageInput('');
+    }
+  };
+
+  const getPaginationRange = () => {
+    const delta = 2;
+    const range: (number | string)[] = [];
+    for (let i = Math.max(2, safeCurrentPage - delta); i <= Math.min(totalPages - 1, safeCurrentPage + delta); i++) {
+      range.push(i);
+    }
+    if (safeCurrentPage - delta > 2) {
+      range.unshift('...');
+    }
+    if (safeCurrentPage + delta < totalPages - 1) {
+      range.push('...');
+    }
+    range.unshift(1);
+    if (totalPages > 1) {
+      range.push(totalPages);
+    }
+    return range;
   };
 
   return (
@@ -1417,8 +1480,69 @@ export default function AdminQuestionsPage() {
           </div>
         </div>
 
-        {/* Questions List */}
-        <div className="space-y-4">
+        {/* Questions List Header & Pagination Summary */}
+        <div ref={questionListRef} className="space-y-4">
+          {!loading && questions.length > 0 && (
+            <div className="bg-white px-4 py-3 rounded-xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <div className="text-slate-600 font-medium">
+                Showing <strong className="text-slate-900 font-bold">{startIndex + 1}</strong> –{' '}
+                <strong className="text-slate-900 font-bold">{endIndex}</strong> of{' '}
+                <strong className="text-indigo-700 font-bold">{totalQuestions}</strong> questions
+                {activePartitionId !== 'ALL' && (
+                  <span className="text-slate-400 ml-1.5 font-normal">
+                    in {activePartition?.label}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-500 font-medium">Show:</span>
+                  <select
+                    value={pageSize}
+                    onChange={(e) => {
+                      const val = e.target.value === 'ALL' ? 'ALL' : parseInt(e.target.value, 10);
+                      setPageSize(val);
+                      setCurrentPage(1);
+                    }}
+                    className="px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                  >
+                    <option value={25}>25 / page</option>
+                    <option value={50}>50 / page</option>
+                    <option value={100}>100 / page</option>
+                    <option value="ALL">Show All ({totalQuestions})</option>
+                  </select>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1 border-l border-slate-200 pl-3">
+                    <button
+                      type="button"
+                      disabled={safeCurrentPage <= 1}
+                      onClick={() => handlePageChange(safeCurrentPage - 1)}
+                      className="p-1 rounded-md text-slate-600 hover:text-indigo-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                      title="Previous Page"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-slate-700 font-semibold px-1">
+                      {safeCurrentPage} / {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={safeCurrentPage >= totalPages}
+                      onClick={() => handlePageChange(safeCurrentPage + 1)}
+                      className="p-1 rounded-md text-slate-600 hover:text-indigo-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                      title="Next Page"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {loading ? (
             <div className="p-12 text-center text-slate-400 bg-white rounded-2xl border border-slate-200">
               <div className="w-8 h-8 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
@@ -1434,14 +1558,16 @@ export default function AdminQuestionsPage() {
               </Button>
             </div>
           ) : (
-            questions.map((q, idx) => (
+            visibleQuestions.map((q, idx) => {
+              const globalIndex = startIndex + idx + 1;
+              return (
               <Card key={q.id} className="border border-slate-200 hover:border-slate-300 transition-colors shadow-xs">
                 <CardContent className="p-5 sm:p-6 space-y-4">
                   {/* Card Header Info */}
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-black text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-md">
-                        #{idx + 1}
+                        #{globalIndex}
                       </span>
                       <span className="text-[11px] font-mono text-slate-400 font-semibold">
                         ID: {q.id}
@@ -1587,7 +1713,110 @@ export default function AdminQuestionsPage() {
                   )}
                 </CardContent>
               </Card>
-            ))
+              );
+            })
+          )}
+
+          {/* Bottom Full Pagination Bar */}
+          {!loading && totalPages > 1 && (
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
+              <div className="text-slate-600 font-medium order-2 md:order-1">
+                Page <strong className="text-slate-900 font-bold">{safeCurrentPage}</strong> of{' '}
+                <strong className="text-slate-900 font-bold">{totalPages}</strong> ({totalQuestions} questions)
+              </div>
+
+              <div className="flex flex-wrap items-center justify-center gap-1.5 order-1 md:order-2">
+                <button
+                  type="button"
+                  disabled={safeCurrentPage <= 1}
+                  onClick={() => handlePageChange(1)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none font-semibold flex items-center gap-1 cursor-pointer"
+                  title="First Page"
+                >
+                  <ChevronsLeft className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">First</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={safeCurrentPage <= 1}
+                  onClick={() => handlePageChange(safeCurrentPage - 1)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none font-semibold flex items-center gap-1 cursor-pointer"
+                  title="Previous Page"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Prev</span>
+                </button>
+
+                {getPaginationRange().map((pageItem, i) => {
+                  if (pageItem === '...') {
+                    return (
+                      <span key={`ellipsis-${i}`} className="px-2 text-slate-400 font-bold select-none">
+                        …
+                      </span>
+                    );
+                  }
+                  const pageNum = pageItem as number;
+                  const isActive = pageNum === safeCurrentPage;
+                  return (
+                    <button
+                      key={`page-${pageNum}`}
+                      type="button"
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`min-w-8 h-8 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        isActive
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'border border-slate-200 text-slate-700 hover:bg-slate-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+
+                <button
+                  type="button"
+                  disabled={safeCurrentPage >= totalPages}
+                  onClick={() => handlePageChange(safeCurrentPage + 1)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none font-semibold flex items-center gap-1 cursor-pointer"
+                  title="Next Page"
+                >
+                  <span className="hidden sm:inline">Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  disabled={safeCurrentPage >= totalPages}
+                  onClick={() => handlePageChange(totalPages)}
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-30 disabled:pointer-events-none font-semibold flex items-center gap-1 cursor-pointer"
+                  title="Last Page"
+                >
+                  <span className="hidden sm:inline">Last</span>
+                  <ChevronsRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {/* Jump to page form */}
+              <form onSubmit={handleJumpSubmit} className="flex items-center gap-2 order-3">
+                <span className="text-slate-500 font-medium">Go to:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  placeholder={String(safeCurrentPage)}
+                  value={jumpPageInput}
+                  onChange={(e) => setJumpPageInput(e.target.value)}
+                  className="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 text-center focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                />
+                <button
+                  type="submit"
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold cursor-pointer"
+                >
+                  Go
+                </button>
+              </form>
+            </div>
           )}
         </div>
       </div>

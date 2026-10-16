@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { getExamBySlug, getMockTests } from '@/lib/services/testService';
 import { getCurrentUser } from '@/lib/auth/session';
 import { PatternTable } from '@/components/exams/PatternTable';
@@ -11,6 +12,47 @@ import { notFound } from 'next/navigation';
 
 export interface ExamPageProps {
   params: Promise<{ slug: string }>;
+}
+
+export const dynamicParams = true;
+
+export async function generateStaticParams() {
+  return [
+    { slug: 'ibps-po' },
+    { slug: 'sbi-clerk' },
+  ];
+}
+
+export async function generateMetadata({ params }: ExamPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const exam = await getExamBySlug(slug, true);
+
+  if (!exam) {
+    return {
+      title: 'Exam Not Found | BankMock',
+      description: 'The requested banking examination could not be found.',
+    };
+  }
+
+  return {
+    title: `${exam.title} - Mock Tests, Pattern & Syllabus | BankMock`,
+    description:
+      exam.description ||
+      `Prepare for ${exam.title} with full-length online mock tests, authentic sectional timing, detailed solutions, and performance analytics.`,
+    openGraph: {
+      title: `${exam.title} Preparation | BankMock`,
+      description: exam.description,
+      type: 'website',
+    },
+    keywords: [
+      exam.title,
+      `${exam.category} Mock Test`,
+      'Banking Exam Prep',
+      'Prelims Exam Pattern',
+      'Mains Exam Pattern',
+      'Free Banking Mock',
+    ],
+  };
 }
 
 export default async function DynamicExamPage({ params }: ExamPageProps) {

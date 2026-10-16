@@ -1,4 +1,5 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { requireUser } from '@/lib/auth/permissions';
 import { getDashboardStats } from '@/lib/services/testService';
 import { getUserAttemptsAction } from '@/lib/services/adminService';
@@ -7,6 +8,12 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { FileCheck2, ArrowLeft, PlayCircle } from 'lucide-react';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'My Results & Scorecards | BankMock',
+  description:
+    'View your completed banking mock test attempts, section-wise marks, accuracy percentages, and question review solutions.',
+};
 
 export default async function MyResultsPage() {
   const user = await requireUser('/my-results');

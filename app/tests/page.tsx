@@ -1,9 +1,22 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { getMockTests, getExams } from '@/lib/services/testService';
 import { TestCard } from '@/components/tests/TestCard';
 import { Badge } from '@/components/ui/Badge';
 import { Award, Search } from 'lucide-react';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Banking Mock Tests & Previous Year Papers (PYQ) | BankMock',
+  description:
+    'Take full-length mock tests for IBPS PO, SBI Clerk, and previous year authentic papers. Features 60-minute duration with strict 20-minute section locks.',
+  keywords: [
+    'IBPS PO Mock Test',
+    'SBI Clerk PYQ 2024',
+    'Banking Mock Test Series',
+    'TCS iON Banking Exam Simulator',
+  ],
+};
 
 export interface TestsPageProps {
   searchParams: Promise<{ exam?: string }>;

@@ -1,4 +1,5 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { requireUser } from '@/lib/auth/permissions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -6,6 +7,16 @@ import { Button } from '@/components/ui/Button';
 import { logoutAction } from '@/lib/auth/actions';
 import { User, Mail, Shield, Calendar, Award, LogOut, CheckCircle2 } from 'lucide-react';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'My Profile & Account Settings | BankMock',
+  description:
+    'Manage your BankMock candidate profile, view account security status, and check test authorization.',
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default async function ProfilePage() {
   const user = await requireUser('/profile');

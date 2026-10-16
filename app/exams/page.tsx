@@ -1,10 +1,24 @@
 import React from 'react';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { getExams } from '@/lib/services/testService';
 import { getCurrentUser } from '@/lib/auth/session';
 import { ExamCard } from '@/components/exams/ExamCard';
 import { Badge } from '@/components/ui/Badge';
 import { BookOpen, ShieldCheck, CheckCircle2, ShieldAlert } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: 'Banking Exams Catalog - IBPS PO, SBI Clerk & Scale 1 | BankMock',
+  description:
+    'Explore official banking examination architectures, prelims and mains pattern breakdowns, sectional weightages, and practice mock tests.',
+  keywords: [
+    'Banking Exams India',
+    'IBPS PO Exam Pattern',
+    'SBI Clerk Junior Associate',
+    'Sectional Timing',
+    'Bank Mock Tests',
+  ],
+};
 
 export default async function ExamsPage() {
   const user = await getCurrentUser();

@@ -1,5 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { getExams, getMockTests } from '@/lib/services/testService';
 import { ExamCard } from '@/components/exams/ExamCard';
 import { TestCard } from '@/components/tests/TestCard';
@@ -17,6 +18,20 @@ import {
   PlayCircle,
   Target
 } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: 'BankMock - High-Yield Banking Mock Tests & TCS iON Simulator',
+  description:
+    'Ace IBPS PO, SBI Clerk, and Banking examinations with authentic TCS iON test simulation, strict 20-minute sectional timers, instant scorecards, and step-by-step solutions.',
+  keywords: [
+    'IBPS PO Mock Test 2025',
+    'SBI Clerk Prelims PYQ',
+    'Banking Exam Practice',
+    'TCS iON Test Simulator',
+    'Quantitative Aptitude Mock',
+    'Reasoning Ability Practice',
+  ],
+};
 
 export default async function HomePage() {
   const exams = await getExams();
@@ -52,13 +67,16 @@ export default async function HomePage() {
   return (
     <div className="space-y-16 pb-16">
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-blue-50/80 via-white to-slate-50 pt-16 pb-20 border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden bg-gradient-to-b from-blue-50/90 via-white to-slate-50/80 pt-16 pb-20 border-b border-slate-200">
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 -right-32 w-96 h-96 bg-indigo-400/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
             {/* Left Content */}
             <div className="lg:col-span-7 space-y-6 text-center lg:text-left">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
-                <Sparkles className="w-4 h-4 text-blue-600" />
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold shadow-2xs">
+                <Sparkles className="w-4 h-4 text-blue-600 animate-pulse" />
                 Updated for 2024-2025 IBPS & SBI Exam Cycles
               </div>
 
@@ -70,19 +88,29 @@ export default async function HomePage() {
               </h1>
 
               <p className="text-lg text-slate-600 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Take real exam-like mock tests for <strong className="text-slate-900">IBPS PO</strong> and{' '}
-                <strong className="text-slate-900">SBI Clerk</strong>. Track accuracy, boost your speed, and review detailed step-by-step explanations.
+                Take real exam-like mock tests for <strong className="text-slate-900 font-bold">IBPS PO</strong> and{' '}
+                <strong className="text-slate-900 font-bold">SBI Clerk</strong>. Track accuracy, boost your speed, and review detailed step-by-step explanations.
               </p>
 
               <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start pt-2">
                 <Link href="/tests">
-                  <Button variant="primary" size="lg" className="w-full sm:w-auto">
+                  <Button
+                    id="hero-start-mock-btn"
+                    variant="primary"
+                    size="lg"
+                    className="w-full sm:w-auto shadow-md hover:shadow-lg transition-all duration-200"
+                  >
                     Start a Mock Test
                     <ArrowRight className="w-5 h-5 ml-1" />
                   </Button>
                 </Link>
                 <Link href="/exams">
-                  <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                  <Button
+                    id="hero-explore-exams-btn"
+                    variant="outline"
+                    size="lg"
+                    className="w-full sm:w-auto hover:bg-slate-50 transition-all duration-200"
+                  >
                     Explore Exams
                   </Button>
                 </Link>
@@ -90,11 +118,11 @@ export default async function HomePage() {
 
               {/* Key Trust Highlights */}
               <div className="grid grid-cols-3 gap-4 pt-6 max-w-lg mx-auto lg:mx-0 border-t border-slate-200 text-left">
-                <div>
+                <div className="p-2 rounded-xl hover:bg-white/60 transition-colors">
                   <span className="text-2xl font-extrabold text-slate-900 block">100%</span>
                   <span className="text-xs text-slate-500 font-medium">Exam Standard</span>
                 </div>
-                <div>
+                <div className="p-2 rounded-xl hover:bg-white/60 transition-colors">
                   <span className="text-2xl font-extrabold text-slate-900 block">+1 / -0.25</span>
                   <span className="text-xs text-slate-500 font-medium">Negative Marking</span>
                 </div>
@@ -139,7 +167,12 @@ export default async function HomePage() {
                   </div>
 
                   <Link href="/test/mock-ibps-po-1">
-                    <Button variant="primary" size="md" className="w-full justify-center mt-2 shadow-xs">
+                    <Button
+                      id="hero-try-featured-btn"
+                      variant="primary"
+                      size="md"
+                      className="w-full justify-center mt-2 shadow-sm hover:shadow-md transition-all duration-200"
+                    >
                       <PlayCircle className="w-4 h-4 mr-1.5" /> Try Featured Mock Test Now
                     </Button>
                   </Link>
@@ -163,7 +196,9 @@ export default async function HomePage() {
             </p>
           </div>
           <Link href="/exams">
-            <Button variant="outline" size="sm">View All Exams</Button>
+            <Button id="explore-all-exams-btn" variant="outline" size="sm" className="hover:bg-slate-50 transition-colors">
+              View All Exams
+            </Button>
           </Link>
         </div>
 
@@ -173,7 +208,7 @@ export default async function HomePage() {
           ))}
 
           {/* Coming Soon Card */}
-          <Card className="md:col-start-1 md:col-span-1 h-full border border-dashed border-slate-300 bg-slate-50/50 flex flex-col justify-center items-center text-center p-6">
+          <Card className="md:col-start-1 md:col-span-1 h-full border border-dashed border-slate-300 bg-slate-50/50 flex flex-col justify-center items-center text-center p-6 hover:border-slate-400 transition-colors">
             <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center mb-4">
               <Sparkles className="w-6 h-6" />
             </div>
@@ -205,7 +240,7 @@ export default async function HomePage() {
             {features.map((f, i) => {
               const Icon = f.icon;
               return (
-                <Card key={i} className="border border-slate-200 shadow-xs">
+                <Card key={i} className="border border-slate-200 shadow-xs hover:border-blue-200 hover:shadow-md transition-all duration-200">
                   <CardContent className="p-6 space-y-4">
                     <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center">
                       <Icon className="w-6 h-6" />
@@ -233,7 +268,9 @@ export default async function HomePage() {
             </p>
           </div>
           <Link href="/tests">
-            <Button variant="outline" size="sm">View All Mock Tests</Button>
+            <Button id="view-all-mocks-btn" variant="outline" size="sm" className="hover:bg-slate-50 transition-colors">
+              View All Mock Tests
+            </Button>
           </Link>
         </div>
 
@@ -246,8 +283,9 @@ export default async function HomePage() {
 
       {/* Final Call To Action Banner */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-blue-600 rounded-2xl p-8 sm:p-12 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="space-y-3 text-center md:text-left max-w-xl">
+        <div className="relative overflow-hidden bg-gradient-to-r from-blue-700 via-indigo-600 to-blue-800 rounded-3xl p-8 sm:p-12 text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-8">
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="space-y-3 text-center md:text-left max-w-xl relative z-10">
             <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               Ready to test your actual exam readiness?
             </h2>
@@ -255,8 +293,13 @@ export default async function HomePage() {
               Experience authentic TCS iON test conditions with real-time sectional timing and instant performance analysis.
             </p>
           </div>
-          <Link href="/tests">
-            <Button variant="inverted" size="lg" className="shrink-0 px-8">
+          <Link href="/tests" className="relative z-10">
+            <Button
+              id="cta-start-free-btn"
+              variant="inverted"
+              size="lg"
+              className="shrink-0 px-8 shadow-md hover:shadow-lg transition-all duration-200"
+            >
               Start Free Mock Test Now
             </Button>
           </Link>

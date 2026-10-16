@@ -1,10 +1,20 @@
 import React from 'react';
 import Link from 'next/link';
+import type { Metadata } from 'next';
 import { getCurrentUser } from '@/lib/auth/session';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { ShieldAlert, LayoutDashboard, LogIn } from 'lucide-react';
+
+export const metadata: Metadata = {
+  title: '403 - Access Denied | BankMock',
+  description: 'Administrator authorization required to access this portal.',
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default async function UnauthorizedPage() {
   const user = await getCurrentUser();
