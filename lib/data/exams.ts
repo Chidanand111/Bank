@@ -229,6 +229,109 @@ export const EXAMS_DATA: Exam[] = [
         ]
       }
     ]
+  },
+  {
+    id: 'exam-ssc-cgl',
+    slug: 'ssc-cgl',
+    title: 'SSC CGL (Combined Graduate Level)',
+    category: 'SSC',
+    description: 'Staff Selection Commission Combined Graduate Level Examination for premier Central Government Ministries and Department recruitments.',
+    shortDescription: 'Official SSC CGL Tier-1 & Tier-2 mock test series with composite timing and negative marking.',
+    totalMockTests: 1,
+    status: 'published',
+    patterns: [
+      {
+        stage: 'Prelims',
+        totalQuestions: 100,
+        totalMarks: 200,
+        totalDurationMinutes: 60,
+        sections: [
+          {
+            id: 'sec-ssc-cgl-reason',
+            name: 'General Intelligence & Reasoning',
+            code: 'REASONING',
+            numQuestions: 25,
+            maxMarks: 50,
+            durationMinutes: 0,
+            topics: ['Analogies', 'Classification', 'Series', 'Venn Diagrams', 'Coding-Decoding']
+          },
+          {
+            id: 'sec-ssc-cgl-ga',
+            name: 'General Awareness',
+            code: 'GA',
+            numQuestions: 25,
+            maxMarks: 50,
+            durationMinutes: 0,
+            topics: ['Current Affairs', 'History', 'Polity', 'Geography', 'Economics', 'General Science']
+          },
+          {
+            id: 'sec-ssc-cgl-quant',
+            name: 'Quantitative Aptitude',
+            code: 'QUANT',
+            numQuestions: 25,
+            maxMarks: 50,
+            durationMinutes: 0,
+            topics: ['Arithmetic', 'Algebra', 'Geometry', 'Trigonometry', 'Data Interpretation']
+          },
+          {
+            id: 'sec-ssc-cgl-eng',
+            name: 'English Comprehension',
+            code: 'ENGLISH',
+            numQuestions: 25,
+            maxMarks: 50,
+            durationMinutes: 0,
+            topics: ['Reading Comprehension', 'Error Spotting', 'Active/Passive Voice', 'Direct/Indirect Speech']
+          }
+        ]
+      }
+    ]
+  },
+  {
+    id: 'exam-rrb-ntpc',
+    slug: 'rrb-ntpc',
+    title: 'RRB NTPC (Non-Technical Popular Categories)',
+    category: 'RAILWAY',
+    description: 'Railway Recruitment Boards Non-Technical Popular Categories (CEN 01/2024) examination across Indian Railways zones.',
+    shortDescription: 'Realistic RRB NTPC CBT-1 & CBT-2 mock exams featuring 90-minute composite countdown and 1/3rd negative marking.',
+    totalMockTests: 1,
+    status: 'published',
+    patterns: [
+      {
+        stage: 'Prelims',
+        totalQuestions: 100,
+        totalMarks: 100,
+        totalDurationMinutes: 90,
+        sections: [
+          {
+            id: 'sec-rrb-ntpc-ga',
+            name: 'General Awareness',
+            code: 'GA',
+            numQuestions: 40,
+            maxMarks: 40,
+            durationMinutes: 0,
+            topics: ['General Science', 'Indian History', 'Polity', 'Geography', 'Current Events']
+          },
+          {
+            id: 'sec-rrb-ntpc-math',
+            name: 'Mathematics',
+            code: 'QUANT',
+            numQuestions: 30,
+            maxMarks: 30,
+            durationMinutes: 0,
+            topics: ['Number System', 'Decimals & Fractions', 'LCM & HCF', 'Ratio & Proportion', 'Time & Work']
+          },
+          {
+            id: 'sec-rrb-ntpc-reason',
+            name: 'General Intelligence & Reasoning',
+            code: 'REASONING',
+            numQuestions: 30,
+            maxMarks: 30,
+            durationMinutes: 0,
+            topics: ['Analogies', 'Coding-Decoding', 'Mathematical Operations', 'Relationships', 'Syllogisms']
+          }
+        ]
+      }
+    ]
   }
 ];
 

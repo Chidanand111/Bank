@@ -150,11 +150,12 @@ export default function TestPage({ params }: TestPageProps) {
       if (freshTest) {
         setTest(freshTest);
 
-        // Initialize 20 minutes (1200 seconds) per section
+        // Initialize timers based on timerType
+        const isComposite = freshTest.timerType === 'OVERALL_COMPOSITE' || Boolean(freshTest.allowSectionSwitch);
+        const totalDurationSecs = (freshTest.durationMinutes || 60) * 60;
         const initialTimers: Record<string, number> = {};
         freshTest.sections.forEach((sec) => {
-          // Standard banking: 20 mins per section = 1200 seconds
-          initialTimers[sec.code] = (sec.durationMinutes || 20) * 60;
+          initialTimers[sec.code] = isComposite ? totalDurationSecs : (sec.durationMinutes || 20) * 60;
         });
         setSectionTimers(initialTimers);
 
@@ -216,8 +217,13 @@ export default function TestPage({ params }: TestPageProps) {
     setIsSubmitting(true);
 
     // Calculate total time taken across all sections
-    const totalAllocated = test.sections.reduce((acc, s) => acc + (s.durationMinutes || 20) * 60, 0);
-    const totalRemaining = Object.values(sectionTimers).reduce((acc, v) => acc + v, 0);
+    const isComposite = test.timerType === 'OVERALL_COMPOSITE' || Boolean(test.allowSectionSwitch);
+    const totalAllocated = isComposite
+      ? (test.durationMinutes || 60) * 60
+      : test.sections.reduce((acc, s) => acc + (s.durationMinutes || 20) * 60, 0);
+    const totalRemaining = isComposite
+      ? (sectionTimers[currentSectionCode] ?? 0)
+      : Object.values(sectionTimers).reduce((acc, v) => acc + v, 0);
     const totalTimeTaken = Math.max(1, totalAllocated - totalRemaining);
 
     const attemptId = `att-${Date.now()}`;
@@ -284,8 +290,26 @@ export default function TestPage({ params }: TestPageProps) {
   useEffect(() => {
     if (loading || isSubmitting || isSubmittedRef.current || !test || !currentSectionCode) return;
 
+    const isComposite = test.timerType === 'OVERALL_COMPOSITE' || Boolean(test.allowSectionSwitch);
+
     const timerId = setInterval(() => {
       setSectionTimers(prev => {
+        if (isComposite) {
+          const currentTotal = prev[currentSectionCode] ?? (test.durationMinutes || 60) * 60;
+          if (currentTotal <= 1) {
+            setTimeout(() => {
+              executeSubmission();
+            }, 0);
+            const zeroTimers: Record<string, number> = {};
+            test.sections.forEach(s => { zeroTimers[s.code] = 0; });
+            return zeroTimers;
+          }
+          const nextVal = currentTotal - 1;
+          const nextTimers: Record<string, number> = {};
+          test.sections.forEach(s => { nextTimers[s.code] = nextVal; });
+          return nextTimers;
+        }
+
         const currentSecTime = prev[currentSectionCode];
         if (typeof currentSecTime !== 'number') return prev;
 
@@ -307,7 +331,7 @@ export default function TestPage({ params }: TestPageProps) {
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, [loading, isSubmitting, test, currentSectionCode, handleSectionTimeUp]);
+  }, [loading, isSubmitting, test, currentSectionCode, handleSectionTimeUp, executeSubmission]);
 
   // Handle active section timer tick (no-op retained for backwards compatibility)
   const handleSectionTimerTick = useCallback(() => {
@@ -323,9 +347,12 @@ export default function TestPage({ params }: TestPageProps) {
       if (lockedSectionCodes.includes(targetQ.sectionCode)) {
         return;
       }
-      // Strict sectional timing prevents selecting questions outside active 20-minute section!
+      // If cross-section navigation is allowed (SSC / Railway), auto-switch section
       if (targetQ.sectionCode !== currentSectionCode) {
-        return;
+        if (!test.allowSectionSwitch && test.timerType !== 'OVERALL_COMPOSITE') {
+          return;
+        }
+        setCurrentSectionCode(targetQ.sectionCode);
       }
     }
 
@@ -510,7 +537,7 @@ export default function TestPage({ params }: TestPageProps) {
         onMaxStrikesReached={executeSubmission}
       />
 
-      {/* 2. Header Console with 20-Minute Sectional Timer and Strict Section Lock */}
+      {/* 2. Header Console with Dynamic Timing Mode (Sectional or Overall Composite) */}
       <TestHeader
         testTitle={test.title}
         sections={test.sections}
@@ -518,13 +545,26 @@ export default function TestPage({ params }: TestPageProps) {
         lockedSectionCodes={lockedSectionCodes}
         remainingSeconds={activeSectionRemainingSeconds}
         totalRemainingSeconds={totalRemainingSeconds}
-        timerLabel={`${activeSectionObj?.name || 'Section'} Time`}
-        isSectionalTimer={true}
-        onSelectSection={() => {
-          // Strictly disabled: candidate cannot move to next section until active section 20-minute timer expires!
+        timerLabel={
+          test.timerType === 'OVERALL_COMPOSITE' || test.allowSectionSwitch
+            ? 'Total Exam Time Left'
+            : `${activeSectionObj?.name || 'Section'} Time`
+        }
+        isSectionalTimer={test.timerType !== 'OVERALL_COMPOSITE' && !test.allowSectionSwitch}
+        allowSectionSwitch={Boolean(test.allowSectionSwitch || test.timerType === 'OVERALL_COMPOSITE')}
+        timerType={test.timerType || (test.allowSectionSwitch ? 'OVERALL_COMPOSITE' : 'SECTIONAL_LOCKED')}
+        onSelectSection={(selectedCode) => {
+          if (test.allowSectionSwitch || test.timerType === 'OVERALL_COMPOSITE') {
+            setCurrentSectionCode(selectedCode);
+            const firstQ = test.questions.find(q => q.sectionCode === selectedCode);
+            if (firstQ) {
+              setCurrentQuestionId(firstQ.id);
+              setVisitedQuestions(prev => (prev.includes(firstQ.id) ? prev : [...prev, firstQ.id]));
+            }
+          }
         }}
         onTickTimer={handleSectionTimerTick}
-        onTimeUp={handleSectionTimeUp}
+        onTimeUp={test.timerType === 'OVERALL_COMPOSITE' ? executeSubmission : handleSectionTimeUp}
         onSubmitClick={() => setIsSubmitModalOpen(true)}
         onExitClick={() => setIsExitModalOpen(true)}
       />

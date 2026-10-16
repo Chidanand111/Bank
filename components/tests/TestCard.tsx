@@ -23,13 +23,17 @@ export const TestCard: React.FC<TestCardProps> = ({ test }) => {
               <span className="text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-md flex items-center gap-1">
                 ★ {test.year ? `${test.year} PYQ PAPER` : 'PYQ PAPER'}
               </span>
+            ) : test.timerType === 'OVERALL_COMPOSITE' || test.allowSectionSwitch ? (
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                Composite Time
+              </span>
             ) : test.isFree ? (
               <Badge variant="green" size="sm">
                 FREE MOCK
               </Badge>
             ) : (
               <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded">
-                20m/Section
+                Sectional Timed
               </span>
             )}
           </div>

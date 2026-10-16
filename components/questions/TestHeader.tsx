@@ -15,6 +15,8 @@ export interface TestHeaderProps {
   totalRemainingSeconds?: number;
   timerLabel?: string;
   isSectionalTimer?: boolean;
+  allowSectionSwitch?: boolean;
+  timerType?: 'SECTIONAL_LOCKED' | 'OVERALL_COMPOSITE' | 'GROUPED_SESSION';
   onTickTimer?: () => void;
   onTimeUp?: () => void;
   onSubmitClick: () => void;
@@ -31,11 +33,15 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
   totalRemainingSeconds,
   timerLabel = 'Section Time',
   isSectionalTimer = false,
+  allowSectionSwitch = false,
+  timerType = 'SECTIONAL_LOCKED',
   onTickTimer,
   onTimeUp,
   onSubmitClick,
   onExitClick,
 }) => {
+  const isComposite = timerType === 'OVERALL_COMPOSITE' || allowSectionSwitch;
+
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-xs select-none">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -48,12 +54,16 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
             <div>
               <h1 className="text-sm sm:text-base font-bold text-slate-900 line-clamp-1">{testTitle}</h1>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] text-slate-500 hidden sm:inline">BankMock CBT Console</span>
-                {isSectionalTimer && (
+                <span className="text-[11px] text-slate-500 hidden sm:inline">CBT Console</span>
+                {isComposite ? (
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
+                    Composite Timer • Free Section Switching (SSC / Railway Pattern)
+                  </span>
+                ) : isSectionalTimer ? (
                   <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded">
                     20m / Section (Official IBPS Pattern)
                   </span>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
@@ -61,7 +71,7 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
           <div className="flex items-center gap-2.5">
             <Timer
               remainingSeconds={remainingSeconds}
-              label={timerLabel}
+              label={isComposite ? 'Total Time Left' : timerLabel}
               totalRemainingSeconds={totalRemainingSeconds}
               onTick={onTickTimer}
               onTimeUp={onTimeUp}
@@ -103,15 +113,15 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
             const isActive = sec.code === currentSectionCode;
             const isLocked = lockedSectionCodes.includes(sec.code);
 
-            // When isSectionalTimer is true, candidate CANNOT navigate to any other section!
-            const isDisabled = isSectionalTimer ? !isActive : isLocked;
+            // In composite/free-switch mode, candidate can freely jump across any section
+            const isDisabled = isComposite ? isLocked : isSectionalTimer ? !isActive : isLocked;
 
             return (
               <button
                 key={sec.code}
                 disabled={isDisabled}
                 onClick={() => {
-                  if (!isSectionalTimer && !isLocked) {
+                  if (isComposite || (!isSectionalTimer && !isLocked)) {
                     onSelectSection(sec.code);
                   }
                 }}
@@ -120,17 +130,21 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
                     ? 'bg-blue-600 text-white shadow-xs cursor-default'
                     : isLocked
                     ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                    : isComposite
+                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer border border-transparent hover:border-slate-300'
                     : isSectionalTimer
                     ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-75'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200 cursor-pointer'
                 }`}
                 title={
                   isActive
-                    ? 'Currently active section (20 minutes allocated)'
+                    ? `Currently active section: ${sec.name}`
                     : isLocked
                     ? 'This section has concluded and is locked.'
+                    : isComposite
+                    ? `Switch to ${sec.name}`
                     : isSectionalTimer
-                    ? 'This section will unlock automatically once the 20 minutes for the active section conclude.'
+                    ? 'This section will unlock automatically once the active section concludes.'
                     : sec.name
                 }
               >
@@ -138,7 +152,7 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                 ) : isActive ? (
                   <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                ) : (
+                ) : isComposite ? null : (
                   <Lock className="w-3 h-3 text-slate-400" />
                 )}
                 <span>{sec.name}</span>
@@ -146,18 +160,22 @@ export const TestHeader: React.FC<TestHeaderProps> = ({
                   <span className="text-[10px] text-emerald-600 font-bold">(Completed)</span>
                 ) : isActive ? (
                   <span className="text-[10px] text-blue-100 font-bold">(Active)</span>
-                ) : isSectionalTimer ? (
+                ) : !isComposite && isSectionalTimer ? (
                   <span className="text-[10px] text-slate-400 font-medium">(Locked)</span>
                 ) : null}
               </button>
             );
           })}
 
-          {isSectionalTimer && (
+          {isComposite ? (
+            <span className="text-[11px] text-emerald-600 font-medium ml-auto hidden md:inline">
+              Free bidirectional navigation enabled across all sections
+            </span>
+          ) : isSectionalTimer ? (
             <span className="text-[11px] text-slate-500 italic ml-auto hidden md:inline">
               20m section lock active • Auto-advances to next section when timer concludes
             </span>
-          )}
+          ) : null}
         </div>
       </div>
     </header>

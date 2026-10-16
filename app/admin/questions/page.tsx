@@ -361,7 +361,7 @@ export default function AdminQuestionsPage() {
   const [pyqTitle, setPyqTitle] = useState('');
   const [pyqExamId, setPyqExamId] = useState('exam-ibps-po');
   const [pyqCustomExamTitle, setPyqCustomExamTitle] = useState('');
-  const [pyqCustomExamCategory, setPyqCustomExamCategory] = useState<'PO' | 'CLERK' | 'SO' | 'OTHER'>('PO');
+  const [pyqCustomExamCategory, setPyqCustomExamCategory] = useState<'PO' | 'CLERK' | 'SO' | 'SSC' | 'RAILWAY' | 'OTHER'>('PO');
   const [pyqYear, setPyqYear] = useState<number | ''>(new Date().getFullYear());
   const [pyqDuration, setPyqDuration] = useState(60);
   const [pyqMarks, setPyqMarks] = useState(100);
@@ -2409,7 +2409,9 @@ export default function AdminQuestionsPage() {
                   <option value="PO">PO (Probationary Officer / Scale 1)</option>
                   <option value="CLERK">Clerk (Junior Associate / Assistant)</option>
                   <option value="SO">SO (Specialist Officer)</option>
-                  <option value="OTHER">Other Banking / Insurance</option>
+                  <option value="SSC">SSC (CGL, CHSL, MTS, CPO)</option>
+                  <option value="RAILWAY">Railway (RRB NTPC, Group D, ALP)</option>
+                  <option value="OTHER">Other Banking / Insurance / Regulatory</option>
                 </select>
               </div>
             </div>

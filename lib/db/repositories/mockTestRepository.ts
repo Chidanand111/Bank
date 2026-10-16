@@ -101,6 +101,10 @@ export class MockTestRepository {
         isPyq: t.isPyq,
         year: t.year ?? undefined,
         status: t.isPublished ? 'published' : 'created',
+        timerType: t.timerType,
+        allowSectionSwitch: t.allowSectionSwitch,
+        negativeMarkRatio: t.negativeMarkRatio,
+        stage: t.stage ?? undefined,
         sections,
         questions: liveQuestions,
       };
@@ -208,6 +212,10 @@ export class MockTestRepository {
       isPyq: t.isPyq,
       year: t.year ?? undefined,
       status: t.isPublished ? 'published' : 'created',
+      timerType: t.timerType,
+      allowSectionSwitch: t.allowSectionSwitch,
+      negativeMarkRatio: t.negativeMarkRatio,
+      stage: t.stage ?? undefined,
       sections,
       questions: liveQuestions,
     };
@@ -243,6 +251,10 @@ export class MockTestRepository {
         isFixed: true,
         isPyq,
         year,
+        timerType: input.timerType || 'SECTIONAL_LOCKED',
+        allowSectionSwitch: input.allowSectionSwitch ?? false,
+        negativeMarkRatio: input.negativeMarkRatio ?? 0.25,
+        stage: input.stage || null,
       },
       create: {
         id: newId,
@@ -259,6 +271,10 @@ export class MockTestRepository {
         isFixed: true,
         isPyq,
         year,
+        timerType: input.timerType || 'SECTIONAL_LOCKED',
+        allowSectionSwitch: input.allowSectionSwitch ?? false,
+        negativeMarkRatio: input.negativeMarkRatio ?? 0.25,
+        stage: input.stage || null,
       },
     });
 

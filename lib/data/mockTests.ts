@@ -250,6 +250,61 @@ export const MOCK_TESTS_DATA: MockTest[] = [
     ],
     questions: [],
   },
+
+  // --- SSC CGL TIER 1 MOCK 1 ---
+  {
+    id: 'mock-ssc-cgl-tier1-1',
+    slug: 'ssc-cgl-tier-1-full-mock-1',
+    title: 'SSC CGL Tier-1 Full Mock Test 1',
+    description: 'Official pattern 100-Question mock test for SSC CGL Tier-1: 25 Reasoning, 25 General Awareness, 25 Quantitative Aptitude, 25 English (+2 marks, -0.50 negative, 60 mins composite timer).',
+    examId: 'exam-ssc-cgl',
+    examSlug: 'ssc-cgl',
+    examTitle: 'SSC CGL (Combined Graduate Level)',
+    durationMinutes: 60,
+    totalMarks: 200,
+    totalQuestions: 100,
+    cutoffMarks: 135.0,
+    isFree: true,
+    isFixed: true,
+    timerType: 'OVERALL_COMPOSITE',
+    allowSectionSwitch: true,
+    negativeMarkRatio: 0.50,
+    stage: 'Tier-1',
+    sections: [
+      { id: 'sec-ssc-cgl-reason', code: 'REASONING', name: 'General Intelligence & Reasoning', durationMinutes: 0, questionCount: 25, marks: 50 },
+      { id: 'sec-ssc-cgl-ga', code: 'GA', name: 'General Awareness', durationMinutes: 0, questionCount: 25, marks: 50 },
+      { id: 'sec-ssc-cgl-quant', code: 'QUANT', name: 'Quantitative Aptitude', durationMinutes: 0, questionCount: 25, marks: 50 },
+      { id: 'sec-ssc-cgl-eng', code: 'ENGLISH', name: 'English Comprehension', durationMinutes: 0, questionCount: 25, marks: 50 },
+    ],
+    questions: [],
+  },
+
+  // --- RRB NTPC CBT-1 MOCK 1 ---
+  {
+    id: 'mock-rrb-ntpc-cbt1-1',
+    slug: 'rrb-ntpc-cbt-1-full-mock-1',
+    title: 'RRB NTPC CBT-1 Full Mock Test 1',
+    description: 'Official pattern 100-Question mock test for RRB NTPC 1st Stage CBT: 40 General Awareness, 30 Mathematics, 30 Reasoning (+1 mark, -0.333 negative, 90 mins composite countdown).',
+    examId: 'exam-rrb-ntpc',
+    examSlug: 'rrb-ntpc',
+    examTitle: 'RRB NTPC (Non-Technical Popular Categories)',
+    durationMinutes: 90,
+    totalMarks: 100,
+    totalQuestions: 100,
+    cutoffMarks: 72.0,
+    isFree: true,
+    isFixed: true,
+    timerType: 'OVERALL_COMPOSITE',
+    allowSectionSwitch: true,
+    negativeMarkRatio: 0.333,
+    stage: 'CBT-1',
+    sections: [
+      { id: 'sec-rrb-ntpc-ga', code: 'GA', name: 'General Awareness', durationMinutes: 0, questionCount: 40, marks: 40 },
+      { id: 'sec-rrb-ntpc-math', code: 'QUANT', name: 'Mathematics', durationMinutes: 0, questionCount: 30, marks: 30 },
+      { id: 'sec-rrb-ntpc-reason', code: 'REASONING', name: 'General Intelligence & Reasoning', durationMinutes: 0, questionCount: 30, marks: 30 },
+    ],
+    questions: [],
+  },
 ];
 
 MOCK_TESTS_DATA.forEach(t => {

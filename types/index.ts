@@ -1,5 +1,6 @@
 export type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
-export type ExamCategory = 'PO' | 'CLERK' | 'SO' | 'OTHER';
+export type ExamCategory = 'PO' | 'CLERK' | 'SO' | 'SSC' | 'RAILWAY' | 'OTHER';
+export type TimerType = 'SECTIONAL_LOCKED' | 'OVERALL_COMPOSITE' | 'GROUPED_SESSION';
 export type Role = 'USER' | 'ADMIN';
 export type UserStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
@@ -123,6 +124,10 @@ export interface MockTest {
   isFixed?: boolean;
   isPyq?: boolean;
   year?: number;
+  timerType?: TimerType;
+  allowSectionSwitch?: boolean;
+  negativeMarkRatio?: number;
+  stage?: string;
   enableSectionalTimer?: boolean;
   sectionDurationMinutes?: number;
   status?: ExamStatus;
@@ -314,6 +319,10 @@ export interface AdminMockTestInput {
   isFree?: boolean;
   isPyq?: boolean;
   year?: number | null;
+  timerType?: TimerType;
+  allowSectionSwitch?: boolean;
+  negativeMarkRatio?: number;
+  stage?: string;
   enableSectionalTimer?: boolean;
   sectionDurationMinutes?: number;
   status?: ExamStatus;

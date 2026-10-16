@@ -125,6 +125,12 @@ export async function saveAttemptAction(
             if (optExists) validOptionId = optExists.id;
           }
 
+          const fallbackMarks = qd.isCorrect
+            ? (qd.question.marks ?? 1.0)
+            : isAnswered
+            ? -(qd.question.negativeMarks ?? ((qd.question.marks ?? 1.0) * (dbMockTest?.negativeMarkRatio ?? 0.25)))
+            : 0;
+
           await prisma.answer.upsert({
             where: {
               attemptId_questionId: {
@@ -137,7 +143,7 @@ export async function saveAttemptAction(
               isMarkedForReview: isMarked,
               isAnswered,
               isCorrect: qd.isCorrect,
-              marksObtained: qd.marksObtained ?? (qd.isCorrect ? 1.0 : isAnswered ? -0.25 : 0),
+              marksObtained: qd.marksObtained ?? fallbackMarks,
               timeSpentSeconds: qd.timeSpentSeconds || 0,
             },
             create: {
@@ -147,7 +153,7 @@ export async function saveAttemptAction(
               isMarkedForReview: isMarked,
               isAnswered,
               isCorrect: qd.isCorrect,
-              marksObtained: qd.marksObtained ?? (qd.isCorrect ? 1.0 : isAnswered ? -0.25 : 0),
+              marksObtained: qd.marksObtained ?? fallbackMarks,
               timeSpentSeconds: qd.timeSpentSeconds || 0,
             },
           });

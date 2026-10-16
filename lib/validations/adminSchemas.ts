@@ -44,7 +44,7 @@ export const bulkImportQuestionsSchema = z
 export const adminExamInputSchema = z.object({
   title: z.string().min(1, 'Exam title is required'),
   slug: z.string().optional(),
-  category: z.enum(['PO', 'CLERK', 'SO', 'OTHER']).optional(),
+  category: z.enum(['PO', 'CLERK', 'SO', 'SSC', 'RAILWAY', 'OTHER']).optional(),
   description: z.string().optional(),
   status: z.enum(['created', 'published']).optional(),
 });
@@ -69,7 +69,7 @@ export const adminMockTestInputSchema = z.object({
   description: z.string().optional(),
   examId: z.string().min(1, 'Exam ID is required'),
   customExamTitle: z.string().optional(),
-  customExamCategory: z.enum(['PO', 'CLERK', 'SO', 'OTHER']).optional(),
+  customExamCategory: z.enum(['PO', 'CLERK', 'SO', 'SSC', 'RAILWAY', 'OTHER']).optional(),
   durationMinutes: z.number().int().positive().optional().default(60),
   totalMarks: z.number().positive().optional().default(100),
   cutoffMarks: z.number().nonnegative().optional().default(60),
@@ -79,6 +79,10 @@ export const adminMockTestInputSchema = z.object({
     .union([z.number().int(), z.string().regex(/^\d{4}$/).transform(Number)])
     .nullable()
     .optional(),
+  timerType: z.enum(['SECTIONAL_LOCKED', 'OVERALL_COMPOSITE', 'GROUPED_SESSION']).optional().default('SECTIONAL_LOCKED'),
+  allowSectionSwitch: z.boolean().optional().default(false),
+  negativeMarkRatio: z.number().nonnegative().optional().default(0.25),
+  stage: z.string().optional(),
   enableSectionalTimer: z.boolean().optional(),
   sectionDurationMinutes: z.number().int().positive().optional(),
   status: z.enum(['created', 'published']).optional(),

@@ -12,6 +12,7 @@ export interface ExamCardProps {
 
 export const ExamCard: React.FC<ExamCardProps> = ({ exam }) => {
   const prelimsPattern = exam.patterns.find(p => p.stage === 'Prelims');
+  const categoryVariant = exam.category === 'SSC' ? 'purple' : exam.category === 'RAILWAY' ? 'amber' : 'blue';
 
   return (
     <Card hoverEffect className="flex flex-col h-full">
@@ -19,7 +20,7 @@ export const ExamCard: React.FC<ExamCardProps> = ({ exam }) => {
         <div>
           <div className="flex justify-between items-start gap-3 mb-3">
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge variant="blue" size="md">
+              <Badge variant={categoryVariant} size="md">
                 {exam.category} EXAM
               </Badge>
               {exam.status === 'created' && (

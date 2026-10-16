@@ -404,7 +404,9 @@ export default function AdminExamsPage() {
               <option value="PO">PO (Probationary Officer / Scale 1)</option>
               <option value="CLERK">Clerk (Junior Associate / Assistant)</option>
               <option value="SO">SO (Specialist Officer)</option>
-              <option value="OTHER">Other Banking / Insurance</option>
+              <option value="SSC">SSC (CGL, CHSL, MTS, CPO)</option>
+              <option value="RAILWAY">Railway (RRB NTPC, Group D, ALP)</option>
+              <option value="OTHER">Other Banking / Insurance / Regulatory</option>
             </select>
           </div>
 

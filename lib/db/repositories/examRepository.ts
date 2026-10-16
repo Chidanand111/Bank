@@ -155,10 +155,21 @@ export class ExamRepository {
       }
     };
 
-    await ensureSection('ENGLISH', 'English Language', 1);
-    await ensureSection('QUANT', 'Quantitative Aptitude', 2);
-    await ensureSection('REASONING', 'Reasoning Ability', 3);
-    await ensureSection('FINANCIAL_AWARENESS', 'General / Banking Awareness', 4);
+    if (category === 'RAILWAY') {
+      await ensureSection('GA', 'General Awareness', 1);
+      await ensureSection('QUANT', 'Mathematics', 2);
+      await ensureSection('REASONING', 'General Intelligence & Reasoning', 3);
+    } else if (category === 'SSC') {
+      await ensureSection('REASONING', 'General Intelligence & Reasoning', 1);
+      await ensureSection('GA', 'General Awareness', 2);
+      await ensureSection('QUANT', 'Quantitative Aptitude', 3);
+      await ensureSection('ENGLISH', 'English Comprehension', 4);
+    } else {
+      await ensureSection('ENGLISH', 'English Language', 1);
+      await ensureSection('QUANT', 'Quantitative Aptitude', 2);
+      await ensureSection('REASONING', 'Reasoning Ability', 3);
+      await ensureSection('FINANCIAL_AWARENESS', 'General / Banking Awareness', 4);
+    }
 
     const updated = await this.findByIdOrSlug(dbExam.id);
     return updated!;

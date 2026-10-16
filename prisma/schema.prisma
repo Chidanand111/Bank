@@ -17,7 +17,15 @@ enum ExamCategory {
   PO
   CLERK
   SO
+  SSC
+  RAILWAY
   OTHER
+}
+
+enum TimerType {
+  SECTIONAL_LOCKED
+  OVERALL_COMPOSITE
+  GROUPED_SESSION
 }
 
 enum Role {
@@ -149,6 +157,10 @@ model MockTest {
   isFixed           Boolean            @default(false)
   isPyq             Boolean            @default(false)
   year              Int?
+  timerType          TimerType          @default(SECTIONAL_LOCKED)
+  allowSectionSwitch Boolean            @default(false)
+  negativeMarkRatio  Float              @default(0.25)
+  stage              String?
   mockTestQuestions MockTestQuestion[]
   attempts          Attempt[]
   createdAt         DateTime           @default(now())

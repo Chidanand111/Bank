@@ -308,15 +308,37 @@ export async function createMockTestAction(
     ? new Date().getFullYear()
     : undefined;
 
-  const defaultSections = [
-    { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30 },
-    { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35 },
-    { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35 },
-  ];
+  const defaultSections =
+    exam.category === 'RAILWAY'
+      ? [
+          { code: 'GA', name: 'General Awareness', questionCount: 40, marks: 40 },
+          { code: 'QUANT', name: 'Mathematics', questionCount: 30, marks: 30 },
+          { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 30, marks: 30 },
+        ]
+      : exam.category === 'SSC'
+      ? [
+          { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 25, marks: 50 },
+          { code: 'GA', name: 'General Awareness', questionCount: 25, marks: 50 },
+          { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 25, marks: 50 },
+          { code: 'ENGLISH', name: 'English Comprehension', questionCount: 25, marks: 50 },
+        ]
+      : [
+          { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30 },
+          { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35 },
+          { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35 },
+        ];
+
   const targetSections =
     validData.sections && validData.sections.length > 0 ? validData.sections : defaultSections;
   const totalQuestions = targetSections.reduce((acc, s) => acc + (s.questionCount || 0), 0);
+  const totalMarks = validData.totalMarks || (exam.category === 'SSC' ? 200 : 100);
   const status: ExamStatus = validData.status || 'published';
+
+  const isOverallTimer = exam.category === 'SSC' || exam.category === 'RAILWAY';
+  const resolvedTimerType = validData.timerType || (isOverallTimer ? 'OVERALL_COMPOSITE' : 'SECTIONAL_LOCKED');
+  const resolvedAllowSwitch = validData.allowSectionSwitch ?? isOverallTimer;
+  const resolvedNegativeRatio =
+    validData.negativeMarkRatio ?? (exam.category === 'SSC' ? 0.5 : exam.category === 'RAILWAY' ? 0.333 : 0.25);
 
   const newTest: MockTest = {
     id: newId,
@@ -326,14 +348,18 @@ export async function createMockTestAction(
     examId: exam.id,
     examSlug: exam.slug,
     examTitle: exam.title,
-    durationMinutes: validData.durationMinutes || 60,
-    totalMarks: validData.totalMarks || 100,
+    durationMinutes: validData.durationMinutes || (exam.category === 'RAILWAY' ? 90 : 60),
+    totalMarks,
     totalQuestions,
-    cutoffMarks: validData.cutoffMarks || 60,
+    cutoffMarks: validData.cutoffMarks || (exam.category === 'SSC' ? 120 : 60),
     isFree: validData.isFree ?? true,
     isFixed: true,
     isPyq,
     year,
+    timerType: resolvedTimerType,
+    allowSectionSwitch: resolvedAllowSwitch,
+    negativeMarkRatio: resolvedNegativeRatio,
+    stage: validData.stage || (exam.category === 'SSC' ? 'Tier-1' : exam.category === 'RAILWAY' ? 'CBT-1' : 'Prelims'),
     status,
     sections: targetSections.map(s => ({
       id: `sec-${s.code.toLowerCase()}`,
@@ -341,13 +367,20 @@ export async function createMockTestAction(
       name: s.name,
       questionCount: s.questionCount,
       marks: s.marks,
-      durationMinutes: s.code === 'FINANCIAL_AWARENESS' ? 35 : s.questionCount >= 40 ? 45 : 20,
+      durationMinutes: isOverallTimer ? 0 : s.code === 'FINANCIAL_AWARENESS' ? 35 : s.questionCount >= 40 ? 45 : 20,
     })),
     questions: [],
   };
 
   try {
-    await MockTestRepository.upsertMockTest(validData, exam.id);
+    await MockTestRepository.upsertMockTest({
+      ...validData,
+      totalMarks,
+      timerType: resolvedTimerType,
+      allowSectionSwitch: resolvedAllowSwitch,
+      negativeMarkRatio: resolvedNegativeRatio,
+      stage: newTest.stage,
+    }, exam.id);
   } catch (dbErr) {
     console.warn('MockTestRepository.upsertMockTest error in createMockTestAction:', dbErr);
   }

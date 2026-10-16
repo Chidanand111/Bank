@@ -36,14 +36,14 @@ export default async function ExamsPage() {
             <BookOpen className="w-6 h-6" />
           </div>
           <div>
-            <Badge variant="blue" size="sm" className="mb-1">Banking Exam Catalog</Badge>
+            <Badge variant="blue" size="sm" className="mb-1">All Competitive Examinations</Badge>
             <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              Target Banking Examinations
+              Target Banking, SSC & Railway Examinations
             </h1>
           </div>
         </div>
         <p className="text-slate-600 text-base max-w-3xl leading-relaxed">
-          Explore complete pattern breakdowns, sectional weightages, and high-yield mock test series for Public Sector Banks (IBPS) and State Bank of India (SBI).
+          Explore complete pattern breakdowns, sectional weightages, and high-yield mock test series for Banking (IBPS, SBI), Staff Selection Commission (SSC CGL, CHSL), and Indian Railways (RRB NTPC).
         </p>
       </div>
 
