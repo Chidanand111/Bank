@@ -1,10 +1,9 @@
 import { PrismaClient } from '@prisma/client';
-
-// Known Neon PostgreSQL connection string for BankMock isolation schema
-const NEON_DEFAULT_URL =
-  'postgresql://neondb_owner:npg_OfCgI5hvq9wL@ep-red-wildflower-aeanr4by-pooler.c-2.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require&schema=bankmock&connect_timeout=30';
+import fs from 'fs';
+import path from 'path';
 
 function resolveDatabaseUrl(): string {
+  // 1. Direct environment variable lookup
   const candidate =
     process.env.DATABASE_URL ||
     process.env.POSTGRES_PRISMA_URL ||
@@ -16,8 +15,25 @@ function resolveDatabaseUrl(): string {
     return candidate.trim();
   }
 
-  // Fallback to project Neon PostgreSQL cluster with schema=bankmock
-  return NEON_DEFAULT_URL;
+  // 2. Local development fallback: parse .env if not loaded yet into process.env
+  try {
+    const envPath = path.resolve(process.cwd(), '.env');
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, 'utf8');
+      const match = content.match(/^DATABASE_URL\s*=\s*["']?([^"'\r\n]+)["']?/m);
+      if (match && match[1]?.trim() && !match[1].includes('127.0.0.1:5432')) {
+        return match[1].trim();
+      }
+    }
+  } catch {
+    // Ignore error reading .env
+  }
+
+  // 3. Fallback dummy placeholder to allow PrismaClient instantiation without hardcoded secrets
+  return (
+    process.env.DATABASE_URL ||
+    'postgresql://postgres:postgres@localhost:5432/bankmock?sslmode=disable&connect_timeout=2'
+  );
 }
 
 const activeDatabaseUrl = resolveDatabaseUrl();
@@ -46,7 +62,9 @@ export function isDatabaseConfigured(): boolean {
   return Boolean(
     url.trim() &&
     !url.includes('127.0.0.1:5432') &&
-    !url.includes('user:password')
+    !url.includes('localhost:5432') &&
+    !url.includes('user:password') &&
+    !url.includes('postgres:postgres')
   );
 }
 
