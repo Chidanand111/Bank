@@ -54,7 +54,14 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  Clock,
 } from 'lucide-react';
+import {
+  EXAM_PRESETS,
+  EXAM_PRESET_OPTIONS,
+  ExamPresetKey,
+  detectDefaultPresetForExam,
+} from '@/lib/data/examPresets';
 
 export type ExamPartition = AdminPartitionInfo;
 
@@ -367,7 +374,33 @@ export default function AdminQuestionsPage() {
   const [pyqMarks, setPyqMarks] = useState(100);
   const [pyqCutoff, setPyqCutoff] = useState(60);
   const [pyqDescription, setPyqDescription] = useState('Authentic Previous Year Question Paper with official questions.');
-  const [pyqPreset, setPyqPreset] = useState<'PRELIMS_3' | 'MAINS_4'>('PRELIMS_3');
+  const [pyqPreset, setPyqPreset] = useState<ExamPresetKey>('PRELIMS_3');
+
+  // Auto-adjust timing, marks, and cutoffs when exam preset changes
+  const handlePyqPresetChange = (preset: ExamPresetKey) => {
+    setPyqPreset(preset);
+    const config = EXAM_PRESETS[preset];
+    if (config && preset !== 'CUSTOM') {
+      setPyqDuration(config.totalDuration);
+      setPyqMarks(config.totalMarks);
+      setPyqCutoff(config.cutoffMarks);
+    }
+  };
+
+  const handlePyqExamChange = (selectedExamId: string) => {
+    setPyqExamId(selectedExamId);
+    if (selectedExamId !== '__NEW_EXAM__') {
+      const selectedExam = exams.find(e => e.id === selectedExamId);
+      const recommended = detectDefaultPresetForExam(selectedExamId, selectedExam?.category);
+      handlePyqPresetChange(recommended);
+    }
+  };
+
+  const handlePyqCustomCategoryChange = (category: 'PO' | 'CLERK' | 'SO' | 'SSC' | 'RAILWAY' | 'OTHER') => {
+    setPyqCustomExamCategory(category);
+    const recommended = detectDefaultPresetForExam(undefined, category);
+    handlePyqPresetChange(recommended);
+  };
 
   // Partition Organizing & Search States
   const [partitionFilter, setPartitionFilter] = useState<'ALL' | 'EXAM' | 'PYQ' | 'MOCK'>('ALL');
@@ -456,18 +489,21 @@ export default function AdminQuestionsPage() {
   const handleCreatePyqFromModal = (e: React.FormEvent) => {
     e.preventDefault();
 
-    let sections = [
-      { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30 },
-      { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35 },
-      { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35 },
-    ];
+    const config = EXAM_PRESETS[pyqPreset] || EXAM_PRESETS.PRELIMS_3;
 
-    if (pyqPreset === 'MAINS_4') {
+    let sections = config.sections.map((s) => ({
+      code: s.code,
+      name: s.name,
+      questionCount: s.questionCount,
+      marks: s.marks,
+      durationMinutes: s.durationMinutes,
+    }));
+
+    if (pyqPreset === 'CUSTOM' || sections.length === 0) {
       sections = [
-        { code: 'REASONING', name: 'Reasoning & Computer Aptitude', questionCount: 45, marks: 60 },
-        { code: 'ENGLISH', name: 'English Language', questionCount: 35, marks: 40 },
-        { code: 'QUANT', name: 'Data Analysis & Interpretation', questionCount: 35, marks: 60 },
-        { code: 'FINANCIAL_AWARENESS', name: 'General / Banking Awareness', questionCount: 40, marks: 40 },
+        { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30, durationMinutes: 20 },
+        { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35, durationMinutes: 20 },
+        { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35, durationMinutes: 20 },
       ];
     }
 
@@ -484,6 +520,12 @@ export default function AdminQuestionsPage() {
       isFree: true,
       isPyq: true,
       year: pyqYear !== '' ? Number(pyqYear) : new Date().getFullYear(),
+      timerType: config.timerType,
+      allowSectionSwitch: config.allowSectionSwitch,
+      negativeMarkRatio: config.negativeMarkRatio,
+      stage: config.stage,
+      enableSectionalTimer: config.timerType === 'SECTIONAL_LOCKED',
+      sectionDurationMinutes: config.sections[0]?.durationMinutes,
       sections,
     };
 
@@ -924,7 +966,14 @@ export default function AdminQuestionsPage() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setIsCreatePyqModalOpen(true)}
+              onClick={() => {
+                if (exams.length > 0) {
+                  const currExam = exams.find(e => e.id === pyqExamId) || exams[0];
+                  if (!pyqExamId) setPyqExamId(currExam.id);
+                  handlePyqPresetChange(detectDefaultPresetForExam(currExam.id, currExam.category));
+                }
+                setIsCreatePyqModalOpen(true);
+              }}
               className="flex items-center gap-1.5 text-xs font-bold border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 shrink-0 shadow-xs"
             >
               <PlusCircle className="w-3.5 h-3.5 text-indigo-600" />
@@ -1492,6 +1541,7 @@ export default function AdminQuestionsPage() {
               <option value="REASONING">Reasoning Ability</option>
               <option value="ENGLISH">English Language</option>
               <option value="FINANCIAL_AWARENESS">General / Banking Awareness</option>
+              <option value="GA">General Awareness (SSC / Railway)</option>
             </select>
           </div>
 
@@ -1902,6 +1952,7 @@ export default function AdminQuestionsPage() {
                   <option value="REASONING">Reasoning Ability</option>
                   <option value="ENGLISH">English Language</option>
                   <option value="FINANCIAL_AWARENESS">General / Banking Awareness</option>
+                  <option value="GA">General Awareness (SSC / Railway)</option>
                 </select>
               </div>
             </div>
@@ -2372,7 +2423,7 @@ export default function AdminQuestionsPage() {
             </label>
             <select
               value={pyqExamId}
-              onChange={(e) => setPyqExamId(e.target.value)}
+              onChange={(e) => handlePyqExamChange(e.target.value)}
               className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
             >
               {exams.map((ex) => (
@@ -2403,7 +2454,7 @@ export default function AdminQuestionsPage() {
                 <label className="font-bold text-indigo-950 block mb-1">Category</label>
                 <select
                   value={pyqCustomExamCategory}
-                  onChange={(e) => setPyqCustomExamCategory(e.target.value as any)}
+                  onChange={(e) => handlePyqCustomCategoryChange(e.target.value as any)}
                   className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs"
                 >
                   <option value="PO">PO (Probationary Officer / Scale 1)</option>
@@ -2438,26 +2489,73 @@ export default function AdminQuestionsPage() {
               </label>
               <select
                 value={pyqPreset}
-                onChange={(e) => {
-                  const val = e.target.value as 'PRELIMS_3' | 'MAINS_4';
-                  setPyqPreset(val);
-                  if (val === 'PRELIMS_3') {
-                    setPyqDuration(60);
-                    setPyqMarks(100);
-                    setPyqCutoff(60);
-                  } else {
-                    setPyqDuration(180);
-                    setPyqMarks(200);
-                    setPyqCutoff(90);
-                  }
-                }}
-                className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold"
+                onChange={(e) => handlePyqPresetChange(e.target.value as ExamPresetKey)}
+                className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900"
               >
-                <option value="PRELIMS_3">Prelims Standard (3 Sections: Eng 30, Quant 35, Reas 35 — 100 M / 60 Min)</option>
-                <option value="MAINS_4">Mains Standard (4 Sections: Reas 45, Eng 35, Quant 35, GA 40 — 200 M / 180 Min)</option>
+                {EXAM_PRESET_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
+
+          {/* Timing & Marks Breakdown Preview Card */}
+          {EXAM_PRESETS[pyqPreset] && (
+            <div className="p-3 bg-gradient-to-br from-slate-50 to-indigo-50/50 rounded-xl border border-indigo-100 text-xs space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-1.5">
+                <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                  Section Timings & Marks Breakdown
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100/90 text-indigo-800 border border-indigo-200">
+                  {EXAM_PRESETS[pyqPreset].badge}
+                </span>
+              </div>
+
+              {EXAM_PRESETS[pyqPreset].sections.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-2xs">
+                  <table className="w-full text-left border-collapse text-[11px]">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                        <th className="py-1.5 px-2.5">Section</th>
+                        <th className="py-1.5 px-2 text-center">Questions</th>
+                        <th className="py-1.5 px-2 text-center">Marks</th>
+                        <th className="py-1.5 px-2.5 text-right">Time Allocated</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {EXAM_PRESETS[pyqPreset].sections.map((sec) => (
+                        <tr key={sec.code} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-1.5 px-2.5 font-medium text-slate-900">{sec.name}</td>
+                          <td className="py-1.5 px-2 text-center font-semibold">{sec.questionCount}</td>
+                          <td className="py-1.5 px-2 text-center font-semibold">{sec.marks}</td>
+                          <td className="py-1.5 px-2.5 text-right font-bold text-indigo-600">
+                            {sec.durationMinutes} min
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-indigo-50/70 font-bold text-indigo-950 border-t border-indigo-100">
+                        <td className="py-1.5 px-2.5">Total</td>
+                        <td className="py-1.5 px-2 text-center">
+                          {EXAM_PRESETS[pyqPreset].sections.reduce((acc, s) => acc + s.questionCount, 0)}
+                        </td>
+                        <td className="py-1.5 px-2 text-center">{EXAM_PRESETS[pyqPreset].totalMarks}</td>
+                        <td className="py-1.5 px-2.5 text-right text-indigo-700">
+                          {EXAM_PRESETS[pyqPreset].totalDuration} min
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-500 italic">
+                  Custom pattern: enter duration, total marks, and cutoff marks manually below.
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <label className="font-semibold text-slate-700 block mb-1">

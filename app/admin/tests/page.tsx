@@ -30,6 +30,12 @@ import {
   ExternalLink,
   BookOpen,
 } from 'lucide-react';
+import {
+  EXAM_PRESETS,
+  EXAM_PRESET_OPTIONS,
+  ExamPresetKey,
+  detectDefaultPresetForExam,
+} from '@/lib/data/examPresets';
 
 export default function AdminTestsPage() {
   const [tests, setTests] = useState<MockTest[]>([]);
@@ -56,7 +62,7 @@ export default function AdminTestsPage() {
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [totalMarks, setTotalMarks] = useState(100);
   const [cutoffMarks, setCutoffMarks] = useState(60);
-  const [sectionPreset, setSectionPreset] = useState<'PRELIMS_3' | 'MAINS_4' | 'SSC_TIER1_4' | 'SSC_TIER1_SECTIONAL' | 'RRB_NTPC_3' | 'CUSTOM'>('PRELIMS_3');
+  const [sectionPreset, setSectionPreset] = useState<ExamPresetKey>('PRELIMS_3');
 
   const [isPending, startTransition] = useTransition();
 
@@ -93,29 +99,35 @@ export default function AdminTestsPage() {
   };
 
   // Auto-adjust duration and marks on preset change
-  const handlePresetChange = (preset: 'PRELIMS_3' | 'MAINS_4' | 'SSC_TIER1_4' | 'SSC_TIER1_SECTIONAL' | 'RRB_NTPC_3' | 'CUSTOM') => {
+  const handlePresetChange = (preset: ExamPresetKey) => {
     setSectionPreset(preset);
-    if (preset === 'PRELIMS_3') {
-      setDurationMinutes(60);
-      setTotalMarks(100);
-      setCutoffMarks(65);
-    } else if (preset === 'MAINS_4') {
-      setDurationMinutes(180);
-      setTotalMarks(200);
-      setCutoffMarks(75);
-    } else if (preset === 'SSC_TIER1_4' || preset === 'SSC_TIER1_SECTIONAL') {
-      setDurationMinutes(60);
-      setTotalMarks(200);
-      setCutoffMarks(130);
-    } else if (preset === 'RRB_NTPC_3') {
-      setDurationMinutes(90);
-      setTotalMarks(100);
-      setCutoffMarks(72);
+    const config = EXAM_PRESETS[preset];
+    if (config && preset !== 'CUSTOM') {
+      setDurationMinutes(config.totalDuration);
+      setTotalMarks(config.totalMarks);
+      setCutoffMarks(config.cutoffMarks);
     }
+  };
+
+  const handleExamChange = (newExamId: string) => {
+    setExamId(newExamId);
+    if (newExamId !== '__NEW_EXAM__') {
+      const selected = exams.find(e => e.id === newExamId);
+      const recommended = detectDefaultPresetForExam(newExamId, selected?.category);
+      handlePresetChange(recommended);
+    }
+  };
+
+  const handleCustomCategoryChange = (category: 'PO' | 'CLERK' | 'SO' | 'SSC' | 'RAILWAY' | 'OTHER') => {
+    setCustomExamCategory(category);
+    const recommended = detectDefaultPresetForExam(undefined, category);
+    handlePresetChange(recommended);
   };
 
   const handleCreateTest = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const config = EXAM_PRESETS[sectionPreset] || EXAM_PRESETS.PRELIMS_3;
 
     let sections: {
       code: string;
@@ -123,57 +135,20 @@ export default function AdminTestsPage() {
       questionCount: number;
       marks: number;
       durationMinutes?: number;
-    }[] = [
-      { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30, durationMinutes: 20 },
-      { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35, durationMinutes: 20 },
-      { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35, durationMinutes: 20 },
-    ];
+    }[] = config.sections.map((s) => ({
+      code: s.code,
+      name: s.name,
+      questionCount: s.questionCount,
+      marks: s.marks,
+      durationMinutes: s.durationMinutes,
+    }));
 
-    let isComposite = false;
-    let timerType: 'SECTIONAL_LOCKED' | 'OVERALL_COMPOSITE' = 'SECTIONAL_LOCKED';
-    let negativeMarkRatio = 0.25;
-    let stage = 'Prelims';
-
-    if (sectionPreset === 'MAINS_4') {
+    if (sectionPreset === 'CUSTOM' || sections.length === 0) {
       sections = [
-        { code: 'REASONING', name: 'Reasoning & Computer Aptitude', questionCount: 45, marks: 60 },
-        { code: 'ENGLISH', name: 'English Language', questionCount: 35, marks: 40 },
-        { code: 'QUANT', name: 'Data Analysis & Interpretation', questionCount: 35, marks: 60 },
-        { code: 'FINANCIAL_AWARENESS', name: 'General / Banking Awareness', questionCount: 40, marks: 40 },
+        { code: 'ENGLISH', name: 'English Language', questionCount: 30, marks: 30, durationMinutes: 20 },
+        { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 35, marks: 35, durationMinutes: 20 },
+        { code: 'REASONING', name: 'Reasoning Ability', questionCount: 35, marks: 35, durationMinutes: 20 },
       ];
-      stage = 'Mains';
-    } else if (sectionPreset === 'SSC_TIER1_4') {
-      sections = [
-        { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 25, marks: 50, durationMinutes: 15 },
-        { code: 'GA', name: 'General Awareness', questionCount: 25, marks: 50, durationMinutes: 15 },
-        { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 25, marks: 50, durationMinutes: 15 },
-        { code: 'ENGLISH', name: 'English Comprehension', questionCount: 25, marks: 50, durationMinutes: 15 },
-      ];
-      isComposite = true;
-      timerType = 'OVERALL_COMPOSITE';
-      negativeMarkRatio = 0.50;
-      stage = 'Tier-1';
-    } else if (sectionPreset === 'SSC_TIER1_SECTIONAL') {
-      sections = [
-        { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 25, marks: 50, durationMinutes: 15 },
-        { code: 'GA', name: 'General Awareness', questionCount: 25, marks: 50, durationMinutes: 15 },
-        { code: 'QUANT', name: 'Quantitative Aptitude', questionCount: 25, marks: 50, durationMinutes: 15 },
-        { code: 'ENGLISH', name: 'English Comprehension', questionCount: 25, marks: 50, durationMinutes: 15 },
-      ];
-      isComposite = false;
-      timerType = 'SECTIONAL_LOCKED';
-      negativeMarkRatio = 0.50;
-      stage = 'Tier-1';
-    } else if (sectionPreset === 'RRB_NTPC_3') {
-      sections = [
-        { code: 'GA', name: 'General Awareness', questionCount: 40, marks: 40 },
-        { code: 'QUANT', name: 'Mathematics', questionCount: 30, marks: 30 },
-        { code: 'REASONING', name: 'General Intelligence & Reasoning', questionCount: 30, marks: 30 },
-      ];
-      isComposite = true;
-      timerType = 'OVERALL_COMPOSITE';
-      negativeMarkRatio = 0.333;
-      stage = 'CBT-1';
     }
 
     const inputData: AdminMockTestInput = {
@@ -189,10 +164,12 @@ export default function AdminTestsPage() {
       isFree: true,
       isPyq: Boolean(isPyq),
       year: isPyq && year ? Number(year) : undefined,
-      timerType,
-      allowSectionSwitch: isComposite,
-      negativeMarkRatio,
-      stage,
+      timerType: config.timerType,
+      allowSectionSwitch: config.allowSectionSwitch,
+      negativeMarkRatio: config.negativeMarkRatio,
+      stage: config.stage,
+      enableSectionalTimer: config.timerType === 'SECTIONAL_LOCKED',
+      sectionDurationMinutes: config.sections[0]?.durationMinutes,
       sections,
     };
 
@@ -431,7 +408,7 @@ export default function AdminTestsPage() {
             </div>
             <select
               value={examId}
-              onChange={(e) => setExamId(e.target.value)}
+              onChange={(e) => handleExamChange(e.target.value)}
               className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
             >
               {exams.map(e => (
@@ -459,7 +436,7 @@ export default function AdminTestsPage() {
                 <label className="font-bold text-indigo-950 block mb-1">Category</label>
                 <select
                   value={customExamCategory}
-                  onChange={(e) => setCustomExamCategory(e.target.value as any)}
+                  onChange={(e) => handleCustomCategoryChange(e.target.value as any)}
                   className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs"
                 >
                   <option value="PO">PO (Probationary Officer / Scale 1)</option>
@@ -528,17 +505,72 @@ export default function AdminTestsPage() {
             <label className="font-semibold text-slate-700 block mb-1">Exam Pattern & Sections</label>
             <select
               value={sectionPreset}
-              onChange={(e) => handlePresetChange(e.target.value as any)}
-              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold"
+              onChange={(e) => handlePresetChange(e.target.value as ExamPresetKey)}
+              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900"
             >
-              <option value="PRELIMS_3">Banking Prelims Standard (3 Sections: English 30, Quant 35, Reasoning 35 — 100 Qs / 60 Mins Sectional 20m)</option>
-              <option value="MAINS_4">Banking Mains Standard (4 Sections: Reasoning 45, English 35, Quant/DI 35, GA 40 — 155 Qs / 180 Mins)</option>
-              <option value="SSC_TIER1_4">SSC CGL Tier-1 Composite (4 Sections: Reasoning 25, GA 25, Quant 25, English 25 — 100 Qs / 200 Marks / 60 Mins Composite + Free Nav, 15m suggested)</option>
-              <option value="SSC_TIER1_SECTIONAL">SSC CGL Tier-1 Sectional Timed (4 Sections: Reasoning 25, GA 25, Quant 25, English 25 — 100 Qs / 200 Marks / 15 Mins Each Auto-Locked)</option>
-              <option value="RRB_NTPC_3">RRB NTPC CBT-1 (3 Sections: GA 40, Math 30, Reasoning 30 — 100 Qs / 100 Marks / 90 Mins Composite + Free Nav)</option>
-              <option value="CUSTOM">Custom Timing & Marks</option>
+              {EXAM_PRESET_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
+
+          {/* Timing & Marks Breakdown Preview Card */}
+          {EXAM_PRESETS[sectionPreset] && (
+            <div className="p-3 bg-gradient-to-br from-slate-50 to-indigo-50/50 rounded-xl border border-indigo-100 text-xs space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-1.5">
+                <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                  Section Timings & Marks Breakdown
+                </span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100/90 text-indigo-800 border border-indigo-200">
+                  {EXAM_PRESETS[sectionPreset].badge}
+                </span>
+              </div>
+
+              {EXAM_PRESETS[sectionPreset].sections.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-2xs">
+                  <table className="w-full text-left border-collapse text-[11px]">
+                    <thead>
+                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                        <th className="py-1.5 px-2.5">Section</th>
+                        <th className="py-1.5 px-2 text-center">Questions</th>
+                        <th className="py-1.5 px-2 text-center">Marks</th>
+                        <th className="py-1.5 px-2.5 text-right">Time Allocated</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 text-slate-700">
+                      {EXAM_PRESETS[sectionPreset].sections.map((sec) => (
+                        <tr key={sec.code} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="py-1.5 px-2.5 font-medium text-slate-900">{sec.name}</td>
+                          <td className="py-1.5 px-2 text-center font-semibold">{sec.questionCount}</td>
+                          <td className="py-1.5 px-2 text-center font-semibold">{sec.marks}</td>
+                          <td className="py-1.5 px-2.5 text-right font-bold text-indigo-600">
+                            {sec.durationMinutes} min
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="bg-indigo-50/70 font-bold text-indigo-950 border-t border-indigo-100">
+                        <td className="py-1.5 px-2.5">Total</td>
+                        <td className="py-1.5 px-2 text-center">
+                          {EXAM_PRESETS[sectionPreset].sections.reduce((acc, s) => acc + s.questionCount, 0)}
+                        </td>
+                        <td className="py-1.5 px-2 text-center">{EXAM_PRESETS[sectionPreset].totalMarks}</td>
+                        <td className="py-1.5 px-2.5 text-right text-indigo-700">
+                          {EXAM_PRESETS[sectionPreset].totalDuration} min
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-500 italic">
+                  Custom pattern: enter duration, total marks, and cutoff marks manually below.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <div>
