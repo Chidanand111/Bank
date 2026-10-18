@@ -325,7 +325,8 @@ export async function getAdminQuestions(filters?: {
  * Creates a single question with Zod validation, passage deduplication, and DB persistence
  */
 export async function createQuestionAction(
-  input: AdminQuestionInput
+  input: AdminQuestionInput,
+  overrideId?: string
 ): Promise<{ success: boolean; question?: Question; error?: string }> {
   await requireAdmin();
 
@@ -338,7 +339,33 @@ export async function createQuestionAction(
   const exam =
     EXAMS_DATA.find(e => e.id === validData.examId || e.slug === validData.examId) ||
     EXAMS_DATA[0];
-  const newQuestionId = `q-custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const newQuestionId = overrideId || `q-custom-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+
+  // Convert any embedded Base64 data URIs to persistent file storage to prevent PostgreSQL bloat
+  const { persistDataUriToStorage } = await import('../storage/mediaStorage');
+  if (validData.imageUrl && validData.imageUrl.startsWith('data:image/')) {
+    validData.imageUrl = (await persistDataUriToStorage(validData.imageUrl, {
+      batchId: `manual-${newQuestionId}`,
+      filenamePrefix: 'qimg',
+    })) || validData.imageUrl;
+  }
+  if (validData.passageImageUrl && validData.passageImageUrl.startsWith('data:image/')) {
+    validData.passageImageUrl = (await persistDataUriToStorage(validData.passageImageUrl, {
+      batchId: `manual-${newQuestionId}`,
+      filenamePrefix: 'passage',
+    })) || validData.passageImageUrl;
+  }
+  if (validData.options && validData.options.length > 0) {
+    for (let optIdx = 0; optIdx < validData.options.length; optIdx++) {
+      const opt = validData.options[optIdx];
+      if (opt.imageUrl && opt.imageUrl.startsWith('data:image/')) {
+        opt.imageUrl = (await persistDataUriToStorage(opt.imageUrl, {
+          batchId: `manual-${newQuestionId}`,
+          filenamePrefix: `opt_${optIdx + 1}`,
+        })) || opt.imageUrl;
+      }
+    }
+  }
 
   // Determine whether this question should persist passage/passageImageUrl to DB or reuse an existing group's
   let dbPassage: string | null = validData.passage?.trim() || null;
@@ -393,6 +420,8 @@ export async function createQuestionAction(
         ? 'Quantitative Aptitude'
         : validData.sectionCode === 'ENGLISH'
         ? 'English Language'
+        : validData.sectionCode === 'GA' || validData.sectionCode === 'FINANCIAL_AWARENESS'
+        ? 'General Awareness'
         : 'Reasoning Ability',
     topicId: `top-${validData.topicName.toLowerCase().replace(/\s+/g, '-')}`,
     topicName: validData.topicName,
@@ -472,8 +501,15 @@ export async function createQuestionAction(
  */
 export async function bulkImportQuestionsAction(
   questions: AdminQuestionInput[],
-  partitionId?: string
-): Promise<{ success: boolean; count: number; error?: string }> {
+  partitionId?: string,
+  images?: { filename: string; base64: string; mimeType: string }[],
+  batchId?: string,
+  options?: {
+    duplicatePolicy?: 'SKIP' | 'UPDATE' | 'REVIEW';
+    allowDestructiveUpdates?: boolean;
+    chunkSize?: number;
+  }
+): Promise<{ success: boolean; count: number; error?: string; batchId?: string; report?: any }> {
   await requireAdmin();
 
   if (!questions || questions.length === 0) {
@@ -485,144 +521,54 @@ export async function bulkImportQuestionsAction(
     return { success: false, count: 0, error: validated.error };
   }
 
-  // Pre-resolve partitionId to targetExamId and targetMockTestId against DB
-  let resolvedExamId: string | undefined = undefined;
-  let resolvedMockTestId: string | undefined = undefined;
+  const activeBatchId = batchId || `batch-${Date.now().toString(36)}`;
+  const imageMapping: Record<string, string> = {};
 
-  if (partitionId && partitionId !== 'ALL') {
-    const cleanSlug = partitionId.replace(/^(exam|mock)-/, '');
+  // If diagrams are attached as base64 payload (e.g. from ZIP extraction), persist them to media storage
+  if (images && images.length > 0) {
+    try {
+      const { saveBatchImages } = await import('../storage/mediaStorage');
+      const preparedImages = images.map(img => ({
+        filename: img.filename,
+        buffer: Buffer.from(img.base64, 'base64'),
+        mimeType: img.mimeType,
+      }));
 
-    // Check if partition matches an Exam in DB
-    const dbExam = await prisma.exam.findFirst({
-      where: {
-        OR: [
-          { id: partitionId },
-          { slug: partitionId },
-          { slug: cleanSlug },
-          { id: `exam-${cleanSlug}` },
-        ],
-      },
-    });
-
-    if (dbExam) {
-      resolvedExamId = dbExam.id;
-    } else {
-      // Check if partition matches a MockTest in DB
-      const dbMock = await prisma.mockTest.findFirst({
-        where: {
-          OR: [
-            { id: partitionId },
-            { slug: partitionId },
-            { slug: cleanSlug },
-            { id: `mock-${cleanSlug}` },
-          ],
-        },
-        include: { exam: true },
+      const savedMap = await saveBatchImages(preparedImages, {
+        batchId: activeBatchId,
+        category: 'questions',
       });
 
-      if (dbMock) {
-        resolvedMockTestId = dbMock.id;
-        resolvedExamId = dbMock.examId || (dbMock.exam ? dbMock.exam.id : undefined);
-      } else if (partitionId.startsWith('exam-')) {
-        resolvedExamId = partitionId;
-      } else {
-        resolvedMockTestId = partitionId;
+      for (const [key, stored] of savedMap.entries()) {
+        imageMapping[key.toLowerCase()] = stored.url;
       }
-    }
-  }
-
-  // Registry to track group passages across the imported batch so they are saved only once
-  const batchGroupRegistry = new Map<string, { passage?: string; passageImageUrl?: string }>();
-
-  let importedCount = 0;
-  for (const qInput of validated.data) {
-    try {
-      const inputToUse: AdminQuestionInput = {
-        ...qInput,
-        imageUrl: qInput.imageUrl || undefined,
-        passage: qInput.passage || undefined,
-        passageImageUrl: qInput.passageImageUrl || undefined,
-        groupId: qInput.groupId || undefined,
-        pyqYear: qInput.pyqYear || undefined,
-        pyqExam: qInput.pyqExam || undefined,
-        mockTestId: qInput.mockTestId || undefined,
-        options: qInput.options.map(o => ({
-          text: o.text,
-          imageUrl: o.imageUrl || undefined,
-          isCorrect: o.isCorrect,
-        })),
+    } catch (saveErr) {
+      console.error('Failed to save batch images:', saveErr);
+      return {
+        success: false,
+        count: 0,
+        error: 'Failed to persist uploaded diagrams to storage.',
       };
-
-      // De-duplicate group passages and DI images in batch
-      if (inputToUse.groupId && inputToUse.groupId.trim()) {
-        const gid = inputToUse.groupId.trim().toLowerCase();
-        const existingInBatch = batchGroupRegistry.get(gid);
-
-        if (!existingInBatch) {
-          const existingInSys = dynamicQuestions.find(
-            q => q.groupId?.trim().toLowerCase() === gid && (Boolean(q.passage?.trim()) || Boolean(q.passageImageUrl?.trim()))
-          );
-
-          if (existingInSys) {
-            batchGroupRegistry.set(gid, {
-              passage: existingInSys.passage?.trim() || undefined,
-              passageImageUrl: existingInSys.passageImageUrl?.trim() || undefined,
-            });
-            if (existingInSys.passage && (!inputToUse.passage || inputToUse.passage.trim() === existingInSys.passage.trim())) {
-              inputToUse.passage = undefined;
-            }
-            if (existingInSys.passageImageUrl && (!inputToUse.passageImageUrl || inputToUse.passageImageUrl.trim() === existingInSys.passageImageUrl.trim())) {
-              inputToUse.passageImageUrl = undefined;
-            }
-          } else {
-            batchGroupRegistry.set(gid, {
-              passage: inputToUse.passage?.trim() || undefined,
-              passageImageUrl: inputToUse.passageImageUrl?.trim() || undefined,
-            });
-          }
-        } else {
-          // Clear duplicate passage and DI image on subsequent questions
-          if (existingInBatch.passage && (!inputToUse.passage || inputToUse.passage.trim() === existingInBatch.passage.trim())) {
-            inputToUse.passage = undefined;
-          }
-          if (existingInBatch.passageImageUrl && (!inputToUse.passageImageUrl || inputToUse.passageImageUrl.trim() === existingInBatch.passageImageUrl.trim())) {
-            inputToUse.passageImageUrl = undefined;
-          }
-        }
-      }
-
-      // Assign pre-resolved partition and exam associations
-      if (resolvedExamId) {
-        inputToUse.examId = resolvedExamId;
-      }
-      if (resolvedMockTestId) {
-        inputToUse.mockTestId = resolvedMockTestId;
-      }
-
-      const res = await createQuestionAction(inputToUse);
-      if (res.success && res.question) {
-        importedCount++;
-      } else {
-        console.warn('createQuestionAction error in bulkImport:', res.error);
-      }
-    } catch (e) {
-      console.error('Error importing question row in questionService:', e);
     }
   }
 
-  dynamicQuestions = resolveGroupPassagesSync(dynamicQuestions);
-  safeRevalidatePath('/admin/questions');
-  safeRevalidatePath('/admin/tests');
-  safeRevalidatePath('/admin');
-  // Bust cached question list after bulk import
-  await invalidateQuestionsCache();
-  if (resolvedMockTestId) {
-    await invalidateLiveQuestionsCache(resolvedMockTestId);
-  }
+  const { executeResilientImport } = await import('./importBatchService');
+  const result = await executeResilientImport({
+    batchId: activeBatchId,
+    questions: validated.data,
+    partitionId,
+    chunkSize: options?.chunkSize || 15,
+    duplicatePolicy: options?.duplicatePolicy || 'SKIP',
+    allowDestructiveUpdates: Boolean(options?.allowDestructiveUpdates),
+    imageMapping,
+  });
+
   return {
-    success: importedCount > 0,
-    count: importedCount,
-    error: importedCount === 0 ? 'No questions could be saved to database.' : undefined,
+    success: result.success,
+    count: result.report.questionsCreated,
+    error: result.error,
+    batchId: activeBatchId,
+    report: result.report,
   };
 }
 
@@ -656,6 +602,32 @@ export async function updateQuestionAction(
 
   const existing = index !== -1 ? dynamicQuestions[index] : null;
   const actualId = existing ? existing.id : questionId;
+
+  // Convert any embedded Base64 data URIs to persistent file storage to prevent PostgreSQL bloat
+  const { persistDataUriToStorage } = await import('../storage/mediaStorage');
+  if (validData.imageUrl && validData.imageUrl.startsWith('data:image/')) {
+    validData.imageUrl = (await persistDataUriToStorage(validData.imageUrl, {
+      batchId: `manual-${actualId}`,
+      filenamePrefix: 'qimg',
+    })) || validData.imageUrl;
+  }
+  if (validData.passageImageUrl && validData.passageImageUrl.startsWith('data:image/')) {
+    validData.passageImageUrl = (await persistDataUriToStorage(validData.passageImageUrl, {
+      batchId: `manual-${actualId}`,
+      filenamePrefix: 'passage',
+    })) || validData.passageImageUrl;
+  }
+  if (validData.options && validData.options.length > 0) {
+    for (let optIdx = 0; optIdx < validData.options.length; optIdx++) {
+      const opt = validData.options[optIdx];
+      if (opt.imageUrl && opt.imageUrl.startsWith('data:image/')) {
+        opt.imageUrl = (await persistDataUriToStorage(opt.imageUrl, {
+          batchId: `manual-${actualId}`,
+          filenamePrefix: `opt_${optIdx + 1}`,
+        })) || opt.imageUrl;
+      }
+    }
+  }
 
   const updatedQuestion: Question = {
     id: actualId,
@@ -880,4 +852,63 @@ export async function deleteQuestionAction(
   // Bust cached question list after delete
   await invalidateQuestionsCache();
   return { success: true };
+}
+
+/**
+ * Direct Question Diagram Upload Action.
+ * Securely persists an uploaded diagram buffer to persistent object storage
+ * and returns the stable URL, preventing raw Base64 accumulation in PostgreSQL.
+ */
+export async function uploadQuestionDiagramAction(
+  formData: FormData
+): Promise<{ success: boolean; url?: string; filename?: string; error?: string }> {
+  await requireAdmin();
+
+  const file = formData.get('file') as File | null;
+  if (!file) {
+    return { success: false, error: 'No image file provided for upload.' };
+  }
+
+  // Enforce size limit (10MB)
+  if (file.size > 10 * 1024 * 1024) {
+    return { success: false, error: 'Image size exceeds maximum allowed limit of 10 MB.' };
+  }
+
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = new Uint8Array(arrayBuffer);
+
+  // Validate format using binary magic byte inspection
+  const { detectImageFormat } = await import('../storage/zipValidator');
+  const detected = detectImageFormat(buffer);
+  if (!detected) {
+    return {
+      success: false,
+      error: 'Invalid or unsupported image file. Only PNG, JPEG, WebP, and GIF formats are accepted.',
+    };
+  }
+
+  const batchId = `diag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+  const { saveBatchImages } = await import('../storage/mediaStorage');
+
+  const savedMap = await saveBatchImages(
+    [
+      {
+        filename: file.name,
+        buffer,
+        mimeType: detected.mimeType,
+      },
+    ],
+    { batchId, category: 'questions' }
+  );
+
+  const stored = savedMap.get(file.name.toLowerCase()) || Array.from(savedMap.values())[0];
+  if (!stored) {
+    return { success: false, error: 'Failed to persist uploaded diagram.' };
+  }
+
+  return {
+    success: true,
+    url: stored.url,
+    filename: stored.safeName,
+  };
 }

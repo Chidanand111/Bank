@@ -181,9 +181,38 @@ export async function createQuestionAction(
 
 export async function bulkImportQuestionsAction(
   questions: AdminQuestionInput[],
-  partitionId?: string
-): Promise<{ success: boolean; count: number; error?: string }> {
-  return questionService.bulkImportQuestionsAction(questions, partitionId);
+  partitionId?: string,
+  images?: { filename: string; base64: string; mimeType: string }[],
+  batchId?: string
+): Promise<{ success: boolean; count: number; error?: string; batchId?: string; report?: any }> {
+  return questionService.bulkImportQuestionsAction(questions, partitionId, images, batchId);
+}
+
+export async function retryImportBatchAction(
+  batchId: string,
+  overrides?: { duplicatePolicy?: 'SKIP' | 'UPDATE' | 'REVIEW'; allowDestructiveUpdates?: boolean }
+) {
+  const { retryImportBatch } = await import('./importBatchService');
+  return retryImportBatch(batchId, overrides);
+}
+
+export async function getImportBatchAction(batchId: string) {
+  const { getImportBatch } = await import('../storage/importBatchStore');
+  return getImportBatch(batchId);
+}
+
+export async function cancelImportBatchAction(batchId: string) {
+  const { requestBatchCancellation } = await import('../storage/importBatchStore');
+  const { safeCleanupUnreferencedBatchImages } = await import('../storage/mediaStorage');
+  const cancelled = requestBatchCancellation(batchId);
+  const cleanup = await safeCleanupUnreferencedBatchImages(batchId);
+  return { cancelled, cleanup };
+}
+
+export async function uploadQuestionDiagramAction(
+  formData: FormData
+): Promise<{ success: boolean; url?: string; filename?: string; error?: string }> {
+  return questionService.uploadQuestionDiagramAction(formData);
 }
 
 export async function updateQuestionAction(

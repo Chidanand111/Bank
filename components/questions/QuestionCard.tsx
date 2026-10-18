@@ -2,6 +2,7 @@ import React from 'react';
 import { Question } from '@/types';
 import { Badge } from '../ui/Badge';
 import { MathRenderer } from '../ui/MathRenderer';
+import { DiagramViewer } from '../ui/DiagramViewer';
 import { CheckCircle2, XCircle, HelpCircle, BookOpen } from 'lucide-react';
 
 export interface QuestionCardProps {
@@ -75,13 +76,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
               </div>
             )}
             {question.passageImageUrl && (
-              <div className="mt-3 border border-indigo-200 rounded-xl overflow-hidden bg-white p-2.5 max-w-2xl shadow-xs">
-                <img
+              <div className="mt-3">
+                <DiagramViewer
                   src={question.passageImageUrl}
-                  alt="Passage Reference Diagram"
-                  className="max-h-72 w-auto object-contain rounded"
-                  loading="lazy"
-                  onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }}
+                  alt={`Passage Reference Diagram ${question.groupId ? `(${question.groupId})` : ''}`}
+                  title={`Directions & Passage Diagram ${question.groupId ? `(${question.groupId})` : ''}`}
+                  maxHeightClass="max-h-80"
                 />
               </div>
             )}
@@ -95,13 +95,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
 
         {/* Optional Question Image */}
         {question.imageUrl && (
-          <div className="my-3 border border-slate-200 rounded-xl overflow-hidden bg-white p-2.5 max-w-2xl inline-block shadow-xs">
-            <img
+          <div className="my-3">
+            <DiagramViewer
               src={question.imageUrl}
-              alt="Question Diagram"
-              className="max-h-72 w-auto object-contain rounded"
-              loading="lazy"
-              onError={(e) => { e.currentTarget.parentElement!.style.display = 'none'; }}
+              alt={`Question ${questionIndex + 1} Diagram`}
+              title={`Question ${questionIndex + 1} Diagram`}
+              maxHeightClass="max-h-80"
             />
           </div>
         )}
@@ -165,12 +164,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                     <div className="text-xs text-slate-500 font-medium italic">[Figure / Diagram Option]</div>
                   ) : null}
                   {option.imageUrl && (
-                    <div className="border border-slate-200 rounded-lg p-1.5 bg-white inline-block shadow-2xs hover:shadow-sm transition-shadow">
-                      <img
+                    <div className="pt-1" onClick={(e) => e.stopPropagation()}>
+                      <DiagramViewer
                         src={option.imageUrl}
-                        alt={`Option ${String.fromCharCode(65 + idx)} illustration`}
-                        className="max-h-40 object-contain rounded"
-                        loading="lazy"
+                        alt={`Option ${String.fromCharCode(65 + idx)} diagram`}
+                        title={`Option ${String.fromCharCode(65 + idx)} diagram`}
+                        maxHeightClass="max-h-48"
                       />
                     </div>
                   )}

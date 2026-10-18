@@ -226,6 +226,49 @@ export class QuestionRepository {
     const negMarksToUse = typeof input.negativeMarks === 'number' ? input.negativeMarks : Number(input.negativeMarks) >= 0 ? Number(input.negativeMarks) : 0.25;
     const pyqYearToUse = input.pyqYear ? Number(input.pyqYear) : null;
 
+    // Safe retry / idempotency check: if question already exists, avoid duplicate insert
+    const existingById = await prisma.question.findUnique({
+      where: { id: newQuestionId },
+      include: {
+        options: { orderBy: { order: 'asc' } },
+        exam: true,
+        section: true,
+        topic: true,
+      },
+    });
+
+    if (existingById) {
+      return {
+        id: existingById.id,
+        text: existingById.text,
+        imageUrl: existingById.imageUrl || undefined,
+        passage: existingById.passage || undefined,
+        passageImageUrl: existingById.passageImageUrl || undefined,
+        groupId: existingById.groupId || undefined,
+        isPyq: existingById.isPyq,
+        pyqYear: existingById.pyqYear || undefined,
+        pyqExam: existingById.pyqExam || undefined,
+        difficulty: (existingById.difficulty as Difficulty) || 'MEDIUM',
+        explanation: existingById.explanation || '',
+        marks: existingById.marks ?? 1.0,
+        negativeMarks: existingById.negativeMarks ?? 0.25,
+        examId: existingById.examId,
+        sectionId: existingById.sectionId,
+        sectionCode: existingById.section?.code || 'GENERAL',
+        sectionName: existingById.section?.name || 'General',
+        topicId: existingById.topicId,
+        topicName: existingById.topic?.name || 'General',
+        options: existingById.options.map((opt: { id: string; questionId: string; text: string; imageUrl: string | null; isCorrect: boolean; order: number }) => ({
+          id: opt.id,
+          questionId: opt.questionId,
+          text: opt.text,
+          imageUrl: opt.imageUrl || undefined,
+          isCorrect: opt.isCorrect,
+          order: opt.order,
+        })),
+      };
+    }
+
     // Transactional question + options creation
     const created = await prisma.question.create({
       data: {

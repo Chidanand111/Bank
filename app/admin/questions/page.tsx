@@ -14,6 +14,7 @@ import {
   deleteExamAction,
   toggleExamPublishAction,
   toggleMockTestPublishAction,
+  uploadQuestionDiagramAction,
 } from '@/lib/services/adminService';
 import { AdminNav } from '@/components/admin/AdminNav';
 import {
@@ -29,6 +30,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { MathRenderer } from '@/components/ui/MathRenderer';
+import { DiagramViewer } from '@/components/ui/DiagramViewer';
 import { BulkQuestionModal } from '@/components/admin/BulkQuestionModal';
 import { AddQuestionsPromptModal } from '@/components/admin/AddQuestionsPromptModal';
 import { compressImageFile, formatByteSize } from '@/lib/utils/imageCompressor';
@@ -329,10 +331,10 @@ export default function AdminQuestionsPage() {
     }, 0);
   };
 
-  // High-performance image file to compressed Base64 converter for direct PostgreSQL database storage
+  // Format-aware diagram uploader: saves to persistent storage URL to avoid Base64 accumulation in DB
   const handleImageFileChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
-    onSuccess: (dataUrl: string) => void
+    onSuccess: (urlOrDataUrl: string) => void
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -340,11 +342,30 @@ export default function AdminQuestionsPage() {
     // Reset input value so same file can be re-selected if needed
     e.target.value = '';
 
+    // 1. First attempt: Direct upload to persistent media storage
     try {
-      const res = await compressImageFile(file, 900, 0.76);
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await uploadQuestionDiagramAction(formData);
+
+      if (uploadRes && uploadRes.success && uploadRes.url) {
+        onSuccess(uploadRes.url);
+        setFeedback({
+          text: `Diagram saved to persistent storage: "${uploadRes.filename}". Stored clean URL: ${uploadRes.url}`,
+          type: 'success',
+        });
+        return;
+      }
+    } catch (uploadErr) {
+      console.warn('Persistent storage direct upload failed, applying format-aware client fallback:', uploadErr);
+    }
+
+    // 2. Format-aware fallback: preserves PNG/transparency, 1920px max dimension, quality 0.90
+    try {
+      const res = await compressImageFile(file, 1920, 0.90);
       onSuccess(res.compressedDataUrl);
       setFeedback({
-        text: `DI Image compressed: ${formatByteSize(res.originalSizeBytes)} → ${formatByteSize(res.compressedSizeBytes)} (${res.compressionRatioPercent}% saved). White background applied for transparent diagrams.`,
+        text: `Diagram processed (${res.format.toUpperCase()}, ${res.width}x${res.height}px, ${formatByteSize(res.compressedSizeBytes)}, ${res.hasTransparency ? 'transparency preserved' : 'optimized'}).`,
         type: 'success',
       });
     } catch (err) {
@@ -1716,11 +1737,11 @@ export default function AdminQuestionsPage() {
                       {q.passageImageUrl && (
                         <div className="pt-2 border-t border-indigo-100">
                           <span className="text-[10px] font-bold text-indigo-900 block mb-1">Passage Reference Diagram:</span>
-                          <img
+                          <DiagramViewer
                             src={q.passageImageUrl}
                             alt="Passage Reference Diagram"
-                            className="max-h-48 rounded-lg border border-indigo-200 object-contain bg-white shadow-2xs"
-                            loading="lazy"
+                            maxHeightClass="max-h-48"
+                            className="rounded-lg border border-indigo-200"
                           />
                         </div>
                       )}
@@ -1738,11 +1759,11 @@ export default function AdminQuestionsPage() {
                       <div className="text-[10px] font-bold text-slate-600 mb-1 flex items-center gap-1">
                         <ImageIcon className="w-3.5 h-3.5 text-indigo-600" /> Question Diagram:
                       </div>
-                      <img
+                      <DiagramViewer
                         src={q.imageUrl}
                         alt="Question Diagram"
-                        className="max-h-48 rounded-md object-contain bg-white border border-slate-100 p-1"
-                        loading="lazy"
+                        maxHeightClass="max-h-48"
+                        className="rounded-md border border-slate-100"
                       />
                     </div>
                   )}
@@ -1771,11 +1792,11 @@ export default function AdminQuestionsPage() {
                         </div>
                         {opt.imageUrl && (
                           <div className="mt-1 border border-slate-200 rounded p-1 bg-white inline-block max-w-[180px]">
-                            <img
+                            <DiagramViewer
                               src={opt.imageUrl}
                               alt={`Option ${String.fromCharCode(65 + i)}`}
-                              className="max-h-20 rounded object-contain"
-                              loading="lazy"
+                              maxHeightClass="max-h-20"
+                              className="rounded"
                             />
                           </div>
                         )}
@@ -2114,10 +2135,11 @@ export default function AdminQuestionsPage() {
             {formPassageImageUrl && (
               <div className="border border-slate-200 rounded-lg p-2 bg-white inline-block">
                 <span className="text-[10px] text-slate-500 font-bold block mb-1">Passage Diagram Preview:</span>
-                <img
+                <DiagramViewer
                   src={formPassageImageUrl}
                   alt="Passage Preview"
-                  className="max-h-36 rounded object-contain"
+                  maxHeightClass="max-h-36"
+                  className="rounded"
                 />
               </div>
             )}
@@ -2210,10 +2232,11 @@ export default function AdminQuestionsPage() {
               {formImageUrl && (
                 <div className="mt-2 border border-slate-200 rounded-lg p-2 bg-white inline-block">
                   <span className="text-[10px] text-slate-500 font-bold block mb-1">Question Diagram Preview:</span>
-                  <img
+                  <DiagramViewer
                     src={formImageUrl}
                     alt="Question Diagram Preview"
-                    className="max-h-36 rounded object-contain"
+                    maxHeightClass="max-h-36"
+                    className="rounded"
                   />
                 </div>
               )}
@@ -2310,10 +2333,11 @@ export default function AdminQuestionsPage() {
 
                     {opt.imageUrl && (
                       <div className="border border-slate-200 rounded p-1 bg-white inline-block shrink-0">
-                        <img
+                        <DiagramViewer
                           src={opt.imageUrl}
                           alt={`Option ${String.fromCharCode(65 + i)} preview`}
-                          className="max-h-16 rounded object-contain"
+                          maxHeightClass="max-h-16"
+                          className="rounded"
                         />
                       </div>
                     )}

@@ -273,6 +273,7 @@ export interface AdminStats {
 }
 
 export interface AdminQuestionInput {
+  id?: string | null;
   examId?: string | null;
   sectionCode: string;
   topicName: string;

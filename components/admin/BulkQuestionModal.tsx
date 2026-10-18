@@ -4,14 +4,18 @@ import React, { useState, useEffect, useMemo, useTransition } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
-import { AdminQuestionInput, AdminPartitionInfo, Difficulty, Exam } from '@/types';
+import { AdminQuestionInput, AdminPartitionInfo, Difficulty } from '@/types';
 import {
   bulkImportQuestionsAction,
   getAdminPartitions,
   getAdminExams,
 } from '@/lib/services/adminService';
 import { MathRenderer } from '../ui/MathRenderer';
+import { DiagramViewer } from '../ui/DiagramViewer';
 import { compressDataUrl } from '@/lib/utils/imageCompressor';
+import { validateAndExtractZip, ValidatedZipImage } from '@/lib/storage/zipValidator';
+import { resolveQuestionDiagramReferences } from '@/lib/storage/questionImageResolver';
+import { classifyImageReference } from '@/lib/storage/mediaStorage';
 import {
   Download,
   Upload,
@@ -21,6 +25,11 @@ import {
   Sparkles,
   BookOpen,
   Loader2,
+  FileArchive,
+  Image as ImageIcon,
+  Trash2,
+  XCircle,
+  RotateCcw,
 } from 'lucide-react';
 
 export interface BulkQuestionModalProps {
@@ -33,23 +42,23 @@ export interface BulkQuestionModalProps {
 }
 
 // Sample CSV content with Reading Comprehension (RC), Data Interpretation (DI) charts, Reasoning puzzles, and LaTeX math
-const SAMPLE_CSV_CONTENT = `groupId,passage,passageImageUrl,imageUrl,sectionCode,topicName,text,optionA,optionB,optionC,optionD,optionE,correctOption,marks,negativeMarks,difficulty,explanation
-RC-SET-01,"The Reserve Bank of India (RBI) operates as the nation's central monetary authority, tasked with maintaining price stability while fostering sustainable economic growth. In response to fluctuating global inflationary pressures, the Monetary Policy Committee (MPC) meticulously regulates the policy Repo Rate and the Cash Reserve Ratio (CRR). By fine-tuning these policy tools, the central bank directly influences domestic liquidity, commercial lending trajectories, and corporate capital expenditure cycles. Financial inclusion drives and digital banking innovations further amplify the transmission of monetary policy across rural and semi-urban banking sectors.","","",ENGLISH,Reading Comprehension,"What is the primary dual mandate of the Reserve Bank of India highlighted in the passage?","Maximizing export revenue and foreign exchange","Maintaining price stability while supporting economic growth","Eliminating inter-bank lending rates completely","Providing direct subsidies to commercial institutions","None of the above",B,1,0.25,MEDIUM,"As explicitly stated in the first sentence, the RBI's dual mandate focuses on maintaining price stability while fostering sustainable economic growth."
-RC-SET-01,"","","",ENGLISH,Reading Comprehension,"Which policy tool mentioned directly impacts commercial bank reserves without interest compensation?","Statutory Liquidity Ratio (SLR)","Cash Reserve Ratio (CRR)","Marginal Standing Facility (MSF)","Open Market Operations (OMO)","Reverse Repo Rate",B,1,0.25,EASY,"The passage highlights the Cash Reserve Ratio (CRR), which requires commercial banks to maintain cash balances with the central bank."
-RC-SET-01,"","","",ENGLISH,Reading Comprehension,"According to the context, what role do digital banking innovations play in monetary economics?","They bypass central banking authority entirely","They amplify the transmission of monetary policy across wider sectors","They eliminate all credit risks in retail lending","They reduce corporate capital expenditures to zero","None of the above",B,1,0.25,MEDIUM,"The passage notes that digital banking innovations amplify the transmission of monetary policy across rural and semi-urban banking sectors."
-RC-SET-01,"","","",ENGLISH,Reading Comprehension,"Which word from the passage is closest in meaning to 'carefully and with great attention to detail'?","Fluctuating","Meticulously","Trajectories","Transmission","Expenditure",B,1,0.25,EASY,"'Meticulously' means in a way that shows great attention to detail or very thoroughly."
-DI-SET-01,"Directions (Questions 5-8): The following Data Interpretation chart displays branch manufacturing distribution across 4 quarters (Q1 to Q4). Total production stood at 2400 units: Q1 (20%), Q2 (30%), Q3 (25%), Q4 (25%). Study the information and answer the questions.","data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='600' height='260' viewBox='0 0 600 260'><rect width='100%' height='100%' fill='%23f8fafc'/><text x='300' y='32' text-anchor='middle' font-size='16' font-family='sans-serif' font-weight='bold' fill='%230f172a'>Branch Production Units (Total = 2400)</text><rect x='60' y='140' width='80' height='90' fill='%233b82f6'/><text x='100' y='130' text-anchor='middle' font-size='12' font-weight='bold' fill='%231e293b'>Q1: 480 (20%)</text><rect x='190' y='95' width='80' height='135' fill='%2310b981'/><text x='230' y='85' text-anchor='middle' font-size='12' font-weight='bold' fill='%231e293b'>Q2: 720 (30%)</text><rect x='320' y='117' width='80' height='113' fill='%23f59e0b'/><text x='360' y='107' text-anchor='middle' font-size='12' font-weight='bold' fill='%231e293b'>Q3: 600 (25%)</text><rect x='450' y='117' width='80' height='113' fill='%238b5cf6'/><text x='490' y='107' text-anchor='middle' font-size='12' font-weight='bold' fill='%231e293b'>Q4: 600 (25%)</text><line x1='30' y1='230' x2='570' y2='230' stroke='%2364748b' stroke-width='2'/></svg>","",QUANT,Data Interpretation,"What is the difference between total units produced in Q2 and Q1?","240 units","300 units","200 units","180 units","150 units",A,1,0.25,EASY,"Total production = 2400. Q2 = 30% of 2400 = 720. Q1 = 20% of 2400 = 480. Difference = 720 - 480 = 240 units."
-DI-SET-01,"","","",QUANT,Data Interpretation,"What is the ratio of combined production in (Q1 + Q3) to (Q2 + Q4)?","$9 : 11$","$1 : 1$","$3 : 4$","$5 : 6$","None of these",A,1,0.25,MEDIUM,"Q1 + Q3 = 20% + 25% = 45%. Q2 + Q4 = 30% + 25% = 55%. Ratio = 45 : 55 = 9 : 11."
-DI-SET-01,"","","",QUANT,Data Interpretation,"If production in Q5 is projected to be 15% higher than Q2, how many units will be produced in Q5?","828 units","810 units","840 units","800 units","790 units",A,1,0.25,MEDIUM,"Q2 production = 720 units. 15% increase = 720 * 1.15 = 828 units."
-DI-SET-01,"","","",QUANT,Data Interpretation,"What is the average number of units produced per quarter across Q1, Q2, and Q3?","600 units","580 units","620 units","640 units","610 units",A,1,0.25,EASY,"Total for Q1+Q2+Q3 = 480 + 720 + 600 = 1800 units. Average = 1800 / 3 = 600 units."
-PUZZLE-SET-01,"Directions (Questions 9-12): Eight friends (A, B, C, D, E, F, G, and H) are sitting around a circular table facing the center. A sits third to the right of B. F sits second to the right of A. Only two people sit between F and C. D sits second to the left of C. E is an immediate neighbor of neither A nor C. G sits third to the left of H.","","",REASONING,Circular Seating Arrangement,"Who sits directly opposite to B in the arrangement?","F","D","H","G","C",B,1,0.25,MEDIUM,"Plotting clockwise from B: B, E, H, A, D, G, F, C. D sits directly opposite B (4 positions away in an 8-person circular table)."
-PUZZLE-SET-01,"","","",REASONING,Circular Seating Arrangement,"Who sits to the immediate left of A?","H","D","F","B","E",A,1,0.25,EASY,"Facing the center, H is to the immediate left (clockwise predecessor) of A."
-PUZZLE-SET-01,"","","",REASONING,Circular Seating Arrangement,"How many persons sit between F and B when counted from the right of F?","One","Two","Three","Four","None",A,1,0.25,MEDIUM,"Counting clockwise from F: only C sits between F and B. Thus exactly one person sits between them."
-PUZZLE-SET-01,"","","",REASONING,Circular Seating Arrangement,"Four of the following five are alike based on their positions and form a group. Which one does not belong to the group?","B - H","A - G","D - F","G - C","E - A",E,1,0.25,HARD,"In B-H, A-G, D-F, and G-C, exactly one person sits between the pairs. In E-A, there is also one person (H), but they are sitting in opposite orientation."
-,,"","",QUANT,Simplification,"Solve the expression: $\\\\sqrt{625} + \\\\frac{15}{3} \\\\times 4 - 2^3 = ?$","37","42","45","39","40",A,1,0.25,EASY,"$\\\\sqrt{625} = 25$; $\\\\frac{15}{3} \\\\times 4 = 20$; $2^3 = 8$. Therefore: $25 + 20 - 8 = 37$."
-,,"","",QUANT,Quadratic Equations,"Find the roots of the quadratic equation: $x^2 - 7x + 12 = 0$","$x = 2, 6$","$x = 3, 4$","$x = -3, -4$","$x = 1, 12$","None of these",B,1,0.25,MEDIUM,"Factorizing: $(x - 3)(x - 4) = 0 \\\\implies x = 3$ or $x = 4$."
-,,"","",REASONING,Syllogism,"Statements: Some bankers are analysts. All analysts are auditors. Conclusions: I. Some auditors are bankers. II. All bankers are auditors.","Only conclusion I follows","Only conclusion II follows","Either I or II follows","Neither I nor II follows","Both conclusions follow",A,1,0.25,EASY,"Since some bankers are analysts and all analysts are auditors, it directly follows that some auditors are bankers. Conclusion I is valid."
-,,"","",FINANCIAL_AWARENESS,Banking Regulations,"Under the Basel III regulatory framework, what is the minimum Common Equity Tier 1 (CET1) capital ratio required to be maintained by banks?","4.5%","5.5%","6.0%","8.0%","9.0%",B,1,0.25,MEDIUM,"Under Basel III norms, the minimum Tier 1 Common Equity ratio (CET1) is 5.5% (plus a capital conservation buffer of 2.5% in India)."
+const SAMPLE_CSV_CONTENT = `groupId,passage,passageImageUrl,imageUrl,sectionCode,topicName,text,optionA,optionA_image,optionB,optionB_image,optionC,optionC_image,optionD,optionD_image,optionE,optionE_image,correctOption,marks,negativeMarks,difficulty,explanation
+RC-SET-01,"The Reserve Bank of India (RBI) operates as the nation's central monetary authority, tasked with maintaining price stability while fostering sustainable economic growth. In response to fluctuating global inflationary pressures, the Monetary Policy Committee (MPC) meticulously regulates the policy Repo Rate and the Cash Reserve Ratio (CRR). By fine-tuning these policy tools, the central bank directly influences domestic liquidity, commercial lending trajectories, and corporate capital expenditure cycles. Financial inclusion drives and digital banking innovations further amplify the transmission of monetary policy across rural and semi-urban banking sectors.","","",ENGLISH,Reading Comprehension,"What is the primary dual mandate of the Reserve Bank of India highlighted in the passage?","Maximizing export revenue and foreign exchange","","Maintaining price stability while supporting economic growth","","Eliminating inter-bank lending rates completely","","Providing direct subsidies to commercial institutions","","None of the above","",B,1,0.25,MEDIUM,"As explicitly stated in the first sentence, the RBI's dual mandate focuses on maintaining price stability while fostering sustainable economic growth."
+RC-SET-01,"","","",ENGLISH,Reading Comprehension,"Which policy tool mentioned directly impacts commercial bank reserves without interest compensation?","Statutory Liquidity Ratio (SLR)","","Cash Reserve Ratio (CRR)","","Marginal Standing Facility (MSF)","","Open Market Operations (OMO)","","Reverse Repo Rate","",B,1,0.25,EASY,"The passage highlights the Cash Reserve Ratio (CRR), which requires commercial banks to maintain cash balances with the central bank."
+RC-SET-01,"","","",ENGLISH,Reading Comprehension,"According to the context, what role do digital banking innovations play in monetary economics?","They bypass central banking authority entirely","","They amplify the transmission of monetary policy across wider sectors","","They eliminate all credit risks in retail lending","","They reduce corporate capital expenditures to zero","","None of the above","",B,1,0.25,MEDIUM,"The passage notes that digital banking innovations amplify the transmission of monetary policy across rural and semi-urban banking sectors."
+RC-SET-01,"","","",ENGLISH,Reading Comprehension,"Which word from the passage is closest in meaning to 'carefully and with great attention to detail'?","Fluctuating","","Meticulously","","Trajectories","","Transmission","","Expenditure","",B,1,0.25,EASY,"'Meticulously' means in a way that shows great attention to detail or very thoroughly."
+DI-SET-01,"Directions (Questions 5-8): The following Data Interpretation chart displays branch manufacturing distribution across 4 quarters (Q1 to Q4). Total production stood at 2400 units: Q1 (20%), Q2 (30%), Q3 (25%), Q4 (25%). Study the information and answer the questions.","branch_production_q1_q4.png","",QUANT,Data Interpretation,"What is the difference between total units produced in Q2 and Q1?","240 units","","300 units","","200 units","","180 units","","150 units","",A,1,0.25,EASY,"Total production = 2400. Q2 = 30% of 2400 = 720. Q1 = 20% of 2400 = 480. Difference = 720 - 480 = 240 units."
+DI-SET-01,"","","",QUANT,Data Interpretation,"What is the ratio of combined production in (Q1 + Q3) to (Q2 + Q4)?","$9 : 11$","","$1 : 1$","","$3 : 4$","","$5 : 6$","","None of these","",A,1,0.25,MEDIUM,"Q1 + Q3 = 20% + 25% = 45%. Q2 + Q4 = 30% + 25% = 55%. Ratio = 45 : 55 = 9 : 11."
+DI-SET-01,"","","",QUANT,Data Interpretation,"If production in Q5 is projected to be 15% higher than Q2, how many units will be produced in Q5?","828 units","","810 units","","840 units","","800 units","","790 units","",A,1,0.25,MEDIUM,"Q2 production = 720 units. 15% increase = 720 * 1.15 = 828 units."
+DI-SET-01,"","","",QUANT,Data Interpretation,"What is the average number of units produced per quarter across Q1, Q2, and Q3?","600 units","","580 units","","620 units","","640 units","","610 units","",A,1,0.25,EASY,"Total for Q1+Q2+Q3 = 480 + 720 + 600 = 1800 units. Average = 1800 / 3 = 600 units."
+PUZZLE-SET-01,"Directions (Questions 9-12): Eight friends (A, B, C, D, E, F, G, and H) are sitting around a circular table facing the center. A sits third to the right of B. F sits second to the right of A. Only two people sit between F and C. D sits second to the left of C. E is an immediate neighbor of neither A nor C. G sits third to the left of H.","","seating_arrangement_diagram.png",REASONING,Circular Seating Arrangement,"Who sits directly opposite to B in the arrangement?","F","","D","","H","","G","","C","",B,1,0.25,MEDIUM,"Plotting clockwise from B: B, E, H, A, D, G, F, C. D sits directly opposite B (4 positions away in an 8-person circular table)."
+PUZZLE-SET-01,"","","",REASONING,Circular Seating Arrangement,"Who sits to the immediate left of A?","H","","D","","F","","B","","E","",A,1,0.25,EASY,"Facing the center, H is to the immediate left (clockwise predecessor) of A."
+PUZZLE-SET-01,"","","",REASONING,Circular Seating Arrangement,"How many persons sit between F and B when counted from the right of F?","One","","Two","","Three","","Four","","None","",A,1,0.25,MEDIUM,"Counting clockwise from F: only C sits between F and B. Thus exactly one person sits between them."
+PUZZLE-SET-01,"","","",REASONING,Circular Seating Arrangement,"Four of the following five are alike based on their positions and form a group. Which one does not belong to the group?","B - H","","A - G","","D - F","","G - C","","E - A","",E,1,0.25,HARD,"In B-H, A-G, D-F, and G-C, exactly one person sits between the pairs. In E-A, there is also one person (H), but they are sitting in opposite orientation."
+,,"","",QUANT,Simplification,"Solve the expression: $\\sqrt{625} + \\frac{15}{3} \\times 4 - 2^3 = ?$","37","","42","","45","","39","","40","",A,1,0.25,EASY,"$\\sqrt{625} = 25$; $\\frac{15}{3} \\times 4 = 20$; $2^3 = 8$. Therefore: $25 + 20 - 8 = 37$."
+,,"","",QUANT,Quadratic Equations,"Find the roots of the quadratic equation: $x^2 - 7x + 12 = 0$","$x = 2, 6$","","$x = 3, 4$","","$x = -3, -4$","","$x = 1, 12$","","None of these","",B,1,0.25,MEDIUM,"Factorizing: $(x - 3)(x - 4) = 0 \\implies x = 3$ or $x = 4$."
+,,"","",REASONING,Syllogism,"Statements: Some bankers are analysts. All analysts are auditors. Conclusions: I. Some auditors are bankers. II. All bankers are auditors.","Only conclusion I follows","","Only conclusion II follows","","Either I or II follows","","Neither I nor II follows","","Both conclusions follow","",A,1,0.25,EASY,"Since some bankers are analysts and all analysts are auditors, it directly follows that some auditors are bankers. Conclusion I is valid."
+,,"","",FINANCIAL_AWARENESS,Banking Regulations,"Under the Basel III regulatory framework, what is the minimum Common Equity Tier 1 (CET1) capital ratio required to be maintained by banks?","4.5%","","5.5%","","6.0%","","8.0%","","9.0%","",B,1,0.25,MEDIUM,"Under Basel III norms, the minimum Tier 1 Common Equity ratio (CET1) is 5.5% (plus a capital conservation buffer of 2.5% in India)."
 `;
 
 export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
@@ -95,9 +104,47 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     currentPartitionId !== 'ALL' ? currentPartitionId : partitions[1]?.id || 'ALL'
   );
 
+  // Raw parsed questions before ZIP diagram substitution
+  const [rawQuestions, setRawQuestions] = useState<AdminQuestionInput[]>([]);
+  const [parseErrors, setParseErrors] = useState<string[]>([]);
+  const [fileName, setFileName] = useState<string>('');
+  const [isParsing, setIsParsing] = useState<boolean>(false);
+  const [isPending, startTransition] = useTransition();
+
+  // ZIP Diagrams state
+  const [zipFileName, setZipFileName] = useState<string>('');
+  const [extractedImages, setExtractedImages] = useState<ValidatedZipImage[]>([]);
+  const [zipImageMap, setZipImageMap] = useState<Map<string, ValidatedZipImage>>(new Map());
+  const [zipBlobUrls, setZipBlobUrls] = useState<string[]>([]);
+  const [zipPreviewUrlMap, setZipPreviewUrlMap] = useState<Map<string, string>>(new Map());
+  const [zipErrors, setZipErrors] = useState<string[]>([]);
+  const [zipWarnings, setZipWarnings] = useState<string[]>([]);
+  const [isExtractingZip, setIsExtractingZip] = useState<boolean>(false);
+
+  // Phase 3: Bounded & Resilient Import Lifecycle State
+  const [duplicatePolicy, setDuplicatePolicy] = useState<'SKIP' | 'UPDATE' | 'REVIEW'>('SKIP');
+  const [allowDestructiveUpdates, setAllowDestructiveUpdates] = useState<boolean>(false);
+  const [importProgressText, setImportProgressText] = useState<string>('');
+  const [finalReport, setFinalReport] = useState<any | null>(null);
+  const [lastBatchId, setLastBatchId] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState<boolean>(false);
+
+  // Clean up object URLs on unmount
+  useEffect(() => {
+    return () => {
+      zipBlobUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [zipBlobUrls]);
+
+  const handleCloseModal = () => {
+    zipBlobUrls.forEach((url) => URL.revokeObjectURL(url));
+    setZipBlobUrls([]);
+    onClose();
+  };
+
   useEffect(() => {
     if (isOpen) {
-      // 1. Immediately fetch fresh live partitions and exams from database so newly added items appear instantly
+      // Refresh partitions and exams
       Promise.all([getAdminPartitions(), getAdminExams()])
         .then(([freshParts, freshExams]) => {
           if (freshParts && freshParts.length > 0) {
@@ -192,12 +239,6 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     }
   };
 
-  const [parsedQuestions, setParsedQuestions] = useState<AdminQuestionInput[]>([]);
-  const [parseErrors, setParseErrors] = useState<string[]>([]);
-  const [fileName, setFileName] = useState<string>('');
-  const [isParsing, setIsParsing] = useState<boolean>(false);
-  const [isPending, startTransition] = useTransition();
-
   // 1. Download Sample CSV File (with UTF-8 BOM for Excel compatibility)
   const handleDownloadSampleCsv = () => {
     const blob = new Blob(['\uFEFF' + SAMPLE_CSV_CONTENT], { type: 'text/csv;charset=utf-8;' });
@@ -286,7 +327,6 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     return rows;
   };
 
-  // Normalizes CSV text where entire lines may be wrapped in outer quotes (common export/AI artifact)
   const normalizeCsvText = (rawText: string): string => {
     const cleanText = rawText.charCodeAt(0) === 0xfeff ? rawText.slice(1) : rawText;
     const lines = cleanText.split(/\r?\n/);
@@ -313,12 +353,10 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     return cleanText;
   };
 
-  // Robust CSV parser with delimiter & quotation fallback
   const parseCsvWithFallbacks = (rawText: string): string[][] => {
     const text = normalizeCsvText(rawText);
     const rows = parseFullCsv(text, ',');
 
-    // Fallback: If only 1 column parsed and semicolon is present, try semicolon
     if (rows.length > 0 && rows[0].length === 1 && rows[0][0].includes(';')) {
       const semiRows = parseFullCsv(text, ';');
       if (semiRows.length > 0 && semiRows[0].length > 1) {
@@ -326,7 +364,6 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
       }
     }
 
-    // Fallback: If rows[0].length is still 1 and commas exist, force-strip outer quotes line-by-line
     if (rows.length > 0 && rows[0].length === 1 && rows[0][0].includes(',')) {
       const lines = rawText.split(/\r?\n/);
       const strippedText = lines
@@ -347,7 +384,6 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     return rows;
   };
 
-  // Helper to extract value from row using flexible case-insensitive header aliases
   const getFieldValue = (
     headers: string[],
     row: string[],
@@ -379,14 +415,14 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     });
   };
 
-  // 4. File upload handler
+  // 4. File upload handler (CSV or JSON)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     setFileName(file.name);
     setParseErrors([]);
-    setParsedQuestions([]);
+    setRawQuestions([]);
     setIsParsing(true);
 
     const reader = new FileReader();
@@ -401,28 +437,33 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
               let pImg = item.passageImageUrl;
               let qImg = item.imageUrl;
               if (pImg && pImg.startsWith('data:image')) {
-                const comp = await compressDataUrl(pImg, 900, 0.76);
+                const comp = await compressDataUrl(pImg);
                 pImg = comp.compressedDataUrl;
               }
               if (qImg && qImg.startsWith('data:image')) {
-                const comp = await compressDataUrl(qImg, 900, 0.76);
+                const comp = await compressDataUrl(qImg);
                 qImg = comp.compressedDataUrl;
               }
 
-              // Support both nested options array and flat optionA..optionE
+              // Support nested options array or flat optionA..optionE
               let options = item.options;
-              if (!options && item.optionA) {
+              if (Array.isArray(options)) {
+                options = options.map((o: any) => ({
+                  text: o.text || '',
+                  isCorrect: Boolean(o.isCorrect),
+                  imageUrl: o.imageUrl || o.image || undefined,
+                }));
+              } else if (!options && item.optionA) {
                 const rawCorrect = (item.correctOption || 'A').trim().toUpperCase();
                 options = [
-                  { text: item.optionA, isCorrect: rawCorrect === 'A' },
-                  { text: item.optionB, isCorrect: rawCorrect === 'B' },
-                  ...(item.optionC ? [{ text: item.optionC, isCorrect: rawCorrect === 'C' }] : []),
-                  ...(item.optionD ? [{ text: item.optionD, isCorrect: rawCorrect === 'D' }] : []),
-                  ...(item.optionE ? [{ text: item.optionE, isCorrect: rawCorrect === 'E' }] : []),
+                  { text: item.optionA, isCorrect: rawCorrect === 'A', imageUrl: item.optionA_image || item.optionAImageUrl || undefined },
+                  { text: item.optionB, isCorrect: rawCorrect === 'B', imageUrl: item.optionB_image || item.optionBImageUrl || undefined },
+                  ...(item.optionC ? [{ text: item.optionC, isCorrect: rawCorrect === 'C', imageUrl: item.optionC_image || item.optionCImageUrl || undefined }] : []),
+                  ...(item.optionD ? [{ text: item.optionD, isCorrect: rawCorrect === 'D', imageUrl: item.optionD_image || item.optionDImageUrl || undefined }] : []),
+                  ...(item.optionE ? [{ text: item.optionE, isCorrect: rawCorrect === 'E', imageUrl: item.optionE_image || item.optionEImageUrl || undefined }] : []),
                 ];
               }
 
-              // Determine exam ID for JSON items
               const itemExam = item.examId || item.exam;
               let rowExamId = selectedExamId;
               if (itemExam) {
@@ -437,7 +478,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                 imageUrl: qImg,
               });
             }
-            setParsedQuestions(processedList);
+            setRawQuestions(processedList);
           } else {
             setParseErrors(['JSON file must contain an array of question objects.']);
           }
@@ -496,7 +537,6 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
 
           for (let idx = 1; idx < rows.length; idx++) {
             const rowValues = rows[idx];
-            // Skip empty rows
             if (!rowValues || rowValues.length === 0 || rowValues.every((val) => !val.trim())) {
               continue;
             }
@@ -566,6 +606,13 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
               continue;
             }
 
+            // Option Images support in CSV
+            const optAImg = getFieldValue(headers, rowValues, ['optiona_image', 'optiona_img', 'optionaimage', 'opta_image', 'optaimg', 'optaimage', 'opt1_image', 'choicea_image']);
+            const optBImg = getFieldValue(headers, rowValues, ['optionb_image', 'optionb_img', 'optionbimage', 'optb_image', 'optbimg', 'optbimage', 'opt2_image', 'choiceb_image']);
+            const optCImg = getFieldValue(headers, rowValues, ['optionc_image', 'optionc_img', 'optioncimage', 'optc_image', 'optcimg', 'optcimage', 'opt3_image', 'choicec_image']);
+            const optDImg = getFieldValue(headers, rowValues, ['optiond_image', 'optiond_img', 'optiondimage', 'optd_image', 'optdimg', 'optdimage', 'opt4_image', 'choiced_image']);
+            const optEImg = getFieldValue(headers, rowValues, ['optione_image', 'optione_img', 'optioneimage', 'opte_image', 'opteimg', 'opteimage', 'opt5_image', 'choicee_image']);
+
             const rawCorrect = getFieldValue(headers, rowValues, [
               'correctoption',
               'correct',
@@ -592,7 +639,6 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
             } else if (cleanCorrect === '5') {
               correctLetter = 'E';
             } else {
-              // Match exact option text if answer was written as text
               const lowerRaw = rawCorrect.toLowerCase();
               if (lowerRaw === optA.toLowerCase()) correctLetter = 'A';
               else if (lowerRaw === optB.toLowerCase()) correctLetter = 'B';
@@ -605,11 +651,11 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
             }
 
             const optionsList = [
-              { text: optA, isCorrect: correctLetter === 'A' },
-              { text: optB, isCorrect: correctLetter === 'B' },
-              ...(optC ? [{ text: optC, isCorrect: correctLetter === 'C' }] : []),
-              ...(optD ? [{ text: optD, isCorrect: correctLetter === 'D' }] : []),
-              ...(optE ? [{ text: optE, isCorrect: correctLetter === 'E' }] : []),
+              { text: optA, isCorrect: correctLetter === 'A', imageUrl: optAImg || undefined },
+              { text: optB, isCorrect: correctLetter === 'B', imageUrl: optBImg || undefined },
+              ...(optC ? [{ text: optC, isCorrect: correctLetter === 'C', imageUrl: optCImg || undefined }] : []),
+              ...(optD ? [{ text: optD, isCorrect: correctLetter === 'D', imageUrl: optDImg || undefined }] : []),
+              ...(optE ? [{ text: optE, isCorrect: correctLetter === 'E', imageUrl: optEImg || undefined }] : []),
             ];
 
             // Resolve Section Code
@@ -638,7 +684,6 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                 'chapter',
               ]) || 'General';
 
-            // Resolve Difficulty
             const difficultyRaw = getFieldValue(headers, rowValues, [
               'difficulty',
               'diff',
@@ -680,17 +725,15 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
             let imageUrl =
               getFieldValue(headers, rowValues, ['imageurl', 'image', 'img', 'diagram', 'photo']) || undefined;
 
-            // Auto-compress base64 images if present in CSV
             if (passageImageUrl && passageImageUrl.startsWith('data:image')) {
-              const comp = await compressDataUrl(passageImageUrl, 900, 0.76);
+              const comp = await compressDataUrl(passageImageUrl);
               passageImageUrl = comp.compressedDataUrl;
             }
             if (imageUrl && imageUrl.startsWith('data:image')) {
-              const comp = await compressDataUrl(imageUrl, 900, 0.76);
+              const comp = await compressDataUrl(imageUrl);
               imageUrl = comp.compressedDataUrl;
             }
 
-            // Determine target exam ID from row or modal selection
             const rowExam = getFieldValue(headers, rowValues, ['examid', 'exam', 'targetexam', 'mocktestid', 'paper']);
             let targetExamId = selectedExamId;
             if (rowExam) {
@@ -720,7 +763,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
             errors.push(`No valid question rows could be read from ${file.name}. Please ensure questions have text and options.`);
           }
 
-          setParsedQuestions(questions);
+          setRawQuestions(questions);
           setParseErrors(errors);
         } catch (err: unknown) {
           const errorMsg = err instanceof Error ? err.message : 'Unknown error';
@@ -737,29 +780,182 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
     }
   };
 
-  // 4. Submit questions
+  // 5. ZIP Diagrams Upload Handler
+  const handleZipUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setZipFileName(file.name);
+    setZipErrors([]);
+    setZipWarnings([]);
+    setIsExtractingZip(true);
+
+    // Revoke previous blob URLs
+    zipBlobUrls.forEach((u) => URL.revokeObjectURL(u));
+    setZipBlobUrls([]);
+    setZipPreviewUrlMap(new Map());
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const result = await validateAndExtractZip(new Uint8Array(arrayBuffer));
+
+      if (!result.isValid) {
+        setZipErrors(result.errors);
+        setZipWarnings(result.warnings);
+        setExtractedImages([]);
+        setZipImageMap(new Map());
+        return;
+      }
+
+      // Generate in-browser preview object URLs
+      const newBlobs: string[] = [];
+      const urlMap = new Map<string, string>();
+      for (const img of result.images) {
+        const blob = new Blob([img.buffer as any], { type: img.mimeType });
+        const objUrl = URL.createObjectURL(blob);
+        newBlobs.push(objUrl);
+        urlMap.set(img.baseName.toLowerCase(), objUrl);
+        urlMap.set(img.normalizedPath.toLowerCase(), objUrl);
+      }
+
+      setZipBlobUrls(newBlobs);
+      setZipPreviewUrlMap(urlMap);
+      setExtractedImages(result.images);
+      setZipImageMap(result.imageMap);
+      setZipWarnings(result.warnings);
+    } catch (err: unknown) {
+      setZipErrors([err instanceof Error ? err.message : 'Failed to inspect and extract ZIP archive.']);
+    } finally {
+      setIsExtractingZip(false);
+    }
+  };
+
+  const handleClearZip = () => {
+    zipBlobUrls.forEach((u) => URL.revokeObjectURL(u));
+    setZipBlobUrls([]);
+    setZipPreviewUrlMap(new Map());
+    setExtractedImages([]);
+    setZipImageMap(new Map());
+    setZipFileName('');
+    setZipErrors([]);
+    setZipWarnings([]);
+  };
+
+  // 6. Reactive Resolution of Diagram References (for Preview & Error Highlighting)
+  const { previewQuestions, resolutionReport } = useMemo(() => {
+    if (rawQuestions.length === 0) {
+      return { previewQuestions: [], resolutionReport: null };
+    }
+
+    const { updatedQuestions, report } = resolveQuestionDiagramReferences(
+      rawQuestions,
+      zipImageMap,
+      zipPreviewUrlMap
+    );
+
+    return { previewQuestions: updatedQuestions, resolutionReport: report };
+  }, [rawQuestions, zipImageMap, zipPreviewUrlMap]);
+
+  const hasMissingReferences = Boolean(
+    resolutionReport && resolutionReport.unresolvedReferences.length > 0
+  );
+
+  // 7. Submit Questions & Attach Diagrams via Bounded Incremental Uploads
   const handleImportSubmit = () => {
-    if (parsedQuestions.length === 0) return;
+    if (rawQuestions.length === 0) return;
+    if (hasMissingReferences) return;
 
     startTransition(async () => {
-      // Ensure target exam ID reflects the currently selected exam if not specified per row
-      const questionsToSubmit = parsedQuestions.map((q) => ({
-        ...q,
-        examId: q.examId || selectedExamId,
-      }));
+      try {
+        setParseErrors([]);
+        const deterministicBatchId = `import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+        setLastBatchId(deterministicBatchId);
 
-      const res = await bulkImportQuestionsAction(questionsToSubmit, selectedPartition);
-      if (res.success) {
-        onSuccess(res.count);
-        onClose();
-      } else {
-        setParseErrors([res.error || 'Failed to import questions.']);
+        // 1. Separate bounded image upload (Avoids sending huge base64 in one Server Action)
+        if (extractedImages.length > 0) {
+          setImportProgressText(`Uploading ${extractedImages.length} diagrams in bounded batches...`);
+          const chunkSize = 10;
+          for (let i = 0; i < extractedImages.length; i += chunkSize) {
+            const chunk = extractedImages.slice(i, i + chunkSize);
+            const formData = new FormData();
+            formData.append('batchId', deterministicBatchId);
+            for (const img of chunk) {
+              const blob = new Blob([img.buffer as any], { type: img.mimeType });
+              formData.append('files', blob, img.baseName);
+            }
+            const uploadRes = await fetch('/api/admin/questions/import/images', {
+              method: 'POST',
+              body: formData,
+            });
+            if (!uploadRes.ok) {
+              const errData = await uploadRes.json().catch(() => ({}));
+              throw new Error(errData.error || `Failed to upload image chunk ${Math.floor(i / chunkSize) + 1}`);
+            }
+          }
+        }
+
+        // 2. Submit questions to bounded, resilient import pipeline
+        setImportProgressText(`Importing ${rawQuestions.length} questions in bounded database chunks...`);
+        const questionsToSubmit = rawQuestions.map((q) => ({
+          ...q,
+          examId: q.examId || selectedExamId,
+        }));
+
+        const res = await bulkImportQuestionsAction(
+          questionsToSubmit,
+          selectedPartition,
+          undefined, // diagrams already uploaded separately to batchId
+          deterministicBatchId
+        );
+
+        setImportProgressText('');
+        if (res.report) {
+          setFinalReport(res.report);
+        }
+
+        if (res.success && (!res.report || res.report.errors.length === 0)) {
+          zipBlobUrls.forEach((u) => URL.revokeObjectURL(u));
+          setZipBlobUrls([]);
+          onSuccess(res.count);
+          onClose();
+        } else {
+          if (res.error) {
+            setParseErrors([res.error]);
+          }
+        }
+      } catch (submitErr) {
+        setImportProgressText('');
+        console.error('Import submit error:', submitErr);
+        setParseErrors([submitErr instanceof Error ? submitErr.message : 'Unexpected error during import.']);
       }
     });
   };
 
+  const handleRetryBatch = async () => {
+    if (!lastBatchId) return;
+    setIsRetrying(true);
+    try {
+      const { retryImportBatchAction } = await import('@/lib/services/adminService');
+      const res = await retryImportBatchAction(lastBatchId, {
+        duplicatePolicy,
+        allowDestructiveUpdates,
+      });
+      if (res.report) {
+        setFinalReport(res.report);
+      }
+      if (res.success && res.report.errors.length === 0) {
+        onSuccess(res.report.questionsCreated);
+        onClose();
+      }
+    } catch (retryErr) {
+      setParseErrors([retryErr instanceof Error ? retryErr.message : 'Retry failed.']);
+    } finally {
+      setIsRetrying(false);
+    }
+  };
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Bulk Question Importer (CSV / JSON)">
+    <Modal isOpen={isOpen} onClose={handleCloseModal} title="Bulk Question Importer (CSV / JSON + Diagrams ZIP)">
       <div className="space-y-5 max-h-[80vh] overflow-y-auto pr-1">
         {/* Step 1: Sample CSV Download Box */}
         <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl p-4.5 space-y-3">
@@ -769,9 +965,9 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                 <FileSpreadsheet className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-slate-900">Required CSV Format Template</h4>
+                <h4 className="text-xs font-bold text-slate-900">Configured CSV & JSON Template</h4>
                 <p className="text-[11px] text-slate-600">
-                  Download our pre-configured CSV template containing RC passages, DI charts, and LaTeX math formatting.
+                  Pre-configured with RC passages, DI charts, Reasoning diagrams, LaTeX math, and optional ZIP filename diagram references.
                 </p>
               </div>
             </div>
@@ -808,28 +1004,28 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
               <BookOpen className="w-3 h-3 text-blue-600" /> 4Q Reading Comprehension Set (RC-SET-01)
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-100/70 text-amber-800 text-[10px] font-semibold">
-              📊 4Q Data Interpretation Set (DI-SET-01 + SVG Chart)
+              📊 4Q Data Interpretation Set (DI-SET-01 + Chart Diagram)
             </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-purple-100/70 text-purple-800 text-[10px] font-semibold">
               🧩 4Q Seating Arrangement Puzzle (PUZZLE-SET-01)
             </span>
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-teal-100/70 text-teal-800 text-[10px] font-semibold">
+              🖼️ Diagrams ZIP Support (PNG, JPG, WebP, GIF)
+            </span>
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-100/70 text-emerald-800 text-[10px] font-semibold">
               📐 LaTeX Equations ($...$)
-            </span>
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-rose-100/70 text-rose-800 text-[10px] font-semibold">
-              🏛️ Financial / Banking Awareness
             </span>
           </div>
 
           <div className="flex items-start gap-2 p-2.5 rounded-xl bg-emerald-50/90 border border-emerald-200 text-xs text-emerald-900">
             <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
             <span className="leading-relaxed">
-              <strong>Smart Storage Optimization:</strong> For Reading Comprehension (RC) sets, DI chart sets, and Puzzles, enter a common <code>groupId</code> (e.g. <code>RC-SET-01</code>, <code>DI-SET-01</code>) and provide the passage or chart image once on the first question. The system will store it once in the database to save space, while rendering it automatically across all 4-8 questions in that set!
+              <strong>Diagram & Image References:</strong> You can reference image files in <code>imageUrl</code>, <code>passageImageUrl</code>, or <code>optionA_image</code>..<code>optionE_image</code> (e.g. <code>branch_chart.png</code>). Upload the images in a companion <strong>.zip</strong> archive. Existing full URLs (<code>https://...</code>) and data URIs (<code>data:image/...</code>) continue to work seamlessly!
             </span>
           </div>
 
           <div className="text-[10px] text-slate-600 font-mono bg-white/90 p-2.5 rounded-xl border border-blue-100 overflow-x-auto whitespace-nowrap">
-            Columns: groupId, passage, passageImageUrl, imageUrl, sectionCode, topicName, text, optionA, optionB, optionC, optionD, optionE, correctOption, marks, negativeMarks, difficulty, explanation
+            Columns: groupId, passage, passageImageUrl, imageUrl, sectionCode, topicName, text, optionA, optionA_image, optionB, optionB_image, optionC, optionC_image, optionD, optionD_image, optionE, optionE_image, correctOption, marks, negativeMarks, difficulty, explanation
           </div>
         </div>
 
@@ -915,54 +1111,148 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
           </div>
         </div>
 
-        {/* Step 3: File Upload Dropzone */}
-        <div className="space-y-1.5">
-          <label className="text-xs font-semibold text-slate-700 block">Upload Questions File (.csv or .json):</label>
-          <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-2xl p-6 text-center transition-colors bg-slate-50/50 hover:bg-blue-50/20 relative cursor-pointer">
-            <input
-              type="file"
-              accept=".csv,.json"
-              onChange={handleFileUpload}
-              className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-            />
-            <div className="flex flex-col items-center justify-center space-y-2">
-              <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                {isParsing ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <Upload className="w-5 h-5" />
-                )}
+        {/* Step 3: File Upload Dropzones (Questions File + Diagrams ZIP) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Box 1: CSV / JSON Questions Dropzone */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+              <span>1. Questions File (.csv or .json):</span>
+              <span className="text-[10px] text-blue-600 font-bold uppercase">Required</span>
+            </label>
+            <div className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-2xl p-4.5 text-center transition-colors bg-slate-50/50 hover:bg-blue-50/20 relative cursor-pointer min-h-[120px] flex flex-col items-center justify-center">
+              <input
+                type="file"
+                accept=".csv,.json"
+                onChange={handleFileUpload}
+                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+              <div className="flex flex-col items-center justify-center space-y-1.5 pointer-events-none">
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                  {isParsing ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4" />
+                  )}
+                </div>
+                <div className="text-xs text-slate-700 font-medium">
+                  {isParsing ? (
+                    <span className="font-bold text-blue-700 animate-pulse">Reading & analyzing {fileName}...</span>
+                  ) : fileName ? (
+                    <span className="font-bold text-blue-700">{fileName}</span>
+                  ) : (
+                    <>
+                      <span className="font-bold text-blue-600">Choose CSV / JSON</span> or drag & drop
+                    </>
+                  )}
+                </div>
+                <span className="text-[10px] text-slate-400">Questions, passages, and option structure</span>
               </div>
-              <div className="text-xs text-slate-700 font-medium">
-                {isParsing ? (
-                  <span className="font-bold text-blue-700 animate-pulse">Reading & analyzing {fileName}...</span>
-                ) : fileName ? (
-                  <span className="font-bold text-blue-700">{fileName}</span>
-                ) : (
-                  <>
-                    <span className="font-bold text-blue-600">Click to upload</span> or drag and drop CSV / JSON
-                  </>
-                )}
-              </div>
-              <span className="text-[10px] text-slate-400">Supports standard banking CSV sheets or exported JSON arrays</span>
+            </div>
+          </div>
+
+          {/* Box 2: Diagrams ZIP Archive Dropzone */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+              <span>2. Diagrams Archive (.zip):</span>
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Optional</span>
+            </label>
+            <div className="border-2 border-dashed border-slate-200 hover:border-teal-400 rounded-2xl p-4.5 text-center transition-colors bg-slate-50/50 hover:bg-teal-50/20 relative min-h-[120px] flex flex-col items-center justify-center">
+              {zipFileName ? (
+                <div className="flex flex-col items-center justify-center space-y-1.5 z-10">
+                  <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center">
+                    <FileArchive className="w-4 h-4" />
+                  </div>
+                  <div className="text-xs font-bold text-teal-900 flex items-center gap-1.5">
+                    <span>{zipFileName}</span>
+                    <Badge variant="green" size="sm">
+                      {extractedImages.length} images
+                    </Badge>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearZip}
+                    className="text-[10px] text-red-600 hover:text-red-700 font-bold flex items-center gap-1 hover:underline cursor-pointer pt-0.5"
+                  >
+                    <Trash2 className="w-3 h-3" /> Remove Archive
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="file"
+                    accept=".zip"
+                    onChange={handleZipUpload}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                  <div className="flex flex-col items-center justify-center space-y-1.5 pointer-events-none">
+                    <div className="w-8 h-8 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center">
+                      {isExtractingZip ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <FileArchive className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-700 font-medium">
+                      {isExtractingZip ? (
+                        <span className="font-bold text-teal-700 animate-pulse">Inspecting diagrams in ZIP...</span>
+                      ) : (
+                        <>
+                          <span className="font-bold text-teal-600">Choose .ZIP Archive</span> or drag & drop
+                        </>
+                      )}
+                    </div>
+                    <span className="text-[10px] text-slate-400">PNG, JPG, WebP, GIF files referenced in CSV</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
 
         {/* Fallback Warning if 0 questions parsed */}
-        {fileName && !isParsing && parsedQuestions.length === 0 && parseErrors.length === 0 && (
+        {fileName && !isParsing && rawQuestions.length === 0 && parseErrors.length === 0 && (
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
             <span>No questions were extracted from {fileName}. Please ensure the file has a valid header and question rows.</span>
           </div>
         )}
 
-        {/* Error Messages if any */}
+        {/* ZIP Validation Errors */}
+        {zipErrors.length > 0 && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 space-y-1 max-h-32 overflow-y-auto">
+            <div className="font-bold flex items-center gap-1.5 text-red-900">
+              <XCircle className="w-4 h-4 text-red-600 shrink-0" />
+              ZIP Archive Validation Errors ({zipErrors.length}):
+            </div>
+            {zipErrors.map((err, i) => (
+              <div key={i} className="text-[11px] text-red-700 pl-5">
+                • {err}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* ZIP Warnings */}
+        {zipWarnings.length > 0 && (
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 space-y-1 max-h-28 overflow-y-auto">
+            <div className="font-bold flex items-center gap-1.5 text-amber-900">
+              <AlertCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+              Archive Notices ({zipWarnings.length}):
+            </div>
+            {zipWarnings.map((w: string, i: number) => (
+              <div key={i} className="text-[11px] text-amber-700 pl-5">
+                • {w}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* CSV Parse Errors if any */}
         {parseErrors.length > 0 && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 space-y-1 max-h-32 overflow-y-auto">
-            <div className="font-bold flex items-center gap-1.5">
+            <div className="font-bold flex items-center gap-1.5 text-red-900">
               <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
-              Validation Warnings ({parseErrors.length}):
+              Questions Validation Warnings ({parseErrors.length}):
             </div>
             {parseErrors.map((err, i) => (
               <div key={i} className="text-[11px] text-red-700 pl-5">
@@ -972,17 +1262,55 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
           </div>
         )}
 
-        {/* Step 4: Parsed Questions Summary & Preview */}
-        {parsedQuestions.length > 0 && (
+        {/* Unresolved Missing Image References Warning Box */}
+        {resolutionReport && resolutionReport.unresolvedReferences.length > 0 && (
+          <div className="p-3.5 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-900 space-y-2">
+            <div className="font-bold flex items-center gap-1.5 text-rose-800">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+              Missing Image References ({resolutionReport.unresolvedReferences.length})
+            </div>
+            <p className="text-[11px] text-rose-700">
+              The following diagram filenames are referenced in your questions but were not found in the uploaded ZIP archive. Please include these images in your ZIP or remove the reference before importing:
+            </p>
+            <div className="space-y-1 max-h-32 overflow-y-auto pr-1">
+              {resolutionReport.unresolvedReferences.map((ref, idx) => (
+                <div key={idx} className="text-[11px] bg-white/80 p-1.5 rounded border border-rose-200 flex items-center justify-between">
+                  <span className="font-medium text-slate-800">
+                    Row {ref.rowNumber} ({ref.questionIdentifier}) • <span className="font-bold text-rose-700">{ref.field}</span>
+                  </span>
+                  <span className="font-mono text-rose-800 font-semibold text-[10px]">
+                    "{ref.referencedFilename}"
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Diagram Match Success Banner */}
+        {resolutionReport && resolutionReport.resolvedCount > 0 && (
+          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between">
+            <span className="flex items-center gap-1.5 font-semibold">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              Successfully resolved {resolutionReport.resolvedCount} diagram {resolutionReport.resolvedCount === 1 ? 'reference' : 'references'} against ZIP!
+            </span>
+            <span className="text-[11px] text-emerald-700 font-medium">
+              Ready for preview
+            </span>
+          </div>
+        )}
+
+        {/* Step 4: Parsed Questions Summary & Interactive Preview */}
+        {previewQuestions.length > 0 && (
           <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                Parsed {parsedQuestions.length} Questions Ready to Import
+                Parsed {previewQuestions.length} Questions Ready to Review
               </span>
               <div className="flex gap-1.5">
                 {['ENGLISH', 'QUANT', 'REASONING', 'GA'].map((sec) => {
-                  const count = parsedQuestions.filter((q) => q.sectionCode === sec).length;
+                  const count = previewQuestions.filter((q) => q.sectionCode === sec).length;
                   if (count === 0) return null;
                   return (
                     <Badge key={sec} variant="blue" size="sm">
@@ -993,69 +1321,261 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
               </div>
             </div>
 
-            {/* Quick Preview of parsed questions */}
-            <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1 text-xs">
-              {parsedQuestions.slice(0, 5).map((q, idx) => (
-                <div key={idx} className="p-3 bg-white rounded-xl border border-slate-200 space-y-1.5 shadow-2xs">
-                  <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-500 font-bold">
-                    <div className="flex items-center gap-1.5">
-                      <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                        {q.sectionCode} • {q.topicName}
+            {/* Quick Preview of parsed questions with diagrams */}
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-1 text-xs">
+              {previewQuestions.slice(0, 6).map((q, idx) => {
+                const isMissingPImg = q.passageImageUrl && classifyImageReference(q.passageImageUrl) === 'FILENAME';
+                const isMissingQImg = q.imageUrl && classifyImageReference(q.imageUrl) === 'FILENAME';
+
+                return (
+                  <div key={idx} className="p-3.5 bg-white rounded-xl border border-slate-200 space-y-2.5 shadow-2xs">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-[10px] text-slate-500 font-bold">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                          {q.sectionCode} • {q.topicName}
+                        </span>
+                        {q.groupId && (
+                          <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-bold">
+                            Group: {q.groupId}
+                          </span>
+                        )}
+                        {(q.passage || q.passageImageUrl) && (
+                          <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                            <BookOpen className="w-3 h-3" />
+                            Passage Attached
+                          </span>
+                        )}
+                        {q.imageUrl && (
+                          <span className="bg-teal-50 text-teal-700 border border-teal-200 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
+                            <ImageIcon className="w-3 h-3" />
+                            Diagram
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-emerald-700">
+                        Answer: Option {q.options.findIndex((o) => o.isCorrect) + 1}
                       </span>
-                      {q.groupId && (
-                        <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-bold">
-                          Group: {q.groupId}
-                        </span>
-                      )}
-                      {(q.passage || q.passageImageUrl) && (
-                        <span className="bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded font-semibold flex items-center gap-1">
-                          <BookOpen className="w-3 h-3" />
-                          Passage / DI Attached
-                        </span>
-                      )}
-                      {q.groupId && !q.passage && !q.passageImageUrl && (
-                        <span className="bg-slate-50 text-slate-500 border border-slate-200 px-2 py-0.5 rounded">
-                          Reuses Group Passage
-                        </span>
-                      )}
                     </div>
-                    <span className="text-emerald-700">
-                      Answer: Option {q.options.findIndex((o) => o.isCorrect) + 1}
-                    </span>
+
+                    {/* Passage text & Passage Diagram */}
+                    {q.passage && (
+                      <div className="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-200/60 line-clamp-2">
+                        {q.passage}
+                      </div>
+                    )}
+
+                    {q.passageImageUrl && (
+                      <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                        <span className="text-[10px] font-bold text-slate-600 block">Passage / DI Diagram:</span>
+                        {isMissingPImg ? (
+                          <div className="text-[11px] text-rose-600 font-semibold bg-rose-50 border border-rose-200 p-2 rounded">
+                            ⚠️ Referenced file "{q.passageImageUrl}" not found in ZIP archive
+                          </div>
+                        ) : (
+                          <DiagramViewer
+                            src={q.passageImageUrl}
+                            alt="Passage Diagram Preview"
+                            maxHeightClass="max-h-36"
+                            className="rounded border border-slate-200"
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Question Statement */}
+                    <div className="font-semibold text-slate-800 text-xs">
+                      <MathRenderer content={q.text} />
+                    </div>
+
+                    {/* Question Diagram */}
+                    {q.imageUrl && (
+                      <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                        <span className="text-[10px] font-bold text-slate-600 block">Question Diagram:</span>
+                        {isMissingQImg ? (
+                          <div className="text-[11px] text-rose-600 font-semibold bg-rose-50 border border-rose-200 p-2 rounded">
+                            ⚠️ Referenced file "{q.imageUrl}" not found in ZIP archive
+                          </div>
+                        ) : (
+                          <DiagramViewer
+                            src={q.imageUrl}
+                            alt="Question Diagram Preview"
+                            maxHeightClass="max-h-36"
+                            className="rounded border border-slate-200"
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Options list with image preview */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                      {q.options.map((opt, oIdx) => {
+                        const isMissingOptImg = opt.imageUrl && classifyImageReference(opt.imageUrl) === 'FILENAME';
+                        return (
+                          <div
+                            key={oIdx}
+                            className={`p-2 text-[11px] rounded-lg border flex items-center justify-between gap-2 ${
+                              opt.isCorrect
+                                ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold'
+                                : 'bg-slate-50 border-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <span className="truncate">
+                              <span className="font-bold mr-1">{String.fromCharCode(65 + oIdx)}.</span>
+                              {opt.text}
+                            </span>
+                            {opt.imageUrl && (
+                              isMissingOptImg ? (
+                                <span className="text-[9px] text-rose-600 font-bold bg-rose-50 border border-rose-200 px-1 py-0.5 rounded shrink-0">
+                                  Missing Image
+                                </span>
+                              ) : (
+                                <DiagramViewer
+                                  src={opt.imageUrl}
+                                  alt={`Option ${String.fromCharCode(65 + oIdx)}`}
+                                  maxHeightClass="max-h-7"
+                                  className="w-7 h-7 rounded border border-slate-200 shrink-0"
+                                />
+                              )
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="font-semibold text-slate-800 line-clamp-2 text-xs">
-                    <MathRenderer content={q.text} />
-                  </div>
-                </div>
-              ))}
-              {parsedQuestions.length > 5 && (
+                );
+              })}
+              {previewQuestions.length > 6 && (
                 <div className="text-[11px] text-slate-400 text-center pt-1 font-mono">
-                  + {parsedQuestions.length - 5} more questions in file
+                  + {previewQuestions.length - 6} more questions in batch
                 </div>
               )}
             </div>
           </div>
         )}
 
+        {/* Phase 3: Duplicate Policy & Conflict Resolution Controls */}
+        {rawQuestions.length > 0 && (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-indigo-600" />
+                Duplicate Question Handling Policy
+              </span>
+              <select
+                value={duplicatePolicy}
+                onChange={(e) => setDuplicatePolicy(e.target.value as any)}
+                className="px-2.5 py-1 text-xs bg-white border border-slate-300 rounded-lg font-medium text-slate-700 focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="SKIP">Skip Duplicates (Default & Safe)</option>
+                <option value="REVIEW">Flag Duplicates for Review</option>
+                <option value="UPDATE">Update Existing Matching Questions</option>
+              </select>
+            </div>
+
+            {duplicatePolicy === 'UPDATE' && (
+              <label className="flex items-start gap-2 p-2 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={allowDestructiveUpdates}
+                  onChange={(e) => setAllowDestructiveUpdates(e.target.checked)}
+                  className="mt-0.5 rounded text-amber-600 focus:ring-amber-500 cursor-pointer"
+                />
+                <span>
+                  <strong>Explicit Consent Required:</strong> I authorize overwriting existing questions if an identical statement is found in the same exam/section.
+                </span>
+              </label>
+            )}
+          </div>
+        )}
+
+        {/* Phase 3: Live Progress Status */}
+        {importProgressText && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3 animate-pulse">
+            <Loader2 className="w-4 h-4 text-blue-600 animate-spin shrink-0" />
+            <div className="text-xs font-medium text-blue-900">{importProgressText}</div>
+          </div>
+        )}
+
+        {/* Phase 3: Final Batch Execution Report */}
+        {finalReport && (
+          <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                <FileSpreadsheet className="w-4 h-4 text-blue-600" />
+                Batch Import Report {lastBatchId ? `(${lastBatchId})` : ''}
+              </h4>
+              {finalReport.errors && finalReport.errors.length > 0 && lastBatchId && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  isLoading={isRetrying}
+                  onClick={handleRetryBatch}
+                  className="bg-white hover:bg-blue-50 text-blue-700 border-blue-300 text-xs font-bold flex items-center gap-1 shadow-2xs"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  Retry Failed Records
+                </Button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+              <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900">
+                <div className="text-base font-black">{finalReport.questionsCreated}</div>
+                <div className="text-[10px] text-emerald-700 font-semibold">Created</div>
+              </div>
+              <div className="p-2 rounded-xl bg-blue-50 border border-blue-200 text-blue-900">
+                <div className="text-base font-black">{finalReport.questionsUpdated}</div>
+                <div className="text-[10px] text-blue-700 font-semibold">Updated</div>
+              </div>
+              <div className="p-2 rounded-xl bg-amber-50 border border-amber-200 text-amber-900">
+                <div className="text-base font-black">{finalReport.duplicatesSkipped + finalReport.duplicatesRequiringReview}</div>
+                <div className="text-[10px] text-amber-700 font-semibold">Duplicates</div>
+              </div>
+              <div className="p-2 rounded-xl bg-rose-50 border border-rose-200 text-rose-900">
+                <div className="text-base font-black">{finalReport.errors ? finalReport.errors.length : 0}</div>
+                <div className="text-[10px] text-rose-700 font-semibold">Errors / Failed</div>
+              </div>
+            </div>
+
+            {finalReport.errors && finalReport.errors.length > 0 && (
+              <div className="space-y-1.5 max-h-40 overflow-y-auto text-[11px] p-2.5 bg-white rounded-lg border border-slate-200">
+                <span className="font-bold text-rose-700 block text-[10px] uppercase tracking-wider">
+                  Row-Level Diagnostics ({finalReport.errors.length}):
+                </span>
+                {finalReport.errors.map((err: any, eIdx: number) => (
+                  <div key={eIdx} className="text-slate-700 flex items-start gap-1">
+                    <span className="font-bold text-rose-600 shrink-0">Row {err.row}:</span>
+                    <span>{err.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Footer Actions */}
         <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
-          <Button variant="secondary" size="md" onClick={onClose} disabled={isPending || isParsing}>
+          <Button variant="secondary" size="md" onClick={handleCloseModal} disabled={isPending || isParsing || isExtractingZip}>
             Cancel
           </Button>
 
           <Button
             variant="primary"
             size="md"
-            isLoading={isPending || isParsing}
-            disabled={parsedQuestions.length === 0 || isPending || isParsing}
+            isLoading={isPending || isParsing || isExtractingZip}
+            disabled={rawQuestions.length === 0 || hasMissingReferences || isPending || isParsing || isExtractingZip}
             onClick={handleImportSubmit}
             className="bg-blue-600 hover:bg-blue-700 font-bold flex items-center gap-1.5"
+            title={hasMissingReferences ? 'Please resolve missing image references before importing' : 'Import questions into database'}
           >
             <Sparkles className="w-4 h-4" />
-            {isParsing
-              ? 'Analyzing File...'
-              : parsedQuestions.length > 0
-              ? `Import ${parsedQuestions.length} Questions`
+            {isParsing || isExtractingZip
+              ? 'Analyzing Files...'
+              : hasMissingReferences
+              ? 'Resolve Missing Images to Import'
+              : rawQuestions.length > 0
+              ? `Import ${rawQuestions.length} Questions`
               : 'Import Questions'}
           </Button>
         </div>
