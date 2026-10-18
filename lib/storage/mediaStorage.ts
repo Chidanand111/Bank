@@ -119,32 +119,7 @@ export async function cleanupBatchImages(batchId: string, category = 'questions'
   }
 }
 
-/**
- * Checks whether an image reference is an external URL, data URI, or local filename.
- */
-export function classifyImageReference(ref?: string | null): 'URL' | 'DATA_URI' | 'FILENAME' | 'NONE' {
-  if (!ref || typeof ref !== 'string') return 'NONE';
-  const trimmed = ref.trim();
-  if (!trimmed) return 'NONE';
-
-  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('//')) {
-    return 'URL';
-  }
-  if (trimmed.startsWith('data:image/')) {
-    return 'DATA_URI';
-  }
-  if (trimmed.startsWith('/uploads/') || trimmed.startsWith('/images/')) {
-    return 'URL';
-  }
-
-  // Check if string clearly looks like an image filename (has image extension)
-  const isImageFile = /\.(png|jpe?g|webp|gif|svg)$/i.test(trimmed);
-  if (isImageFile) {
-    return 'FILENAME';
-  }
-
-  return 'NONE';
-}
+export { classifyImageReference, type ImageReferenceClassification } from './imageClassifier';
 
 /**
  * If the provided image reference is a Base64 data URI (data:image/...),

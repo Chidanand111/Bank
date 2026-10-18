@@ -15,7 +15,7 @@ import { DiagramViewer } from '../ui/DiagramViewer';
 import { compressDataUrl } from '@/lib/utils/imageCompressor';
 import { validateAndExtractZip, ValidatedZipImage } from '@/lib/storage/zipValidator';
 import { resolveQuestionDiagramReferences } from '@/lib/storage/questionImageResolver';
-import { classifyImageReference } from '@/lib/storage/mediaStorage';
+import { classifyImageReference } from '@/lib/storage/imageClassifier';
 import {
   Download,
   Upload,
