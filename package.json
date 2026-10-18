@@ -13,7 +13,8 @@
     "db:push": "prisma db push",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
-    "test:db": "tsx --env-file=.env prisma/test-connection.ts"
+    "test:db": "tsx --env-file=.env prisma/test-connection.ts",
+    "db:admin": "tsx --env-file=.env scripts/create-admin.ts"
   },
   "prisma": {
     "seed": "tsx --env-file=.env prisma/seed.ts"
