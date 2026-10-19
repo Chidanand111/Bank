@@ -129,7 +129,7 @@ describe('TimerPolicy Engine', () => {
     });
 
     it('advances section and locks previous when section time expires', () => {
-      let state = sectionalLockedTimerPolicy.initialize(bankMockTest);
+      const state = sectionalLockedTimerPolicy.initialize(bankMockTest);
       state.sectionTimers['ENGLISH'] = 1;
 
       const result = sectionalLockedTimerPolicy.tick(state, bankMockTest);
@@ -145,7 +145,7 @@ describe('TimerPolicy Engine', () => {
     });
 
     it('auto-submits when final section concludes', () => {
-      let state = sectionalLockedTimerPolicy.initialize(bankMockTest);
+      const state = sectionalLockedTimerPolicy.initialize(bankMockTest);
       state.currentSectionCode = 'REASONING';
       state.sectionTimers['REASONING'] = 1;
       state.lockedSectionCodes = ['ENGLISH', 'QUANT'];
@@ -191,7 +191,7 @@ describe('TimerPolicy Engine', () => {
     });
 
     it('auto-submits only when total master clock hits 00:00', () => {
-      let state = overallCompositeTimerPolicy.initialize(sscMockTest);
+      const state = overallCompositeTimerPolicy.initialize(sscMockTest);
       state.totalRemainingSeconds = 1;
 
       const result = overallCompositeTimerPolicy.tick(state);

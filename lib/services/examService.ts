@@ -496,7 +496,7 @@ export async function toggleExamPublishAction(
   const cleanSlug = examIdOrSlug.replace(/^exam-/, '');
 
   // Look up in Neon PostgreSQL first to guarantee accuracy
-  let dbExam = await prisma.exam.findFirst({
+  const dbExam = await prisma.exam.findFirst({
     where: {
       OR: [
         { id: examIdOrSlug },

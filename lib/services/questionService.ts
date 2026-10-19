@@ -741,6 +741,23 @@ export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<
       },
     });
 
+    if (dbMockTest) {
+      const isUnpublished = (dbMockTest as any).status === 'created' || (dbMockTest as any).isPublished === false;
+      if (isUnpublished) {
+        let isAdminUser = false;
+        try {
+          const { getCurrentUser } = await import('../auth/session');
+          const user = await getCurrentUser();
+          isAdminUser = user?.role === 'ADMIN';
+        } catch {
+          isAdminUser = false;
+        }
+        if (!isAdminUser) {
+          throw new Error('Access restricted: This mock test is unpublished and only accessible to administrators.');
+        }
+      }
+    }
+
     if (dbMockTest && dbMockTest.mockTestQuestions.length > 0) {
       const mapped: Question[] = dbMockTest.mockTestQuestions.map(mtq => {
         const q = mtq.question;
@@ -807,7 +824,10 @@ export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<
 
       return resolveGroupPassagesSync(mapped);
     }
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message?.includes('Access restricted')) {
+      throw err;
+    }
     console.warn('getLiveExamQuestionsAction DB mockTest query fallback:', err);
   }
 

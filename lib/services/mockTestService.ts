@@ -529,7 +529,7 @@ export async function toggleMockTestPublishAction(
   }
 
   const cleanSlug = testIdOrSlug.replace(/^mock-/, '');
-  let test =
+  const test =
     dynamicMockTests.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug || t.slug === cleanSlug) ||
     MOCK_TESTS_DATA.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug || t.slug === cleanSlug);
 
