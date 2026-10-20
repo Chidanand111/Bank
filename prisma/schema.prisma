@@ -97,6 +97,7 @@ model Question {
   imageUrl          String?            @db.Text
   passage           String?            @db.Text
   passageImageUrl   String?            @db.Text
+  table             String?            @db.Text
   groupId           String?
   isPyq             Boolean            @default(false)
   pyqYear           Int?

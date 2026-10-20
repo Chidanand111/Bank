@@ -1,12 +1,17 @@
 import { z } from 'zod';
 
-export const questionOptionInputSchema = z.object({
-  id: z.string().optional(),
-  text: z.string().min(1, 'Option text cannot be empty'),
-  imageUrl: z.string().nullable().optional(),
-  isCorrect: z.boolean().default(false),
-  order: z.number().int().optional(),
-});
+export const questionOptionInputSchema = z
+  .object({
+    id: z.string().optional(),
+    text: z.string().default(''),
+    imageUrl: z.string().nullable().optional(),
+    isCorrect: z.boolean().default(false),
+    order: z.number().int().optional(),
+  })
+  .refine(
+    (data) => Boolean((data.text && data.text.trim().length > 0) || (data.imageUrl && data.imageUrl.trim().length > 0)),
+    { message: 'Option must have either text or an image' }
+  );
 
 export const adminQuestionInputSchema = z.object({
   text: z.string().min(1, 'Question text cannot be empty'),
@@ -20,6 +25,7 @@ export const adminQuestionInputSchema = z.object({
   imageUrl: z.string().nullable().optional(),
   passage: z.string().nullable().optional(),
   passageImageUrl: z.string().nullable().optional(),
+  table: z.string().nullable().optional(),
   groupId: z.string().nullable().optional(),
   isPyq: z.boolean().optional().default(false),
   pyqYear: z

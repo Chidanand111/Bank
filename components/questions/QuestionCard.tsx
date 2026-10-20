@@ -3,6 +3,7 @@ import { Question } from '@/types';
 import { Badge } from '../ui/Badge';
 import { MathRenderer } from '../ui/MathRenderer';
 import { DiagramViewer } from '../ui/DiagramViewer';
+import { LatexTableViewer } from '../ui/LatexTableViewer';
 import { CheckCircle2, XCircle, HelpCircle, BookOpen } from 'lucide-react';
 
 export interface QuestionCardProps {
@@ -30,7 +31,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
     );
   }
 
-  const hasPassage = Boolean(question.passage || question.passageImageUrl);
+  const hasPassage = Boolean(question.passage || question.passageImageUrl || (question.groupId && question.table));
   const optionsList = Array.isArray(question.options) ? question.options : [];
 
   return (
@@ -75,6 +76,14 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 <MathRenderer content={question.passage} />
               </div>
             )}
+            {question.table && (
+              <div className="mt-2">
+                <LatexTableViewer
+                  content={question.table}
+                  title={`Directions Data Table ${question.groupId ? `(${question.groupId})` : ''}`}
+                />
+              </div>
+            )}
             {question.passageImageUrl && (
               <div className="mt-3">
                 <DiagramViewer
@@ -85,6 +94,16 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
                 />
               </div>
             )}
+          </div>
+        )}
+
+        {/* Standalone Table (when not part of a shared passage group) */}
+        {!hasPassage && question.table && (
+          <div className="my-3">
+            <LatexTableViewer
+              content={question.table}
+              title="Question Reference Table"
+            />
           </div>
         )}
 

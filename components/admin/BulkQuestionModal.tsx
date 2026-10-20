@@ -12,6 +12,7 @@ import {
 } from '@/lib/services/adminService';
 import { MathRenderer } from '../ui/MathRenderer';
 import { DiagramViewer } from '../ui/DiagramViewer';
+import { LatexTableViewer } from '../ui/LatexTableViewer';
 import { compressDataUrl } from '@/lib/utils/imageCompressor';
 import { validateAndExtractZip, ValidatedZipImage } from '@/lib/storage/zipValidator';
 import { resolveQuestionDiagramReferences } from '@/lib/storage/questionImageResolver';
@@ -30,6 +31,7 @@ import {
   Trash2,
   XCircle,
   RotateCcw,
+  Table as TableIcon,
 } from 'lucide-react';
 
 export interface BulkQuestionModalProps {
@@ -41,24 +43,18 @@ export interface BulkQuestionModalProps {
   exams?: { id: string; title: string; category?: string }[];
 }
 
-// Sample CSV content with Reading Comprehension (RC), Data Interpretation (DI) charts, Reasoning puzzles, and LaTeX math
-const SAMPLE_CSV_CONTENT = `groupId,passage,passageImageUrl,imageUrl,sectionCode,topicName,text,optionA,optionA_image,optionB,optionB_image,optionC,optionC_image,optionD,optionD_image,optionE,optionE_image,correctOption,marks,negativeMarks,difficulty,explanation
-RC-SET-01,"The Reserve Bank of India (RBI) operates as the nation's central monetary authority, tasked with maintaining price stability while fostering sustainable economic growth. In response to fluctuating global inflationary pressures, the Monetary Policy Committee (MPC) meticulously regulates the policy Repo Rate and the Cash Reserve Ratio (CRR). By fine-tuning these policy tools, the central bank directly influences domestic liquidity, commercial lending trajectories, and corporate capital expenditure cycles. Financial inclusion drives and digital banking innovations further amplify the transmission of monetary policy across rural and semi-urban banking sectors.","","",ENGLISH,Reading Comprehension,"What is the primary dual mandate of the Reserve Bank of India highlighted in the passage?","Maximizing export revenue and foreign exchange","","Maintaining price stability while supporting economic growth","","Eliminating inter-bank lending rates completely","","Providing direct subsidies to commercial institutions","","None of the above","",B,1,0.25,MEDIUM,"As explicitly stated in the first sentence, the RBI's dual mandate focuses on maintaining price stability while fostering sustainable economic growth."
-RC-SET-01,"","","",ENGLISH,Reading Comprehension,"Which policy tool mentioned directly impacts commercial bank reserves without interest compensation?","Statutory Liquidity Ratio (SLR)","","Cash Reserve Ratio (CRR)","","Marginal Standing Facility (MSF)","","Open Market Operations (OMO)","","Reverse Repo Rate","",B,1,0.25,EASY,"The passage highlights the Cash Reserve Ratio (CRR), which requires commercial banks to maintain cash balances with the central bank."
-RC-SET-01,"","","",ENGLISH,Reading Comprehension,"According to the context, what role do digital banking innovations play in monetary economics?","They bypass central banking authority entirely","","They amplify the transmission of monetary policy across wider sectors","","They eliminate all credit risks in retail lending","","They reduce corporate capital expenditures to zero","","None of the above","",B,1,0.25,MEDIUM,"The passage notes that digital banking innovations amplify the transmission of monetary policy across rural and semi-urban banking sectors."
-RC-SET-01,"","","",ENGLISH,Reading Comprehension,"Which word from the passage is closest in meaning to 'carefully and with great attention to detail'?","Fluctuating","","Meticulously","","Trajectories","","Transmission","","Expenditure","",B,1,0.25,EASY,"'Meticulously' means in a way that shows great attention to detail or very thoroughly."
-DI-SET-01,"Directions (Questions 5-8): The following Data Interpretation chart displays branch manufacturing distribution across 4 quarters (Q1 to Q4). Total production stood at 2400 units: Q1 (20%), Q2 (30%), Q3 (25%), Q4 (25%). Study the information and answer the questions.","branch_production_q1_q4.png","",QUANT,Data Interpretation,"What is the difference between total units produced in Q2 and Q1?","240 units","","300 units","","200 units","","180 units","","150 units","",A,1,0.25,EASY,"Total production = 2400. Q2 = 30% of 2400 = 720. Q1 = 20% of 2400 = 480. Difference = 720 - 480 = 240 units."
-DI-SET-01,"","","",QUANT,Data Interpretation,"What is the ratio of combined production in (Q1 + Q3) to (Q2 + Q4)?","$9 : 11$","","$1 : 1$","","$3 : 4$","","$5 : 6$","","None of these","",A,1,0.25,MEDIUM,"Q1 + Q3 = 20% + 25% = 45%. Q2 + Q4 = 30% + 25% = 55%. Ratio = 45 : 55 = 9 : 11."
-DI-SET-01,"","","",QUANT,Data Interpretation,"If production in Q5 is projected to be 15% higher than Q2, how many units will be produced in Q5?","828 units","","810 units","","840 units","","800 units","","790 units","",A,1,0.25,MEDIUM,"Q2 production = 720 units. 15% increase = 720 * 1.15 = 828 units."
-DI-SET-01,"","","",QUANT,Data Interpretation,"What is the average number of units produced per quarter across Q1, Q2, and Q3?","600 units","","580 units","","620 units","","640 units","","610 units","",A,1,0.25,EASY,"Total for Q1+Q2+Q3 = 480 + 720 + 600 = 1800 units. Average = 1800 / 3 = 600 units."
-PUZZLE-SET-01,"Directions (Questions 9-12): Eight friends (A, B, C, D, E, F, G, and H) are sitting around a circular table facing the center. A sits third to the right of B. F sits second to the right of A. Only two people sit between F and C. D sits second to the left of C. E is an immediate neighbor of neither A nor C. G sits third to the left of H.","","seating_arrangement_diagram.png",REASONING,Circular Seating Arrangement,"Who sits directly opposite to B in the arrangement?","F","","D","","H","","G","","C","",B,1,0.25,MEDIUM,"Plotting clockwise from B: B, E, H, A, D, G, F, C. D sits directly opposite B (4 positions away in an 8-person circular table)."
-PUZZLE-SET-01,"","","",REASONING,Circular Seating Arrangement,"Who sits to the immediate left of A?","H","","D","","F","","B","","E","",A,1,0.25,EASY,"Facing the center, H is to the immediate left (clockwise predecessor) of A."
-PUZZLE-SET-01,"","","",REASONING,Circular Seating Arrangement,"How many persons sit between F and B when counted from the right of F?","One","","Two","","Three","","Four","","None","",A,1,0.25,MEDIUM,"Counting clockwise from F: only C sits between F and B. Thus exactly one person sits between them."
-PUZZLE-SET-01,"","","",REASONING,Circular Seating Arrangement,"Four of the following five are alike based on their positions and form a group. Which one does not belong to the group?","B - H","","A - G","","D - F","","G - C","","E - A","",E,1,0.25,HARD,"In B-H, A-G, D-F, and G-C, exactly one person sits between the pairs. In E-A, there is also one person (H), but they are sitting in opposite orientation."
-,,"","",QUANT,Simplification,"Solve the expression: $\\sqrt{625} + \\frac{15}{3} \\times 4 - 2^3 = ?$","37","","42","","45","","39","","40","",A,1,0.25,EASY,"$\\sqrt{625} = 25$; $\\frac{15}{3} \\times 4 = 20$; $2^3 = 8$. Therefore: $25 + 20 - 8 = 37$."
-,,"","",QUANT,Quadratic Equations,"Find the roots of the quadratic equation: $x^2 - 7x + 12 = 0$","$x = 2, 6$","","$x = 3, 4$","","$x = -3, -4$","","$x = 1, 12$","","None of these","",B,1,0.25,MEDIUM,"Factorizing: $(x - 3)(x - 4) = 0 \\implies x = 3$ or $x = 4$."
-,,"","",REASONING,Syllogism,"Statements: Some bankers are analysts. All analysts are auditors. Conclusions: I. Some auditors are bankers. II. All bankers are auditors.","Only conclusion I follows","","Only conclusion II follows","","Either I or II follows","","Neither I nor II follows","","Both conclusions follow","",A,1,0.25,EASY,"Since some bankers are analysts and all analysts are auditors, it directly follows that some auditors are bankers. Conclusion I is valid."
-,,"","",FINANCIAL_AWARENESS,Banking Regulations,"Under the Basel III regulatory framework, what is the minimum Common Equity Tier 1 (CET1) capital ratio required to be maintained by banks?","4.5%","","5.5%","","6.0%","","8.0%","","9.0%","",B,1,0.25,MEDIUM,"Under Basel III norms, the minimum Tier 1 Common Equity ratio (CET1) is 5.5% (plus a capital conservation buffer of 2.5% in India)."
+// Sample CSV content with Reading Comprehension (RC), Tabular DI (LaTeX), DI charts, Reasoning puzzles, option images, and LaTeX math
+const SAMPLE_CSV_CONTENT = `groupId,passage,passageImageUrl,table,imageUrl,sectionCode,topicName,text,optionA,optionA_image,optionB,optionB_image,optionC,optionC_image,optionD,optionD_image,optionE,optionE_image,correctOption,marks,negativeMarks,difficulty,explanation
+DI-TAB-01,"Directions (Questions 1-2): The table below outlines recruitment data across four commercial banks in 2024. Total applicants, shortlisted percentages, and gender ratio (Male:Female) among shortlisted candidates are displayed. Study the data and answer the questions.","","\\begin{tabular}{|c|c|c|c|}\\hline \\textbf{Bank} & \\textbf{Total Applicants} & \\textbf{Shortlisted (\\%)} & \\textbf{Ratio (M:F)} \\\\ \\hline PNB & 24000 & 15\\% & 3:2 \\\\ \\hline BOB & 30000 & 20\\% & 5:3 \\\\ \\hline SBI & 45000 & 12\\% & 4:1 \\\\ \\hline CANARA & 18000 & 25\\% & 2:1 \\\\ \\hline \\end{tabular}","",QUANT,Data Interpretation,"What is the total number of candidates shortlisted in Bank of Baroda (BOB)?","6000","","5500","","6200","","5800","","None of these","",A,1,0.25,EASY,"Total shortlisted in BOB = 20% of 30,000 = 6,000 candidates."
+DI-TAB-01,"","","","","QUANT,Data Interpretation,"What is the count of male shortlisted candidates in Punjab National Bank (PNB)?","2160","","2240","","2080","","2400","","1980","",A,1,0.25,MEDIUM,"PNB shortlisted = 15% of 24,000 = 3,600. Male ratio = 3 / (3 + 2) = 3/5. Male candidates = 3600 * (3/5) = 2,160."
+RC-SET-01,"The Reserve Bank of India (RBI) operates as the nation's central monetary authority, tasked with maintaining price stability while fostering sustainable economic growth. In response to fluctuating global inflationary pressures, the Monetary Policy Committee (MPC) meticulously regulates the policy Repo Rate and the Cash Reserve Ratio (CRR). By fine-tuning these policy tools, the central bank directly influences domestic liquidity, commercial lending trajectories, and corporate capital expenditure cycles. Financial inclusion drives and digital banking innovations further amplify the transmission of monetary policy across rural and semi-urban banking sectors.","","","",ENGLISH,Reading Comprehension,"What is the primary dual mandate of the Reserve Bank of India highlighted in the passage?","Maximizing export revenue and foreign exchange","","Maintaining price stability while supporting economic growth","","Eliminating inter-bank lending rates completely","","Providing direct subsidies to commercial institutions","","None of the above","",B,1,0.25,MEDIUM,"As explicitly stated in the first sentence, the RBI's dual mandate focuses on maintaining price stability while fostering sustainable economic growth."
+RC-SET-01,"","","","","ENGLISH,Reading Comprehension,"Which policy tool mentioned directly impacts commercial bank reserves without interest compensation?","Statutory Liquidity Ratio (SLR)","","Cash Reserve Ratio (CRR)","","Marginal Standing Facility (MSF)","","Open Market Operations (OMO)","","Reverse Repo Rate","",B,1,0.25,EASY,"The passage highlights the Cash Reserve Ratio (CRR), which requires commercial banks to maintain cash balances with the central bank."
+DI-SET-01,"Directions (Questions 5-6): The following Data Interpretation chart displays branch manufacturing distribution across 4 quarters (Q1 to Q4). Total production stood at 2400 units: Q1 (20%), Q2 (30%), Q3 (25%), Q4 (25%). Study the information and answer the questions.","branch_production_q1_q4.png","","",QUANT,Data Interpretation,"What is the difference between total units produced in Q2 and Q1?","240 units","","300 units","","200 units","","180 units","","150 units","",A,1,0.25,EASY,"Total production = 2400. Q2 = 30% of 2400 = 720. Q1 = 20% of 2400 = 480. Difference = 720 - 480 = 240 units."
+PUZZLE-SET-01,"Directions (Questions 7-8): Eight friends (A, B, C, D, E, F, G, and H) are sitting around a circular table facing the center. A sits third to the right of B. F sits second to the right of A. Only two people sit between F and C. D sits second to the left of C.","","","seating_arrangement_diagram.png",REASONING,Circular Seating Arrangement,"Who sits directly opposite to B in the arrangement?","F","","D","","H","","G","","C","",B,1,0.25,MEDIUM,"D sits directly opposite B (4 positions away in an 8-person circular table)."
+GEOM-01,"","","","geom_problem.png",QUANT,Geometry,"Which of the following figures represents an equilateral triangle where all three medians are equal in length?","Figure A","optA_equilateral.png","Figure B","optB_isosceles.png","Figure C","optC_scalene.png","Figure D","optD_right.png","None of these","",A,1,0.25,MEDIUM,"In an equilateral triangle, all three sides are equal and all three medians are equal in length."
+,,"","","","QUANT,Simplification,"Solve the expression: $\\sqrt{625} + \\frac{15}{3} \\times 4 - 2^3 = ?$","37","","42","","45","","39","","40","",A,1,0.25,EASY,"$\\sqrt{625} = 25$; $\\frac{15}{3} \\times 4 = 20$; $2^3 = 8$. Therefore: $25 + 20 - 8 = 37$."
+,,"","","","QUANT,Quadratic Equations,"Find the roots of the quadratic equation: $x^2 - 7x + 12 = 0$","$x = 2, 6$","","$x = 3, 4$","","$x = -3, -4$","","$x = 1, 12$","","None of these","",B,1,0.25,MEDIUM,"Factorizing: $(x - 3)(x - 4) = 0 \\implies x = 3$ or $x = 4$."
+,,"","","","FINANCIAL_AWARENESS,Banking Regulations,"Under the Basel III regulatory framework, what is the minimum Common Equity Tier 1 (CET1) capital ratio required to be maintained by banks?","4.5%","","5.5%","","6.0%","","8.0%","","9.0%","",B,1,0.25,MEDIUM,"Under Basel III norms, the minimum Tier 1 Common Equity ratio (CET1) is 5.5% (plus a capital conservation buffer of 2.5% in India)."
 `;
 
 export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
@@ -453,14 +449,14 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                   isCorrect: Boolean(o.isCorrect),
                   imageUrl: o.imageUrl || o.image || undefined,
                 }));
-              } else if (!options && item.optionA) {
+              } else if (!options && (item.optionA || item.optionA_image || item.optionAImageUrl)) {
                 const rawCorrect = (item.correctOption || 'A').trim().toUpperCase();
                 options = [
-                  { text: item.optionA, isCorrect: rawCorrect === 'A', imageUrl: item.optionA_image || item.optionAImageUrl || undefined },
-                  { text: item.optionB, isCorrect: rawCorrect === 'B', imageUrl: item.optionB_image || item.optionBImageUrl || undefined },
-                  ...(item.optionC ? [{ text: item.optionC, isCorrect: rawCorrect === 'C', imageUrl: item.optionC_image || item.optionCImageUrl || undefined }] : []),
-                  ...(item.optionD ? [{ text: item.optionD, isCorrect: rawCorrect === 'D', imageUrl: item.optionD_image || item.optionDImageUrl || undefined }] : []),
-                  ...(item.optionE ? [{ text: item.optionE, isCorrect: rawCorrect === 'E', imageUrl: item.optionE_image || item.optionEImageUrl || undefined }] : []),
+                  { text: item.optionA || '', isCorrect: rawCorrect === 'A', imageUrl: item.optionA_image || item.optionAImageUrl || undefined },
+                  { text: item.optionB || '', isCorrect: rawCorrect === 'B', imageUrl: item.optionB_image || item.optionBImageUrl || undefined },
+                  ...(item.optionC || item.optionC_image || item.optionCImageUrl ? [{ text: item.optionC || '', isCorrect: rawCorrect === 'C', imageUrl: item.optionC_image || item.optionCImageUrl || undefined }] : []),
+                  ...(item.optionD || item.optionD_image || item.optionDImageUrl ? [{ text: item.optionD || '', isCorrect: rawCorrect === 'D', imageUrl: item.optionD_image || item.optionDImageUrl || undefined }] : []),
+                  ...(item.optionE || item.optionE_image || item.optionEImageUrl ? [{ text: item.optionE || '', isCorrect: rawCorrect === 'E', imageUrl: item.optionE_image || item.optionEImageUrl || undefined }] : []),
                 ];
               }
 
@@ -476,6 +472,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                 options,
                 passageImageUrl: pImg,
                 imageUrl: qImg,
+                table: item.table || item.tabular || item.passageTable || undefined,
               });
             }
             setRawQuestions(processedList);
@@ -601,17 +598,17 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
               'e',
             ]);
 
-            if (!optA || !optB) {
-              errors.push(`Row ${idx + 1}: At least Option A and Option B are required.`);
-              continue;
-            }
-
             // Option Images support in CSV
             const optAImg = getFieldValue(headers, rowValues, ['optiona_image', 'optiona_img', 'optionaimage', 'opta_image', 'optaimg', 'optaimage', 'opt1_image', 'choicea_image']);
             const optBImg = getFieldValue(headers, rowValues, ['optionb_image', 'optionb_img', 'optionbimage', 'optb_image', 'optbimg', 'optbimage', 'opt2_image', 'choiceb_image']);
             const optCImg = getFieldValue(headers, rowValues, ['optionc_image', 'optionc_img', 'optioncimage', 'optc_image', 'optcimg', 'optcimage', 'opt3_image', 'choicec_image']);
             const optDImg = getFieldValue(headers, rowValues, ['optiond_image', 'optiond_img', 'optiondimage', 'optd_image', 'optdimg', 'optdimage', 'opt4_image', 'choiced_image']);
             const optEImg = getFieldValue(headers, rowValues, ['optione_image', 'optione_img', 'optioneimage', 'opte_image', 'opteimg', 'opteimage', 'opt5_image', 'choicee_image']);
+
+            if ((!optA && !optAImg) || (!optB && !optBImg)) {
+              errors.push(`Row ${idx + 1}: At least Option A and Option B (text or diagram) are required.`);
+              continue;
+            }
 
             const rawCorrect = getFieldValue(headers, rowValues, [
               'correctoption',
@@ -640,8 +637,8 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
               correctLetter = 'E';
             } else {
               const lowerRaw = rawCorrect.toLowerCase();
-              if (lowerRaw === optA.toLowerCase()) correctLetter = 'A';
-              else if (lowerRaw === optB.toLowerCase()) correctLetter = 'B';
+              if (optA && lowerRaw === optA.toLowerCase()) correctLetter = 'A';
+              else if (optB && lowerRaw === optB.toLowerCase()) correctLetter = 'B';
               else if (optC && lowerRaw === optC.toLowerCase()) correctLetter = 'C';
               else if (optD && lowerRaw === optD.toLowerCase()) correctLetter = 'D';
               else if (optE && lowerRaw === optE.toLowerCase()) correctLetter = 'E';
@@ -651,11 +648,11 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
             }
 
             const optionsList = [
-              { text: optA, isCorrect: correctLetter === 'A', imageUrl: optAImg || undefined },
-              { text: optB, isCorrect: correctLetter === 'B', imageUrl: optBImg || undefined },
-              ...(optC ? [{ text: optC, isCorrect: correctLetter === 'C', imageUrl: optCImg || undefined }] : []),
-              ...(optD ? [{ text: optD, isCorrect: correctLetter === 'D', imageUrl: optDImg || undefined }] : []),
-              ...(optE ? [{ text: optE, isCorrect: correctLetter === 'E', imageUrl: optEImg || undefined }] : []),
+              { text: optA || (optAImg ? 'Option A' : ''), isCorrect: correctLetter === 'A', imageUrl: optAImg || undefined },
+              { text: optB || (optBImg ? 'Option B' : ''), isCorrect: correctLetter === 'B', imageUrl: optBImg || undefined },
+              ...(optC || optCImg ? [{ text: optC || (optCImg ? 'Option C' : ''), isCorrect: correctLetter === 'C', imageUrl: optCImg || undefined }] : []),
+              ...(optD || optDImg ? [{ text: optD || (optDImg ? 'Option D' : ''), isCorrect: correctLetter === 'D', imageUrl: optDImg || undefined }] : []),
+              ...(optE || optEImg ? [{ text: optE || (optEImg ? 'Option E' : ''), isCorrect: correctLetter === 'E', imageUrl: optEImg || undefined }] : []),
             ];
 
             // Resolve Section Code
@@ -742,6 +739,17 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                 : `exam-${rowExam.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
             }
 
+            const table =
+              getFieldValue(headers, rowValues, [
+                'table',
+                'passagetable',
+                'tabular',
+                'datatable',
+                'tabledata',
+                'ditable',
+                'di_table',
+              ]) || undefined;
+
             questions.push({
               examId: targetExamId,
               sectionCode,
@@ -750,6 +758,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
               imageUrl,
               passage,
               passageImageUrl,
+              table,
               groupId,
               difficulty,
               marks,
@@ -1382,6 +1391,17 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                       </div>
                     )}
 
+                    {/* Data Table Preview (LaTeX / Tabular) */}
+                    {q.table && (
+                      <div className="p-2 bg-slate-50 border border-slate-200 rounded-lg space-y-1">
+                        <span className="text-[10px] font-bold text-slate-600 flex items-center gap-1">
+                          <TableIcon className="w-3 h-3 text-indigo-600" />
+                          Data Table Preview:
+                        </span>
+                        <LatexTableViewer content={q.table} showCaption={false} />
+                      </div>
+                    )}
+
                     {/* Question Statement */}
                     <div className="font-semibold text-slate-800 text-xs">
                       <MathRenderer content={q.text} />
@@ -1407,34 +1427,44 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
                     )}
 
                     {/* Options list with image preview */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                       {q.options.map((opt, oIdx) => {
                         const isMissingOptImg = opt.imageUrl && classifyImageReference(opt.imageUrl) === 'FILENAME';
                         return (
                           <div
                             key={oIdx}
-                            className={`p-2 text-[11px] rounded-lg border flex items-center justify-between gap-2 ${
+                            className={`p-2.5 text-[11px] rounded-lg border flex flex-col justify-between gap-1.5 ${
                               opt.isCorrect
                                 ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold'
                                 : 'bg-slate-50 border-slate-200 text-slate-700'
                             }`}
                           >
-                            <span className="truncate">
-                              <span className="font-bold mr-1">{String.fromCharCode(65 + oIdx)}.</span>
-                              {opt.text}
-                            </span>
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-medium">
+                                <span className="font-bold mr-1">{String.fromCharCode(65 + oIdx)}.</span>
+                                {opt.text || <span className="italic text-slate-400">[Diagram Option]</span>}
+                              </span>
+                              {opt.isCorrect && (
+                                <span className="text-[9px] bg-emerald-200/80 text-emerald-800 font-bold px-1.5 py-0.5 rounded shrink-0">
+                                  Correct
+                                </span>
+                              )}
+                            </div>
                             {opt.imageUrl && (
                               isMissingOptImg ? (
-                                <span className="text-[9px] text-rose-600 font-bold bg-rose-50 border border-rose-200 px-1 py-0.5 rounded shrink-0">
-                                  Missing Image
-                                </span>
+                                <div className="text-[10px] text-rose-600 font-bold bg-rose-50 border border-rose-200 p-1.5 rounded">
+                                  ⚠️ Missing from ZIP: "{opt.imageUrl}"
+                                </div>
                               ) : (
-                                <DiagramViewer
-                                  src={opt.imageUrl}
-                                  alt={`Option ${String.fromCharCode(65 + oIdx)}`}
-                                  maxHeightClass="max-h-7"
-                                  className="w-7 h-7 rounded border border-slate-200 shrink-0"
-                                />
+                                <div className="pt-1">
+                                  <DiagramViewer
+                                    src={opt.imageUrl}
+                                    alt={`Option ${String.fromCharCode(65 + oIdx)} Diagram`}
+                                    title={`Option ${String.fromCharCode(65 + oIdx)} Diagram`}
+                                    maxHeightClass="max-h-24"
+                                    className="rounded border border-slate-200"
+                                  />
+                                </div>
                               )
                             )}
                           </div>

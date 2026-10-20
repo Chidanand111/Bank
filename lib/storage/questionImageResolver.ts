@@ -9,6 +9,7 @@
 import { AdminQuestionInput } from '@/types';
 import { ValidatedZipImage } from './zipValidator';
 import { classifyImageReference } from './imageClassifier';
+export { classifyImageReference };
 
 export interface UnresolvedImageReference {
   rowNumber: number;

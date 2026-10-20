@@ -45,6 +45,7 @@ export interface Question {
   imageUrl?: string;
   passage?: string;
   passageImageUrl?: string;
+  table?: string;
   groupId?: string;
   isPyq?: boolean;
   pyqYear?: number;
@@ -285,6 +286,7 @@ export interface AdminQuestionInput {
   imageUrl?: string | null;
   passage?: string | null;
   passageImageUrl?: string | null;
+  table?: string | null;
   groupId?: string | null;
   isPyq?: boolean;
   pyqYear?: number | null;

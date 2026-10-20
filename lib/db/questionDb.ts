@@ -17,6 +17,7 @@ export interface RawJsonQuestion {
   imageUrl?: string;
   passage?: string;
   passageImageUrl?: string;
+  table?: string;
   groupId?: string;
   isPyq?: boolean;
   pyqYear?: number;
@@ -168,6 +169,7 @@ export function normalizeQuestion(raw: RawJsonQuestion): Question {
     imageUrl: raw.imageUrl,
     passage: raw.passage,
     passageImageUrl: raw.passageImageUrl,
+    table: raw.table,
     groupId: raw.groupId,
     isPyq,
     pyqYear,
@@ -1020,6 +1022,7 @@ export function syncQuestionsToStore(questions: Question[]): void {
         imageUrl: q.imageUrl,
         passage: q.passage,
         passageImageUrl: q.passageImageUrl,
+        table: q.table,
         groupId: q.groupId,
         isPyq: q.isPyq,
         pyqYear: q.pyqYear,
@@ -1041,6 +1044,7 @@ export function syncQuestionsToStore(questions: Question[]): void {
         imageUrl: q.imageUrl,
         passage: q.passage,
         passageImageUrl: q.passageImageUrl,
+        table: q.table,
         groupId: q.groupId,
         isPyq: q.isPyq,
         pyqYear: q.pyqYear,

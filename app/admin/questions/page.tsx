@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
 import { MathRenderer } from '@/components/ui/MathRenderer';
 import { DiagramViewer } from '@/components/ui/DiagramViewer';
+import { LatexTableViewer } from '@/components/ui/LatexTableViewer';
 import { BulkQuestionModal } from '@/components/admin/BulkQuestionModal';
 import { AddQuestionsPromptModal } from '@/components/admin/AddQuestionsPromptModal';
 import { compressImageFile, formatByteSize } from '@/lib/utils/imageCompressor';
@@ -57,6 +58,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Clock,
+  Table as TableIcon,
 } from 'lucide-react';
 import {
   EXAM_PRESETS,
@@ -268,6 +270,7 @@ export default function AdminQuestionsPage() {
   const [formIsPyq, setFormIsPyq] = useState(false);
   const [formPyqYear, setFormPyqYear] = useState<number | ''>('');
   const [formPyqExam, setFormPyqExam] = useState('');
+  const [formTable, setFormTable] = useState('');
 
   // 5 Options with both text and imageUrl
   const [options, setOptions] = useState<Array<{ text: string; imageUrl: string; isCorrect: boolean }>>([
@@ -717,6 +720,7 @@ export default function AdminQuestionsPage() {
     setFormIsPyq(Boolean(part?.isPyq));
     setFormPyqYear(part?.pyqYear || (part?.isPyq ? 2024 : ''));
     setFormPyqExam(part?.isPyq ? part.title : '');
+    setFormTable('');
     setOptions([
       { text: '', imageUrl: '', isCorrect: true },
       { text: '', imageUrl: '', isCorrect: false },
@@ -744,6 +748,7 @@ export default function AdminQuestionsPage() {
     setFormIsPyq(Boolean(q.isPyq));
     setFormPyqYear(q.pyqYear || '');
     setFormPyqExam(q.pyqExam || '');
+    setFormTable(q.table || '');
     setOptions(
       q.options.map(opt => ({
         text: opt.text || '',
@@ -770,6 +775,7 @@ export default function AdminQuestionsPage() {
       imageUrl: formImageUrl.trim() || undefined,
       passage: formPassage.trim() || undefined,
       passageImageUrl: formPassageImageUrl.trim() || undefined,
+      table: formTable.trim() || undefined,
       groupId: formGroupId.trim() || undefined,
       isPyq: formIsPyq,
       pyqYear: formPyqYear !== '' ? Number(formPyqYear) : undefined,
@@ -1690,6 +1696,11 @@ export default function AdminQuestionsPage() {
                           <ImageIcon className="w-3 h-3" /> Has Images
                         </span>
                       )}
+                      {q.table && (
+                        <span className="text-[10px] font-bold bg-teal-100 text-teal-800 px-2 py-0.5 rounded flex items-center gap-1">
+                          <TableIcon className="w-3 h-3 text-teal-700" /> Has Table
+                        </span>
+                      )}
                       {q.groupId && (
                         <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded flex items-center gap-1">
                           <BookOpen className="w-3 h-3 text-indigo-600" /> Group: {q.groupId}
@@ -1765,6 +1776,16 @@ export default function AdminQuestionsPage() {
                         maxHeightClass="max-h-48"
                         className="rounded-md border border-slate-100"
                       />
+                    </div>
+                  )}
+
+                  {/* Question Reference Table */}
+                  {q.table && (
+                    <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50 shadow-2xs">
+                      <div className="text-[10px] font-bold text-slate-600 mb-1.5 flex items-center gap-1 uppercase tracking-wider">
+                        <TableIcon className="w-3.5 h-3.5 text-indigo-600" /> Reference Table (LaTeX / Tabular):
+                      </div>
+                      <LatexTableViewer content={q.table} />
                     </div>
                   )}
 
@@ -2238,6 +2259,33 @@ export default function AdminQuestionsPage() {
                     maxHeightClass="max-h-36"
                     className="rounded"
                   />
+                </div>
+              )}
+            </div>
+
+            {/* Table / Tabular Support */}
+            <div className="pt-2 border-t border-slate-200/80">
+              <div className="flex items-center justify-between mb-1">
+                <label className="font-semibold text-slate-700 block text-xs">
+                  Data Table (LaTeX / Tabular)
+                </label>
+                <span className="text-[10px] text-slate-400 font-normal">
+                  LaTeX \begin&#123;tabular&#125;... or Markdown table
+                </span>
+              </div>
+              <textarea
+                rows={3}
+                value={formTable}
+                onChange={(e) => setFormTable(e.target.value)}
+                placeholder="\begin{tabular}{|c|c|c|}\hline Year & Income & Expenditure \\ \hline 2021 & $450$ & $320$ \\ \hline \end{tabular}"
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono focus:ring-2 focus:ring-indigo-500"
+              />
+              {formTable.trim() && (
+                <div className="mt-2 border border-slate-200 rounded-lg p-2.5 bg-white">
+                  <span className="text-[10px] text-slate-500 font-bold block mb-1.5 uppercase tracking-wider">
+                    Live Table Preview:
+                  </span>
+                  <LatexTableViewer content={formTable} />
                 </div>
               )}
             </div>

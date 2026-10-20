@@ -43,6 +43,7 @@ export class QuestionRepository {
       imageUrl: q.imageUrl || undefined,
       passage: q.passage || undefined,
       passageImageUrl: q.passageImageUrl || undefined,
+      table: (q as any).table || undefined,
       groupId: q.groupId || undefined,
       isPyq: q.isPyq,
       pyqYear: q.pyqYear || undefined,
@@ -90,6 +91,7 @@ export class QuestionRepository {
       imageUrl: q.imageUrl || undefined,
       passage: q.passage || undefined,
       passageImageUrl: q.passageImageUrl || undefined,
+      table: (q as any).table || undefined,
       groupId: q.groupId || undefined,
       isPyq: q.isPyq,
       pyqYear: q.pyqYear || undefined,
@@ -277,6 +279,7 @@ export class QuestionRepository {
         imageUrl: input.imageUrl || null,
         passage: dbPassage,
         passageImageUrl: dbPassageImageUrl,
+        table: input.table || null,
         groupId: gId,
         isPyq: Boolean(input.isPyq),
         pyqYear: pyqYearToUse,
@@ -350,6 +353,7 @@ export class QuestionRepository {
       imageUrl: created.imageUrl || undefined,
       passage: created.passage || undefined,
       passageImageUrl: created.passageImageUrl || undefined,
+      table: created.table || undefined,
       groupId: created.groupId || undefined,
       isPyq: created.isPyq,
       pyqYear: created.pyqYear || undefined,
@@ -380,65 +384,71 @@ export class QuestionRepository {
   /**
    * Update question and replace its options transactionally in Neon PostgreSQL
    */
-  static async update(id: string, input: AdminQuestionInput): Promise<Question | null> {
+  static async update(id: string, input: Partial<AdminQuestionInput>): Promise<Question | null> {
     const existing = await prisma.question.findUnique({
       where: { id },
       include: { section: true, topic: true, exam: true },
     });
 
-    const finalExamId = existing?.examId || input.examId || 'exam-ibps-po';
-    const finalSecId = existing?.sectionId || `sec-${input.sectionCode.toLowerCase()}`;
-    const finalTopicId = existing?.topicId || `top-${input.topicName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    const finalExamId = input.examId || existing?.examId || 'exam-ibps-po';
+    const finalSecId = input.sectionCode ? `sec-${input.sectionCode.toLowerCase()}` : (existing?.sectionId || 'sec-quant');
+    const finalTopicId = input.topicName ? `top-${input.topicName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}` : (existing?.topicId || 'top-general');
 
     await prisma.$transaction([
       prisma.question.upsert({
         where: { id },
         update: {
-          text: input.text,
-          imageUrl: input.imageUrl || null,
-          passage: input.passage || null,
-          passageImageUrl: input.passageImageUrl || null,
-          groupId: input.groupId || null,
-          isPyq: Boolean(input.isPyq),
-          pyqYear: input.pyqYear ? Number(input.pyqYear) : null,
-          pyqExam: input.pyqExam || null,
-          difficulty: input.difficulty,
-          explanation: input.explanation,
-          marks: input.marks,
-          negativeMarks: input.negativeMarks,
+          ...(input.text !== undefined ? { text: input.text } : {}),
+          ...(input.imageUrl !== undefined ? { imageUrl: input.imageUrl || null } : {}),
+          ...(input.passage !== undefined ? { passage: input.passage || null } : {}),
+          ...(input.passageImageUrl !== undefined ? { passageImageUrl: input.passageImageUrl || null } : {}),
+          ...(input.table !== undefined ? { table: input.table || null } : {}),
+          ...(input.groupId !== undefined ? { groupId: input.groupId || null } : {}),
+          ...(input.isPyq !== undefined ? { isPyq: Boolean(input.isPyq) } : {}),
+          ...(input.pyqYear !== undefined ? { pyqYear: input.pyqYear ? Number(input.pyqYear) : null } : {}),
+          ...(input.pyqExam !== undefined ? { pyqExam: input.pyqExam || null } : {}),
+          ...(input.difficulty !== undefined ? { difficulty: input.difficulty } : {}),
+          ...(input.explanation !== undefined ? { explanation: input.explanation } : {}),
+          ...(input.marks !== undefined ? { marks: input.marks } : {}),
+          ...(input.negativeMarks !== undefined ? { negativeMarks: input.negativeMarks } : {}),
         },
         create: {
           id,
-          text: input.text,
+          text: input.text || '',
           imageUrl: input.imageUrl || null,
           passage: input.passage || null,
           passageImageUrl: input.passageImageUrl || null,
+          table: input.table || null,
           groupId: input.groupId || null,
           isPyq: Boolean(input.isPyq),
           pyqYear: input.pyqYear ? Number(input.pyqYear) : null,
           pyqExam: input.pyqExam || null,
-          difficulty: input.difficulty,
-          explanation: input.explanation,
-          marks: input.marks,
-          negativeMarks: input.negativeMarks,
+          difficulty: input.difficulty || 'MEDIUM',
+          explanation: input.explanation || '',
+          marks: input.marks ?? 1.0,
+          negativeMarks: input.negativeMarks ?? 0.25,
           examId: finalExamId,
           sectionId: finalSecId,
           topicId: finalTopicId,
         },
       }),
-      prisma.option.deleteMany({ where: { questionId: id } }),
-      ...input.options.map((opt, i) =>
-        prisma.option.create({
-          data: {
-            id: `opt-${id}-${i + 1}`,
-            questionId: id,
-            text: opt.text || '',
-            imageUrl: opt.imageUrl || null,
-            isCorrect: opt.isCorrect,
-            order: i + 1,
-          },
-        })
-      ),
+      ...(input.options && Array.isArray(input.options)
+        ? [
+            prisma.option.deleteMany({ where: { questionId: id } }),
+            ...input.options.map((opt, i) =>
+              prisma.option.create({
+                data: {
+                  id: `opt-${id}-${i + 1}`,
+                  questionId: id,
+                  text: opt.text || '',
+                  imageUrl: opt.imageUrl || null,
+                  isCorrect: opt.isCorrect,
+                  order: i + 1,
+                },
+              })
+            ),
+          ]
+        : []),
     ]);
 
     return this.findById(id);
