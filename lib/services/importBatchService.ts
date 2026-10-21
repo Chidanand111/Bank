@@ -51,7 +51,14 @@ export async function executeResilientImport(
   params: ChunkedImportParams
 ): Promise<{ success: boolean; batch: ImportBatchMetadata; report: ImportBatchReport; error?: string }> {
   // 1. Authorization Guard
-  await requireAdmin();
+  try {
+    await requireAdmin();
+  } catch (authErr: any) {
+    if (authErr?.message === 'NEXT_REDIRECT' || authErr?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw new Error('Unauthorized: Admin session expired. Please log in.');
+    }
+    throw authErr;
+  }
 
   const {
     questions,
@@ -118,34 +125,38 @@ export async function executeResilientImport(
 
   if (partitionId && partitionId !== 'ALL') {
     const cleanSlug = partitionId.replace(/^(exam|mock)-/, '');
-    const dbExam = await prisma.exam.findFirst({
-      where: {
-        OR: [
-          { id: partitionId },
-          { slug: partitionId },
-          { slug: cleanSlug },
-          { id: `exam-${cleanSlug}` },
-        ],
-      },
-    });
-
-    if (dbExam) {
-      resolvedExamId = dbExam.id;
-    } else {
-      const dbMock = await prisma.mockTest.findFirst({
+    try {
+      const dbExam = await prisma.exam.findFirst({
         where: {
           OR: [
             { id: partitionId },
             { slug: partitionId },
             { slug: cleanSlug },
-            { id: `mock-${cleanSlug}` },
+            { id: `exam-${cleanSlug}` },
           ],
         },
       });
-      if (dbMock) {
-        resolvedMockTestId = dbMock.id;
-        resolvedExamId = dbMock.examId;
+
+      if (dbExam) {
+        resolvedExamId = dbExam.id;
+      } else {
+        const dbMock = await prisma.mockTest.findFirst({
+          where: {
+            OR: [
+              { id: partitionId },
+              { slug: partitionId },
+              { slug: cleanSlug },
+              { id: `mock-${cleanSlug}` },
+            ],
+          },
+        });
+        if (dbMock) {
+          resolvedMockTestId = dbMock.id;
+          resolvedExamId = dbMock.examId;
+        }
       }
+    } catch (partitionErr) {
+      console.warn('[executeResilientImport] Partition resolution DB warning:', partitionErr);
     }
   }
 
@@ -400,7 +411,17 @@ export async function executeResilientImport(
   }
 
   // 4. Finalize Batch State & Reporting
-  const finalBatch = getImportBatch(activeBatchId)!;
+  let finalBatch = getImportBatch(activeBatchId);
+  if (!finalBatch) {
+    finalBatch = createImportBatch({
+      batchId: activeBatchId,
+      filename,
+      partitionId,
+      duplicatePolicy,
+      allowDestructiveUpdates,
+      totalRows: questions.length,
+    });
+  }
   finalBatch.report.durationMs = Date.now() - startTime;
 
   const totalErrors = finalBatch.report.errors.length;
@@ -441,7 +462,14 @@ export async function retryImportBatch(
     allowDestructiveUpdates?: boolean;
   } = {}
 ): Promise<{ success: boolean; batch: ImportBatchMetadata; report: ImportBatchReport; error?: string }> {
-  await requireAdmin();
+  try {
+    await requireAdmin();
+  } catch (authErr: any) {
+    if (authErr?.message === 'NEXT_REDIRECT' || authErr?.digest?.startsWith('NEXT_REDIRECT')) {
+      throw new Error('Unauthorized: Admin session expired. Please log in.');
+    }
+    throw authErr;
+  }
 
   const batch = getImportBatch(batchId);
   if (!batch) {

@@ -183,9 +183,14 @@ export async function bulkImportQuestionsAction(
   questions: AdminQuestionInput[],
   partitionId?: string,
   images?: { filename: string; base64: string; mimeType: string }[],
-  batchId?: string
+  batchId?: string,
+  options?: {
+    duplicatePolicy?: 'SKIP' | 'UPDATE' | 'REVIEW';
+    allowDestructiveUpdates?: boolean;
+    chunkSize?: number;
+  }
 ): Promise<{ success: boolean; count: number; error?: string; batchId?: string; report?: any }> {
-  return questionService.bulkImportQuestionsAction(questions, partitionId, images, batchId);
+  return questionService.bulkImportQuestionsAction(questions, partitionId, images, batchId, options);
 }
 
 export async function retryImportBatchAction(

@@ -433,6 +433,20 @@ describe('4. Authorization Guard & Role Verification', () => {
 
     spy.mockRestore();
   });
+
+  it('catches NEXT_REDIRECT gracefully and returns friendly unauthorized error', async () => {
+    const redirectErr = new Error('NEXT_REDIRECT');
+    (redirectErr as any).digest = 'NEXT_REDIRECT;replace;/admin/login;307';
+    const spy = vi.spyOn(authPermissions, 'requireAdmin').mockRejectedValueOnce(redirectErr);
+
+    const res = await questionService.bulkImportQuestionsAction([
+      createTestQuestion({ text: 'Redirect test question' }),
+    ]);
+
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/Unauthorized: Admin session expired/i);
+    spy.mockRestore();
+  });
 });
 
 describe('5. Bulk Import Flow & Idempotency / Safe Retries', () => {

@@ -509,66 +509,100 @@ export async function bulkImportQuestionsAction(
     chunkSize?: number;
   }
 ): Promise<{ success: boolean; count: number; error?: string; batchId?: string; report?: any }> {
-  await requireAdmin();
-
-  if (!questions || questions.length === 0) {
-    return { success: false, count: 0, error: 'No questions provided for import.' };
-  }
-
-  const validated = validateInput(bulkImportQuestionsSchema, questions);
-  if (!validated.success) {
-    return { success: false, count: 0, error: validated.error };
-  }
-
-  const activeBatchId = batchId || `batch-${Date.now().toString(36)}`;
-  const imageMapping: Record<string, string> = {};
-
-  // If diagrams are attached as base64 payload (e.g. from ZIP extraction), persist them to media storage
-  if (images && images.length > 0) {
-    try {
-      const { saveBatchImages } = await import('../storage/mediaStorage');
-      const preparedImages = images.map(img => ({
-        filename: img.filename,
-        buffer: Buffer.from(img.base64, 'base64'),
-        mimeType: img.mimeType,
-      }));
-
-      const savedMap = await saveBatchImages(preparedImages, {
-        batchId: activeBatchId,
-        category: 'questions',
-      });
-
-      for (const [key, stored] of savedMap.entries()) {
-        imageMapping[key.toLowerCase()] = stored.url;
-      }
-    } catch (saveErr) {
-      console.error('Failed to save batch images:', saveErr);
+  try {
+    await requireAdmin();
+  } catch (authErr: any) {
+    if (authErr?.message === 'NEXT_REDIRECT' || authErr?.digest?.startsWith('NEXT_REDIRECT')) {
       return {
         success: false,
         count: 0,
-        error: 'Failed to persist uploaded diagrams to storage.',
+        error: 'Unauthorized: Admin session expired. Please log in to admin portal.',
       };
     }
+    throw authErr;
   }
 
-  const { executeResilientImport } = await import('./importBatchService');
-  const result = await executeResilientImport({
-    batchId: activeBatchId,
-    questions: validated.data,
-    partitionId,
-    chunkSize: options?.chunkSize || 15,
-    duplicatePolicy: options?.duplicatePolicy || 'SKIP',
-    allowDestructiveUpdates: Boolean(options?.allowDestructiveUpdates),
-    imageMapping,
-  });
+  try {
+    if (!questions || questions.length === 0) {
+      return { success: false, count: 0, error: 'No questions provided for import.' };
+    }
 
-  return {
-    success: result.success,
-    count: result.report.questionsCreated,
-    error: result.error,
-    batchId: activeBatchId,
-    report: result.report,
-  };
+    const validated = validateInput(bulkImportQuestionsSchema, questions);
+    if (!validated.success) {
+      return { success: false, count: 0, error: validated.error };
+    }
+
+    const activeBatchId = batchId || `batch-${Date.now().toString(36)}`;
+    const imageMapping: Record<string, string> = {};
+
+    // If diagrams are attached as base64 payload (e.g. from ZIP extraction), persist them to media storage
+    if (images && images.length > 0) {
+      try {
+        const { saveBatchImages } = await import('../storage/mediaStorage');
+        const preparedImages = images.map(img => ({
+          filename: img.filename,
+          buffer: Buffer.from(img.base64, 'base64'),
+          mimeType: img.mimeType,
+        }));
+
+        const savedMap = await saveBatchImages(preparedImages, {
+          batchId: activeBatchId,
+          category: 'questions',
+        });
+
+        for (const [key, stored] of savedMap.entries()) {
+          imageMapping[key.toLowerCase()] = stored.url;
+        }
+      } catch (saveErr) {
+        console.error('Failed to save batch images:', saveErr);
+        return {
+          success: false,
+          count: 0,
+          error: 'Failed to persist uploaded diagrams to storage.',
+        };
+      }
+    }
+
+    const { executeResilientImport } = await import('./importBatchService');
+    const result = await executeResilientImport({
+      batchId: activeBatchId,
+      questions: validated.data,
+      partitionId,
+      chunkSize: options?.chunkSize || 15,
+      duplicatePolicy: options?.duplicatePolicy || 'SKIP',
+      allowDestructiveUpdates: Boolean(options?.allowDestructiveUpdates),
+      imageMapping,
+    });
+
+    const report = result?.report || { questionsCreated: 0, errors: [] };
+
+    return {
+      success: result.success,
+      count: report.questionsCreated || 0,
+      error: result.error,
+      batchId: activeBatchId,
+      report,
+    };
+  } catch (err: unknown) {
+    console.error('bulkImportQuestionsAction error:', err);
+    const anyErr = err as any;
+    if (
+      anyErr?.message === 'NEXT_REDIRECT' ||
+      anyErr?.digest?.startsWith('NEXT_REDIRECT') ||
+      (typeof anyErr?.message === 'string' && anyErr.message.includes('NEXT_REDIRECT'))
+    ) {
+      return {
+        success: false,
+        count: 0,
+        error: 'Unauthorized: Admin session expired. Please log in to admin portal.',
+      };
+    }
+    return {
+      success: false,
+      count: 0,
+      error: err instanceof Error ? err.message : 'An unexpected error occurred during bulk import.',
+    };
+  }
 }
 
 /**

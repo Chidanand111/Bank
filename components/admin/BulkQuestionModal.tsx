@@ -105,6 +105,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
   const [parseErrors, setParseErrors] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string>('');
   const [isParsing, setIsParsing] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isPending, startTransition] = useTransition();
 
   // ZIP Diagrams state
@@ -870,74 +871,99 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
   );
 
   // 7. Submit Questions & Attach Diagrams via Bounded Incremental Uploads
-  const handleImportSubmit = () => {
+  const handleImportSubmit = async () => {
     if (rawQuestions.length === 0) return;
     if (hasMissingReferences) return;
+    if (isSubmitting) return;
 
-    startTransition(async () => {
-      try {
-        setParseErrors([]);
-        const deterministicBatchId = `import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-        setLastBatchId(deterministicBatchId);
+    setIsSubmitting(true);
+    setParseErrors([]);
 
-        // 1. Separate bounded image upload (Avoids sending huge base64 in one Server Action)
-        if (extractedImages.length > 0) {
-          setImportProgressText(`Uploading ${extractedImages.length} diagrams in bounded batches...`);
-          const chunkSize = 10;
-          for (let i = 0; i < extractedImages.length; i += chunkSize) {
-            const chunk = extractedImages.slice(i, i + chunkSize);
-            const formData = new FormData();
-            formData.append('batchId', deterministicBatchId);
-            for (const img of chunk) {
-              const blob = new Blob([img.buffer as any], { type: img.mimeType });
-              formData.append('files', blob, img.baseName);
-            }
-            const uploadRes = await fetch('/api/admin/questions/import/images', {
-              method: 'POST',
-              body: formData,
-            });
-            if (!uploadRes.ok) {
-              const errData = await uploadRes.json().catch(() => ({}));
-              throw new Error(errData.error || `Failed to upload image chunk ${Math.floor(i / chunkSize) + 1}`);
-            }
+    try {
+      const deterministicBatchId = `import-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+      setLastBatchId(deterministicBatchId);
+
+      // 1. Separate bounded image upload (Avoids sending huge base64 in one Server Action)
+      if (extractedImages.length > 0) {
+        setImportProgressText(`Uploading ${extractedImages.length} diagrams in bounded batches...`);
+        const chunkSize = 10;
+        for (let i = 0; i < extractedImages.length; i += chunkSize) {
+          const chunk = extractedImages.slice(i, i + chunkSize);
+          const formData = new FormData();
+          formData.append('batchId', deterministicBatchId);
+          for (const img of chunk) {
+            const blob = new Blob([img.buffer as any], { type: img.mimeType });
+            formData.append('files', blob, img.baseName);
+          }
+          const uploadRes = await fetch('/api/admin/questions/import/images', {
+            method: 'POST',
+            body: formData,
+          });
+          if (!uploadRes.ok) {
+            const errData = await uploadRes.json().catch(() => ({}));
+            throw new Error(errData.error || `Failed to upload image chunk ${Math.floor(i / chunkSize) + 1}`);
           }
         }
-
-        // 2. Submit questions to bounded, resilient import pipeline
-        setImportProgressText(`Importing ${rawQuestions.length} questions in bounded database chunks...`);
-        const questionsToSubmit = rawQuestions.map((q) => ({
-          ...q,
-          examId: q.examId || selectedExamId,
-        }));
-
-        const res = await bulkImportQuestionsAction(
-          questionsToSubmit,
-          selectedPartition,
-          undefined, // diagrams already uploaded separately to batchId
-          deterministicBatchId
-        );
-
-        setImportProgressText('');
-        if (res.report) {
-          setFinalReport(res.report);
-        }
-
-        if (res.success && (!res.report || res.report.errors.length === 0)) {
-          zipBlobUrls.forEach((u) => URL.revokeObjectURL(u));
-          setZipBlobUrls([]);
-          onSuccess(res.count);
-          onClose();
-        } else {
-          if (res.error) {
-            setParseErrors([res.error]);
-          }
-        }
-      } catch (submitErr) {
-        setImportProgressText('');
-        console.error('Import submit error:', submitErr);
-        setParseErrors([submitErr instanceof Error ? submitErr.message : 'Unexpected error during import.']);
       }
-    });
+
+      // 2. Submit questions to bounded, resilient import pipeline
+      setImportProgressText(`Importing ${rawQuestions.length} questions in bounded database chunks...`);
+      const questionsToSubmit = rawQuestions.map((q) => ({
+        ...q,
+        examId: q.examId || selectedExamId,
+      }));
+
+      const res = await bulkImportQuestionsAction(
+        questionsToSubmit,
+        selectedPartition,
+        undefined, // diagrams already uploaded separately to batchId
+        deterministicBatchId,
+        {
+          duplicatePolicy,
+          allowDestructiveUpdates,
+        }
+      );
+
+      setImportProgressText('');
+      if (res.report) {
+        setFinalReport(res.report);
+      }
+
+      if (res.success && (!res.report || res.report.errors.length === 0)) {
+        zipBlobUrls.forEach((u) => URL.revokeObjectURL(u));
+        setZipBlobUrls([]);
+        onSuccess(res.count);
+        onClose();
+      } else {
+        if (res.error) {
+          let errText = res.error;
+          if (
+            errText.includes('441') ||
+            errText.includes('Minified React error') ||
+            errText.includes('Server Components render')
+          ) {
+            errText = 'A server error occurred during import. Please verify your admin session is active and check the database connection.';
+          }
+          setParseErrors([errText]);
+        }
+      }
+    } catch (submitErr: any) {
+      setImportProgressText('');
+      console.error('Import submit error:', submitErr);
+      let errorMsg = submitErr instanceof Error ? submitErr.message : 'Unexpected error during import.';
+      if (
+        errorMsg.includes('441') ||
+        errorMsg.includes('Minified React error') ||
+        submitErr?.digest ||
+        errorMsg.includes('Server Components render')
+      ) {
+        errorMsg = 'A server error occurred during import. Please verify your admin session is active and check the database connection.';
+      }
+      setParseErrors([errorMsg]);
+    } finally {
+      setIsSubmitting(false);
+      setImportProgressText('');
+    }
   };
 
   const handleRetryBatch = async () => {
@@ -955,9 +981,29 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
       if (res.success && res.report.errors.length === 0) {
         onSuccess(res.report.questionsCreated);
         onClose();
+      } else if (res.error) {
+        let errText = res.error;
+        if (
+          errText.includes('441') ||
+          errText.includes('Minified React error') ||
+          errText.includes('Server Components render')
+        ) {
+          errText = 'A server error occurred during retry. Please verify your admin session is active.';
+        }
+        setParseErrors([errText]);
       }
-    } catch (retryErr) {
-      setParseErrors([retryErr instanceof Error ? retryErr.message : 'Retry failed.']);
+    } catch (retryErr: any) {
+      console.error('Retry batch error:', retryErr);
+      let errorMsg = retryErr instanceof Error ? retryErr.message : 'Retry failed.';
+      if (
+        errorMsg.includes('441') ||
+        errorMsg.includes('Minified React error') ||
+        retryErr?.digest ||
+        errorMsg.includes('Server Components render')
+      ) {
+        errorMsg = 'A server error occurred during retry. Please verify your admin session is active and check the database connection.';
+      }
+      setParseErrors([errorMsg]);
     } finally {
       setIsRetrying(false);
     }
@@ -1586,21 +1632,36 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
 
         {/* Footer Actions */}
         <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
-          <Button variant="secondary" size="md" onClick={handleCloseModal} disabled={isPending || isParsing || isExtractingZip}>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={handleCloseModal}
+            disabled={isPending || isSubmitting || isParsing || isExtractingZip || isRetrying}
+          >
             Cancel
           </Button>
 
           <Button
             variant="primary"
             size="md"
-            isLoading={isPending || isParsing || isExtractingZip}
-            disabled={rawQuestions.length === 0 || hasMissingReferences || isPending || isParsing || isExtractingZip}
+            isLoading={isPending || isSubmitting || isParsing || isExtractingZip || isRetrying}
+            disabled={
+              rawQuestions.length === 0 ||
+              hasMissingReferences ||
+              isPending ||
+              isSubmitting ||
+              isParsing ||
+              isExtractingZip ||
+              isRetrying
+            }
             onClick={handleImportSubmit}
             className="bg-blue-600 hover:bg-blue-700 font-bold flex items-center gap-1.5"
             title={hasMissingReferences ? 'Please resolve missing image references before importing' : 'Import questions into database'}
           >
             <Sparkles className="w-4 h-4" />
-            {isParsing || isExtractingZip
+            {isSubmitting
+              ? importProgressText || 'Importing Questions...'
+              : isParsing || isExtractingZip
               ? 'Analyzing Files...'
               : hasMissingReferences
               ? 'Resolve Missing Images to Import'
