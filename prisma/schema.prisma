@@ -49,6 +49,11 @@ model User {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   attempts  Attempt[]
+
+  @@index([status])
+  @@index([role])
+  @@index([status, role])
+  @@index([createdAt])
 }
 
 model Exam {
@@ -63,6 +68,9 @@ model Exam {
   questions   Question[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+
+  @@index([category])
+  @@index([isActive])
 }
 
 model Section {
@@ -89,6 +97,8 @@ model Topic {
   questions Question[]
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+
+  @@index([sectionId])
 }
 
 model Question {
@@ -126,6 +136,9 @@ model Question {
   @@index([groupId])
   @@index([examId, sectionId])
   @@index([examId, sectionId, difficulty])
+  @@index([pyqExam])
+  @@index([isPyq, pyqYear])
+  @@index([createdAt])
 }
 
 model Option {
@@ -169,6 +182,7 @@ model MockTest {
 
   @@index([examId])
   @@index([examId, isPublished])
+  @@index([isPublished])
   @@index([isPyq])
   @@index([createdAt])
 }
@@ -214,6 +228,9 @@ model Attempt {
   @@index([mockTestId])
   @@index([userId, isCompleted])
   @@index([userId, createdAt])
+  @@index([mockTestId, isCompleted])
+  @@index([isCompleted, completedAt])
+  @@index([isCompleted, createdAt])
 }
 
 model Answer {
@@ -234,4 +251,5 @@ model Answer {
   @@unique([attemptId, questionId])
   @@index([attemptId])
   @@index([questionId])
+  @@index([selectedOptionId])
 }

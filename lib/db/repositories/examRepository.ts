@@ -246,66 +246,69 @@ export class ExamRepository {
     });
     const questionIds = Array.from(new Set(examQuestions.map(q => q.id)));
 
-    // Cascade deletion
-    if (questionIds.length > 0 || mockTestIds.length > 0) {
-      await prisma.answer.deleteMany({
-        where: {
-          OR: [
-            ...(questionIds.length > 0 ? [{ questionId: { in: questionIds } }] : []),
-            ...(mockTestIds.length > 0 ? [{ attempt: { mockTestId: { in: mockTestIds } } }] : []),
-          ],
-        },
-      });
-    }
-
-    if (mockTestIds.length > 0) {
-      await prisma.attempt.deleteMany({
-        where: { mockTestId: { in: mockTestIds } },
-      });
-    }
-
-    if (mockTestIds.length > 0 || questionIds.length > 0) {
-      await prisma.mockTestQuestion.deleteMany({
-        where: {
-          OR: [
-            ...(mockTestIds.length > 0 ? [{ mockTestId: { in: mockTestIds } }] : []),
-            ...(questionIds.length > 0 ? [{ questionId: { in: questionIds } }] : []),
-          ],
-        },
-      });
-    }
-
-    if (questionIds.length > 0) {
-      await prisma.option.deleteMany({
-        where: { questionId: { in: questionIds } },
-      });
-      await prisma.question.deleteMany({
-        where: { id: { in: questionIds } },
-      });
-    }
-
-    if (mockTestIds.length > 0) {
-      await prisma.mockTest.deleteMany({
-        where: { id: { in: mockTestIds } },
-      });
-    }
-
     const sections = await prisma.section.findMany({
       where: { examId: dbExam.id },
       select: { id: true },
     });
     const sectionIds = sections.map(s => s.id);
-    if (sectionIds.length > 0) {
-      await prisma.topic.deleteMany({
-        where: { sectionId: { in: sectionIds } },
-      });
-      await prisma.section.deleteMany({
-        where: { id: { in: sectionIds } },
-      });
-    }
 
-    await prisma.exam.delete({
-      where: { id: dbExam.id },
+    // Cascade deletion wrapped in atomic transaction
+    await prisma.$transaction(async (tx) => {
+      if (questionIds.length > 0 || mockTestIds.length > 0) {
+        await tx.answer.deleteMany({
+          where: {
+            OR: [
+              ...(questionIds.length > 0 ? [{ questionId: { in: questionIds } }] : []),
+              ...(mockTestIds.length > 0 ? [{ attempt: { mockTestId: { in: mockTestIds } } }] : []),
+            ],
+          },
+        });
+      }
+
+      if (mockTestIds.length > 0) {
+        await tx.attempt.deleteMany({
+          where: { mockTestId: { in: mockTestIds } },
+        });
+      }
+
+      if (mockTestIds.length > 0 || questionIds.length > 0) {
+        await tx.mockTestQuestion.deleteMany({
+          where: {
+            OR: [
+              ...(mockTestIds.length > 0 ? [{ mockTestId: { in: mockTestIds } }] : []),
+              ...(questionIds.length > 0 ? [{ questionId: { in: questionIds } }] : []),
+            ],
+          },
+        });
+      }
+
+      if (questionIds.length > 0) {
+        await tx.option.deleteMany({
+          where: { questionId: { in: questionIds } },
+        });
+        await tx.question.deleteMany({
+          where: { id: { in: questionIds } },
+        });
+      }
+
+      if (mockTestIds.length > 0) {
+        await tx.mockTest.deleteMany({
+          where: { id: { in: mockTestIds } },
+        });
+      }
+
+      if (sectionIds.length > 0) {
+        await tx.topic.deleteMany({
+          where: { sectionId: { in: sectionIds } },
+        });
+        await tx.section.deleteMany({
+          where: { id: { in: sectionIds } },
+        });
+      }
+
+      await tx.exam.delete({
+        where: { id: dbExam.id },
+      });
     });
 
     return { success: true, deletedQuestionsCount: questionIds.length };

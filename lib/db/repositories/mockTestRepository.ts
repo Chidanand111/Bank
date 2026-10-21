@@ -336,43 +336,45 @@ export class MockTestRepository {
 
     const questionIds = Array.from(new Set(relatedQuestions.map(q => q.id)));
 
-    // Cascade delete in FK order
-    if (questionIds.length > 0) {
-      await prisma.answer.deleteMany({
-        where: {
-          OR: [
-            { questionId: { in: questionIds } },
-            { attempt: { mockTestId: dbTest.id } },
-          ],
-        },
-      });
+    // Cascade delete in FK order within an atomic transaction
+    await prisma.$transaction(async (tx) => {
+      if (questionIds.length > 0) {
+        await tx.answer.deleteMany({
+          where: {
+            OR: [
+              { questionId: { in: questionIds } },
+              { attempt: { mockTestId: dbTest.id } },
+            ],
+          },
+        });
 
-      await prisma.option.deleteMany({
-        where: { questionId: { in: questionIds } },
-      });
+        await tx.option.deleteMany({
+          where: { questionId: { in: questionIds } },
+        });
 
-      await prisma.mockTestQuestion.deleteMany({
-        where: {
-          OR: [
-            { mockTestId: dbTest.id },
-            { questionId: { in: questionIds } },
-          ],
-        },
-      });
+        await tx.mockTestQuestion.deleteMany({
+          where: {
+            OR: [
+              { mockTestId: dbTest.id },
+              { questionId: { in: questionIds } },
+            ],
+          },
+        });
 
-      await prisma.attempt.deleteMany({
-        where: { mockTestId: dbTest.id },
-      });
+        await tx.attempt.deleteMany({
+          where: { mockTestId: dbTest.id },
+        });
 
-      await prisma.question.deleteMany({
-        where: { id: { in: questionIds } },
-      });
-    } else {
-      await prisma.mockTestQuestion.deleteMany({ where: { mockTestId: dbTest.id } });
-      await prisma.attempt.deleteMany({ where: { mockTestId: dbTest.id } });
-    }
+        await tx.question.deleteMany({
+          where: { id: { in: questionIds } },
+        });
+      } else {
+        await tx.mockTestQuestion.deleteMany({ where: { mockTestId: dbTest.id } });
+        await tx.attempt.deleteMany({ where: { mockTestId: dbTest.id } });
+      }
 
-    await prisma.mockTest.delete({ where: { id: dbTest.id } });
+      await tx.mockTest.delete({ where: { id: dbTest.id } });
+    });
 
     return { success: true, deletedQuestionsCount: questionIds.length };
   }

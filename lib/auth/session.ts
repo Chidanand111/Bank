@@ -20,7 +20,9 @@ function toStoredUser(u: {
   status?: string | null;
   createdAt?: Date | string;
   attempts?: Array<{ id: string }>;
+  _count?: { attempts: number };
 }): StoredUser {
+  const count = u._count?.attempts ?? (Array.isArray(u.attempts) ? u.attempts.length : 0);
   return {
     id: u.id,
     name: u.name,
@@ -29,14 +31,14 @@ function toStoredUser(u: {
     role: u.role as Role,
     status: (u.status || 'APPROVED') as UserStatus,
     createdAt: typeof u.createdAt === 'string' ? u.createdAt : u.createdAt?.toISOString() || new Date().toISOString(),
-    attemptCount: Array.isArray(u.attempts) ? u.attempts.length : 0,
+    attemptCount: count,
   };
 }
 
 export async function getDatabaseUsers(): Promise<StoredUser[]> {
   try {
     const dbUsers = await prisma.user.findMany({
-      include: { attempts: true },
+      include: { attempts: { select: { id: true } } },
       orderBy: { createdAt: 'desc' },
     });
     if (dbUsers.length > 0) {
@@ -52,7 +54,7 @@ export async function findDatabaseUserById(id: string): Promise<StoredUser | nul
   try {
     const user = await prisma.user.findUnique({
       where: { id },
-      include: { attempts: true },
+      include: { attempts: { select: { id: true } } },
     });
     if (user) return toStoredUser(user);
   } catch (err) {
@@ -66,7 +68,7 @@ export async function findDatabaseUserByEmail(email: string): Promise<StoredUser
   try {
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
-      include: { attempts: true },
+      include: { attempts: { select: { id: true } } },
     });
     if (user) return toStoredUser(user);
   } catch (err) {
@@ -80,7 +82,7 @@ export async function updateDatabaseUserRole(userId: string, newRole: Role): Pro
     const updated = await prisma.user.update({
       where: { id: userId },
       data: { role: newRole as PrismaRole },
-      include: { attempts: true },
+      include: { attempts: { select: { id: true } } },
     });
     return toStoredUser(updated);
   } catch (err) {
@@ -99,7 +101,7 @@ export async function updateDatabaseUserStatus(userId: string, newStatus: UserSt
     const updated = await prisma.user.update({
       where: { id: userId },
       data: { status: newStatus as PrismaUserStatus },
-      include: { attempts: true },
+      include: { attempts: { select: { id: true } } },
     });
     return toStoredUser(updated);
   } catch (err) {
@@ -130,7 +132,7 @@ export async function createDatabaseUser(data: {
         role: (data.role || 'USER') as PrismaRole,
         status: (data.status || 'PENDING') as PrismaUserStatus,
       },
-      include: { attempts: true },
+      include: { attempts: { select: { id: true } } },
     });
     return toStoredUser(created);
   } catch (err) {

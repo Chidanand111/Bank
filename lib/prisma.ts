@@ -32,7 +32,7 @@ function resolveDatabaseUrl(): string {
   // 3. Fallback dummy placeholder to allow PrismaClient instantiation without hardcoded secrets
   return (
     process.env.DATABASE_URL ||
-    'postgresql://postgres:postgres@localhost:5432/bankmock?sslmode=disable&connect_timeout=2'
+    'postgresql://postgres:postgres@localhost:5432/bankmock?sslmode=disable&connect_timeout=15'
   );
 }
 
