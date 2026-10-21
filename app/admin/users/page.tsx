@@ -48,6 +48,7 @@ export default function AdminUsersPage() {
       setUsers(data);
     } catch (err) {
       console.error(err);
+      setStatusMessage({ text: 'Failed to load user accounts.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -85,7 +86,7 @@ export default function AdminUsersPage() {
       if (res.success) {
         setStatusMessage({
           text: `Candidate application for ${userName} has been REJECTED.`,
-          type: 'error',
+          type: 'success',
         });
         await loadUsers();
       } else {

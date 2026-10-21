@@ -1,6 +1,6 @@
 'use server';
 
-import { requireAdmin } from '../auth/permissions';
+import { requireAdmin, assertAdmin } from '../auth/permissions';
 import {
   getDatabaseUsers,
   updateDatabaseUserRole,
@@ -18,7 +18,8 @@ import { AuthUser, Role, UserStatus } from '@/types';
  * Server-side User Listing for Administrators
  */
 export async function getAdminUsers(): Promise<AuthUser[]> {
-  await requireAdmin();
+  const currentAdmin = await requireAdmin();
+  assertAdmin(currentAdmin);
   const users = await getDatabaseUsers();
   return users.map(u => ({
     id: u.id,
@@ -37,7 +38,8 @@ export async function getAdminUsers(): Promise<AuthUser[]> {
 export async function approveUserAction(
   userId: string
 ): Promise<{ success: boolean; error?: string }> {
-  await requireAdmin();
+  const currentAdmin = await requireAdmin();
+  assertAdmin(currentAdmin);
 
   if (!userId?.trim()) {
     return { success: false, error: 'User ID is required.' };
@@ -60,6 +62,7 @@ export async function rejectUserAction(
   userId: string
 ): Promise<{ success: boolean; error?: string }> {
   const currentAdmin = await requireAdmin();
+  assertAdmin(currentAdmin);
 
   if (!userId?.trim()) {
     return { success: false, error: 'User ID is required.' };
@@ -90,6 +93,7 @@ export async function updateUserStatusAction(
   newStatus: UserStatus
 ): Promise<{ success: boolean; error?: string }> {
   const currentAdmin = await requireAdmin();
+  assertAdmin(currentAdmin);
 
   if (!userId?.trim()) {
     return { success: false, error: 'User ID is required.' };
@@ -125,6 +129,7 @@ export async function updateUserRoleAction(
   newRole: Role
 ): Promise<{ success: boolean; error?: string }> {
   const currentAdmin = await requireAdmin();
+  assertAdmin(currentAdmin);
 
   if (!userId?.trim()) {
     return { success: false, error: 'User ID is required.' };
@@ -143,7 +148,7 @@ export async function updateUserRoleAction(
     };
   }
 
-  const updated = updateDatabaseUserRole(userId, validatedRole.data);
+  const updated = await updateDatabaseUserRole(userId, validatedRole.data);
   if (!updated) {
     return { success: false, error: 'User not found in database.' };
   }

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { Shield, Lock, Mail, AlertTriangle, KeyRound, Sparkles, ArrowRight, ArrowLeft } from 'lucide-react';
 
-export default function AdminLoginPage() {
+function AdminLoginForm() {
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get('callbackUrl') || '/admin';
 
@@ -171,5 +171,13 @@ export default function AdminLoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AdminLoginPage() {
+  return (
+    <React.Suspense fallback={<div className="min-h-[90vh] bg-slate-950" />}>
+      <AdminLoginForm />
+    </React.Suspense>
   );
 }

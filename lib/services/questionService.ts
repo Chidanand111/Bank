@@ -31,6 +31,8 @@ import {
   Difficulty,
   Question,
 } from '@/types';
+import { MOCK_TESTS_DATA } from '../data/mockTests';
+import { toStudentSafeQuestions } from '../utils/questionDto';
 
 // In-memory working sets for admin modifications backed by JSON question store and Neon PostgreSQL
 let dynamicQuestions: Question[] = getAllQuestions();
@@ -123,14 +125,9 @@ export async function loadFreshQuestionsFromDb(): Promise<Question[]> {
         })),
       }));
 
-      // CRITICAL: Merge static questions from JSON store whose IDs are not in DB
-      // Ensures newly added exam questions (e.g. IBPS PO 2025 Prelims PYQ) are immediately available
-      const dbIds = new Set(mapped.map(q => String(q.id)));
-      const staticQuestions = getAllQuestions().filter(q => !dbIds.has(String(q.id)));
-      const combined = [...mapped, ...staticQuestions];
-
-      // Resolve and hydrate shared passages across groups
-      const resolved = resolveGroupPassagesSync(combined);
+      // Authoritative DB mode: Neon PostgreSQL is the authoritative source of truth.
+      // Do not merge or resurrect deleted questions from static JSON files.
+      const resolved = resolveGroupPassagesSync(mapped);
       dynamicQuestions = resolved;
       syncQuestionsToStore(resolved);
       return resolved;
@@ -695,20 +692,27 @@ export async function updateQuestionAction(
     answer: String.fromCharCode(65 + Math.max(0, validData.options.findIndex(o => o.isCorrect))),
   });
 
-  // Keep in-memory store in sync
-  syncQuestionsToStore([updatedQuestion]);
-
   // Persist directly to Neon PostgreSQL Database via QuestionRepository
   try {
     await QuestionRepository.update(actualId, input);
   } catch (dbErr) {
-    console.warn('QuestionRepository.update error in updateQuestionAction:', dbErr);
+    console.error('QuestionRepository.update error in updateQuestionAction:', dbErr);
+    return {
+      success: false,
+      error: dbErr instanceof Error ? dbErr.message : 'Database error updating question',
+    };
   }
+
+  // Keep in-memory store in sync only after successful DB persistence
+  syncQuestionsToStore([updatedQuestion]);
 
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/admin/tests');
   // Bust cached question list after update
   await invalidateQuestionsCache();
+  if (updatedQuestion.examId) {
+    await invalidateLiveQuestionsCache(updatedQuestion.examId);
+  }
   return { success: true };
 }
 
@@ -717,6 +721,18 @@ export async function updateQuestionAction(
  * guaranteeing all question and option diagrams are rendered during the test.
  */
 export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<Question[]> {
+  let currentUser = null;
+  try {
+    const { getCurrentUser } = await import('../auth/session');
+    currentUser = await getCurrentUser();
+  } catch {
+    currentUser = null;
+  }
+  if (currentUser && currentUser.status && currentUser.status !== 'APPROVED') {
+    throw new Error('Forbidden: Account approval required.');
+  }
+  const isAdmin = currentUser?.role === 'ADMIN';
+
   try {
     const dbMockTest = await prisma.mockTest.findFirst({
       where: {
@@ -727,6 +743,7 @@ export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<
         ],
       },
       include: {
+        exam: true,
         mockTestQuestions: {
           orderBy: { order: 'asc' },
           include: {
@@ -745,19 +762,17 @@ export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<
     });
 
     if (dbMockTest) {
-      const isUnpublished = (dbMockTest as any).status === 'created' || (dbMockTest as any).isPublished === false;
-      if (isUnpublished) {
-        let isAdminUser = false;
-        try {
-          const { getCurrentUser } = await import('../auth/session');
-          const user = await getCurrentUser();
-          isAdminUser = user?.role === 'ADMIN';
-        } catch {
-          isAdminUser = false;
-        }
-        if (!isAdminUser) {
-          throw new Error('Access restricted: This mock test is unpublished and only accessible to administrators.');
-        }
+      const isUnpublished =
+        (dbMockTest as any).status === 'created' ||
+        (dbMockTest as any).isPublished === false ||
+        Boolean(dbMockTest.exam && (dbMockTest.exam as any).status === 'created');
+      if (isUnpublished && !isAdmin) {
+        throw new Error('Access restricted: This mock test is unpublished and only accessible to administrators.');
+      }
+    } else {
+      const staticTest = MOCK_TESTS_DATA.find(t => t.id === testIdOrSlug || t.slug === testIdOrSlug);
+      if (staticTest && (staticTest as any).status === 'created' && !isAdmin) {
+        throw new Error('Access restricted: This mock test is unpublished and only accessible to administrators.');
       }
     }
 
@@ -825,7 +840,11 @@ export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<
         }
       }
 
-      return resolveGroupPassagesSync(mapped);
+      const resolved = resolveGroupPassagesSync(mapped);
+      if (!isAdmin) {
+        return toStudentSafeQuestions(resolved);
+      }
+      return resolved;
     }
   } catch (err: any) {
     if (err?.message?.includes('Access restricted')) {
@@ -837,15 +856,108 @@ export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<
   const freshQuestions = await loadFreshQuestionsFromDb();
   const partitioned = partitionQuestionsListSync(freshQuestions, testIdOrSlug);
   if (partitioned && partitioned.length > 0) {
-    return resolveGroupPassagesSync(partitioned);
+    const resolved = resolveGroupPassagesSync(partitioned);
+    if (!isAdmin) {
+      return toStudentSafeQuestions(resolved);
+    }
+    return resolved;
   }
 
   // Robust fallback to static getFixedQuestionsForMockTest
   const fixed = getFixedQuestionsForMockTest(testIdOrSlug);
   if (fixed && fixed.length > 0) {
+    const resolved = resolveGroupPassagesSync(fixed);
+    if (!isAdmin) {
+      return toStudentSafeQuestions(resolved);
+    }
+    return resolved;
+  }
+
+  const finalResolved = resolveGroupPassagesSync(partitioned);
+  if (!isAdmin) {
+    return toStudentSafeQuestions(finalResolved);
+  }
+  return finalResolved;
+}
+
+/**
+ * Server-side Canonical Question Loader for scoring and grading engines.
+ * Retrieves full canonical question records with true answer keys and explanations.
+ */
+export async function getCanonicalExamQuestions(testIdOrSlug: string): Promise<Question[]> {
+  try {
+    const dbMockTest = await prisma.mockTest.findFirst({
+      where: {
+        OR: [
+          { id: testIdOrSlug },
+          { slug: testIdOrSlug },
+          { slug: testIdOrSlug.replace(/^mock-/, '') },
+        ],
+      },
+      include: {
+        mockTestQuestions: {
+          orderBy: { order: 'asc' },
+          include: {
+            question: {
+              include: {
+                options: { orderBy: { order: 'asc' } },
+                exam: true,
+                section: true,
+                topic: true,
+              },
+            },
+            section: true,
+          },
+        },
+      },
+    });
+
+    if (dbMockTest && dbMockTest.mockTestQuestions.length > 0) {
+      const mapped: Question[] = dbMockTest.mockTestQuestions.map(mtq => {
+        const q = mtq.question;
+        return {
+          id: q.id,
+          text: q.text,
+          imageUrl: q.imageUrl || undefined,
+          passage: q.passage || undefined,
+          passageImageUrl: q.passageImageUrl || undefined,
+          groupId: q.groupId || undefined,
+          isPyq: q.isPyq,
+          pyqYear: q.pyqYear || undefined,
+          pyqExam: q.pyqExam || undefined,
+          difficulty: (q.difficulty as Difficulty) || 'MEDIUM',
+          explanation: q.explanation || '',
+          marks: q.marks ?? 1.0,
+          negativeMarks: q.negativeMarks ?? 0.25,
+          examId: q.examId,
+          sectionId: q.sectionId,
+          sectionCode: mtq.section?.code || q.section?.code || 'GENERAL',
+          sectionName: mtq.section?.name || q.section?.name || 'General',
+          topicId: q.topicId,
+          topicName: q.topic?.name || 'General',
+          options: (q.options || []).map(opt => ({
+            id: opt.id,
+            questionId: opt.questionId,
+            text: opt.text,
+            imageUrl: opt.imageUrl || undefined,
+            isCorrect: opt.isCorrect,
+            order: opt.order,
+          })),
+        };
+      });
+      return resolveGroupPassagesSync(mapped);
+    }
+  } catch (err) {
+    console.warn('getCanonicalExamQuestions fallback:', err);
+  }
+
+  const fixed = getFixedQuestionsForMockTest(testIdOrSlug);
+  if (fixed && fixed.length > 0) {
     return resolveGroupPassagesSync(fixed);
   }
 
+  const freshQuestions = await loadFreshQuestionsFromDb();
+  const partitioned = partitionQuestionsListSync(freshQuestions, testIdOrSlug);
   return resolveGroupPassagesSync(partitioned);
 }
 
@@ -861,19 +973,47 @@ export async function deleteQuestionAction(
     return { success: false, error: 'Question ID is required.' };
   }
 
-  dynamicQuestions = dynamicQuestions.filter(q => q.id !== questionId);
-  deleteQuestionFromJsonDb(questionId);
-  deleteQuestionsByIdsFromStore([questionId]);
+  // Preserve historical attempt accuracy: verify question is not part of completed candidate answers
+  try {
+    const existingAnswer = await prisma.answer.findFirst({
+      where: { questionId },
+      select: { id: true, attemptId: true },
+    });
+    if (existingAnswer) {
+      return {
+        success: false,
+        error: `Cannot delete question "${questionId}" because it is part of finalized student exam attempts. Preserving historical scorecards is required.`,
+      };
+    }
+  } catch (checkErr) {
+    console.warn('Error checking answer references for question deletion:', checkErr);
+  }
+
+  const existingQ = dynamicQuestions.find(q => q.id === questionId);
+  const targetExamId = existingQ?.examId;
 
   try {
     await QuestionRepository.delete(questionId);
   } catch (dbErr) {
-    console.warn('QuestionRepository.delete error in deleteQuestionAction:', dbErr);
+    console.error('QuestionRepository.delete error in deleteQuestionAction:', dbErr);
+    return {
+      success: false,
+      error: dbErr instanceof Error ? dbErr.message : 'Database error deleting question',
+    };
   }
 
+  // Only mutate in-memory and local stores after successful database deletion
+  dynamicQuestions = dynamicQuestions.filter(q => q.id !== questionId);
+  deleteQuestionFromJsonDb(questionId);
+  deleteQuestionsByIdsFromStore([questionId]);
+
   safeRevalidatePath('/admin/questions');
-  // Bust cached question list after delete
+  safeRevalidatePath('/admin/tests');
+  // Bust cached question list and live exam cache after delete
   await invalidateQuestionsCache();
+  if (targetExamId) {
+    await invalidateLiveQuestionsCache(targetExamId);
+  }
   return { success: true };
 }
 

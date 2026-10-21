@@ -6,7 +6,39 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // -------------------------------------------------------------
-  // 1. ADMIN ACCESS CONTROL (Dedicated /admin Portal)
+  // 1. API EXAM QUESTIONS ACCESS CONTROL (Return JSON 401/403)
+  // -------------------------------------------------------------
+  if (pathname.startsWith('/api/exam-questions')) {
+    const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+    if (!sessionToken) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Authentication required.' },
+        { status: 401 }
+      );
+    }
+
+    const payload = await verifySession(sessionToken);
+    if (!payload) {
+      const res = NextResponse.json(
+        { success: false, error: 'Unauthorized: Invalid or expired session.' },
+        { status: 401 }
+      );
+      res.cookies.delete(SESSION_COOKIE_NAME);
+      return res;
+    }
+
+    if (payload.status && payload.status !== 'APPROVED') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Account approval required.' },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.next();
+  }
+
+  // -------------------------------------------------------------
+  // 2. ADMIN ACCESS CONTROL (Dedicated /admin Portal)
   // -------------------------------------------------------------
   if (pathname.startsWith('/admin')) {
     const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
@@ -46,11 +78,57 @@ export async function proxy(request: NextRequest) {
       return NextResponse.redirect(unauthorizedUrl);
     }
 
+    // Account Status Enforcement for Admin
+    if (payload.status && payload.status !== 'APPROVED') {
+      const adminLoginUrl = new URL('/admin/login', request.url);
+      adminLoginUrl.searchParams.set('error', payload.status === 'PENDING' ? 'pending' : 'rejected');
+      return NextResponse.redirect(adminLoginUrl);
+    }
+
     return NextResponse.next();
   }
 
   // -------------------------------------------------------------
-  // 2. CANDIDATE ACCESS CONTROL (User must be logged in to use)
+  // 3. ADMIN API ACCESS CONTROL (Return JSON 401/403)
+  // -------------------------------------------------------------
+  if (pathname.startsWith('/api/admin')) {
+    const sessionToken = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+    if (!sessionToken) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Authentication required.' },
+        { status: 401 }
+      );
+    }
+
+    const payload = await verifySession(sessionToken);
+    if (!payload) {
+      const res = NextResponse.json(
+        { success: false, error: 'Unauthorized: Invalid or expired session.' },
+        { status: 401 }
+      );
+      res.cookies.delete(SESSION_COOKIE_NAME);
+      return res;
+    }
+
+    if (payload.role !== 'ADMIN') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Administrator privileges required.' },
+        { status: 403 }
+      );
+    }
+
+    if (payload.status && payload.status !== 'APPROVED') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: Account approval required.' },
+        { status: 403 }
+      );
+    }
+
+    return NextResponse.next();
+  }
+
+  // -------------------------------------------------------------
+  // 4. CANDIDATE ACCESS CONTROL (User must be logged in & approved)
   // -------------------------------------------------------------
   const candidateProtectedPrefixes = [
     '/test',
@@ -83,6 +161,17 @@ export async function proxy(request: NextRequest) {
       res.cookies.delete(SESSION_COOKIE_NAME);
       return res;
     }
+
+    // Account Status Enforcement for Candidate
+    if (payload.status === 'PENDING') {
+      return NextResponse.redirect(new URL('/login?error=pending', request.url));
+    }
+    if (payload.status === 'REJECTED') {
+      return NextResponse.redirect(new URL('/login?error=rejected', request.url));
+    }
+    if (payload.status && payload.status !== 'APPROVED') {
+      return NextResponse.redirect(new URL('/login?error=unapproved', request.url));
+    }
   }
 
   return NextResponse.next();
@@ -91,11 +180,13 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     '/admin/:path*',
+    '/api/admin/:path*',
     '/test/:path*',
     '/dashboard/:path*',
     '/my-results/:path*',
     '/result/:path*',
     '/review/:path*',
     '/profile/:path*',
+    '/api/exam-questions/:path*',
   ],
 };

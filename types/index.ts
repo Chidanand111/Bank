@@ -32,11 +32,44 @@ export type QuestionStatus =
 
 export interface Option {
   id: string;
-  questionId: string;
+  questionId?: string;
   text: string;
   imageUrl?: string;
-  isCorrect: boolean;
+  isCorrect?: boolean;
   order: number;
+}
+
+export interface StudentSafeOption {
+  id: string;
+  text: string;
+  imageUrl?: string;
+  order: number;
+}
+
+export interface StudentSafeQuestion {
+  id: string;
+  text: string;
+  imageUrl?: string;
+  passage?: string;
+  passageImageUrl?: string;
+  table?: string;
+  groupId?: string;
+  isPyq?: boolean;
+  pyqYear?: number;
+  pyqExam?: string;
+  difficulty: Difficulty;
+  marks: number;
+  negativeMarks: number;
+  examId: string;
+  examSlug?: string;
+  examTitle?: string;
+  sectionId: string;
+  sectionCode: string;
+  sectionName: string;
+  topicId: string;
+  topicName: string;
+  mockTestId?: string;
+  options: StudentSafeOption[];
 }
 
 export interface Question {
@@ -51,7 +84,7 @@ export interface Question {
   pyqYear?: number;
   pyqExam?: string;
   difficulty: Difficulty;
-  explanation: string;
+  explanation?: string;
   marks: number;
   negativeMarks: number;
   examId: string;
@@ -139,6 +172,7 @@ export interface MockTest {
     durationMinutes?: number;
     questionCount: number;
     marks: number;
+    cutoffMarks?: number;
   }[];
   questions: Question[];
 }

@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth/permissions';
+import { getAuthenticatedAdmin } from '@/lib/auth/permissions';
 import { uploadQuestionDiagramAction } from '@/lib/services/questionService';
 
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin();
+    const auth = await getAuthenticatedAdmin();
+    if (!auth.user) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
 
     const formData = await request.formData();
     const result = await uploadQuestionDiagramAction(formData);

@@ -396,7 +396,11 @@ export async function createMockTestAction(
       stage: newTest.stage,
     }, exam.id);
   } catch (dbErr) {
-    console.warn('MockTestRepository.upsertMockTest error in createMockTestAction:', dbErr);
+    console.error('MockTestRepository.upsertMockTest error in createMockTestAction:', dbErr);
+    return {
+      success: false,
+      error: dbErr instanceof Error ? dbErr.message : 'Database error creating mock test',
+    };
   }
 
   dynamicMockTests.unshift(newTest);
@@ -472,6 +476,8 @@ export async function updateMockTestTitleAction(
     safeRevalidatePath('/admin/tests');
     safeRevalidatePath('/admin/questions');
     safeRevalidatePath('/tests');
+    // Bust cached mock-test lists after title update
+    await invalidateMockTestsCache();
 
     return { success: true };
   } catch (err) {
@@ -492,20 +498,49 @@ export async function deleteMockTestAction(
     return { success: false, error: 'Test ID is required.' };
   }
 
-  deletedMockTestIds.add(testId);
-  deletedMockTestIds.add(testId.replace(/^mock-/, ''));
+  // Preserve historical scorecard integrity: check if this mock test has any completed student attempts
+  try {
+    const cleanSlug = testId.replace(/^mock-/, '');
+    const existingAttempt = await prisma.attempt.findFirst({
+      where: {
+        OR: [
+          { mockTestId: testId },
+          { mockTestId: `mock-${cleanSlug}` },
+          { mockTestId: cleanSlug },
+          { mockTest: { slug: cleanSlug } },
+          { mockTest: { id: testId } },
+        ],
+        isCompleted: true,
+      },
+      select: { id: true, userId: true },
+    });
+    if (existingAttempt) {
+      return {
+        success: false,
+        error: `Cannot delete mock test "${testId}" because it contains finalized student exam attempts. Preserving historical scorecards is required.`,
+      };
+    }
+  } catch (checkErr) {
+    console.warn('Error checking attempt references for mock test deletion:', checkErr);
+  }
 
   let deletedQuestionsCount = 0;
-  dynamicMockTests = dynamicMockTests.filter(t => t.id !== testId && t.slug !== testId);
-
   try {
     const delResult = await MockTestRepository.deleteCascade(testId);
     deletedQuestionsCount = delResult.deletedQuestionsCount;
   } catch (dbErr) {
-    console.warn('MockTestRepository.deleteCascade error in deleteMockTestAction:', dbErr);
+    console.error('MockTestRepository.deleteCascade error in deleteMockTestAction:', dbErr);
+    return {
+      success: false,
+      error: dbErr instanceof Error ? dbErr.message : 'Database error deleting mock test',
+    };
   }
 
+  deletedMockTestIds.add(testId);
+  deletedMockTestIds.add(testId.replace(/^mock-/, ''));
+  dynamicMockTests = dynamicMockTests.filter(t => t.id !== testId && t.slug !== testId);
   saveCustomMockTestsToFile(dynamicMockTests);
+
   safeRevalidatePath('/admin/tests');
   safeRevalidatePath('/admin/questions');
   safeRevalidatePath('/tests');
@@ -551,16 +586,20 @@ export async function toggleMockTestPublishAction(
   const currentIsPublished = dbTest !== null ? dbTest.isPublished : test?.status === 'published';
   const newStatus: ExamStatus = targetStatus || (currentIsPublished ? 'created' : 'published');
 
+  try {
+    await MockTestRepository.togglePublish(dbTest?.id || test?.id || testIdOrSlug, newStatus === 'published');
+  } catch (err) {
+    console.error('MockTestRepository.togglePublish error in toggleMockTestPublishAction:', err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Database error toggling mock test publish status',
+    };
+  }
+
   if (test) {
     test.status = newStatus;
   }
   saveCustomMockTestsToFile(dynamicMockTests);
-
-  try {
-    await MockTestRepository.togglePublish(dbTest?.id || test?.id || testIdOrSlug, newStatus === 'published');
-  } catch (err) {
-    console.warn('MockTestRepository.togglePublish error in toggleMockTestPublishAction:', err);
-  }
 
   safeRevalidatePath('/admin/tests');
   safeRevalidatePath('/admin/questions');

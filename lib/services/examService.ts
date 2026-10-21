@@ -3,6 +3,7 @@
 import {
   invalidateExamsCache,
   invalidateMockTestsCache,
+  invalidateQuestionsCache,
 } from '../cache';
 import { requireAdmin } from '../auth/permissions';
 import { EXAMS_DATA, saveCustomExamsToFile } from '../data/exams';
@@ -135,7 +136,11 @@ export async function createExamAction(
       status,
     });
   } catch (dbErr) {
-    console.warn('ExamRepository.upsertExam warning in createExamAction (falling back to memory):', dbErr);
+    console.error('ExamRepository.upsertExam error in createExamAction:', dbErr);
+    return {
+      success: false,
+      error: dbErr instanceof Error ? dbErr.message : 'Database error creating exam category',
+    };
   }
 
   const defaultMockId = `mock-${slug}-prelims-1`;
@@ -395,7 +400,11 @@ export async function updateExamTitleAction(
   try {
     await ExamRepository.updateTitle(examIdOrSlug, trimmedTitle, validDesc);
   } catch (dbErr) {
-    console.warn('ExamRepository.updateTitle error in updateExamTitleAction:', dbErr);
+    console.error('ExamRepository.updateTitle error in updateExamTitleAction:', dbErr);
+    return {
+      success: false,
+      error: dbErr instanceof Error ? dbErr.message : 'Database error updating exam title',
+    };
   }
 
   // Update in-memory EXAMS_DATA
@@ -441,13 +450,46 @@ export async function deleteExamAction(
     return { success: false, error: 'Exam ID or slug is required.' };
   }
 
+  // Historical attempt protection: verify exam contains no mock tests with completed attempts
+  try {
+    const targetSlug = examIdOrSlug.replace(/^exam-/, '');
+    const existingAttempt = await prisma.attempt.findFirst({
+      where: {
+        mockTest: {
+          exam: {
+            OR: [
+              { id: examIdOrSlug },
+              { id: `exam-${targetSlug}` },
+              { slug: targetSlug },
+              { slug: examIdOrSlug },
+            ],
+          },
+        },
+        isCompleted: true,
+      },
+      select: { id: true, userId: true },
+    });
+    if (existingAttempt) {
+      return {
+        success: false,
+        error: `Cannot delete exam "${examIdOrSlug}" because it contains mock tests with finalized student exam attempts. Preserving historical scorecards is required.`,
+      };
+    }
+  } catch (checkErr) {
+    console.warn('Error checking attempt references for exam deletion:', checkErr);
+  }
+
   let deletedQuestionsCount = 0;
 
   try {
     const delResult = await ExamRepository.deleteCascade(examIdOrSlug);
     deletedQuestionsCount = delResult.deletedQuestionsCount;
   } catch (dbErr) {
-    console.warn('ExamRepository.deleteCascade error in deleteExamAction:', dbErr);
+    console.error('ExamRepository.deleteCascade error in deleteExamAction:', dbErr);
+    return {
+      success: false,
+      error: dbErr instanceof Error ? dbErr.message : 'Database error deleting exam',
+    };
   }
 
   const targetExamId = examIdOrSlug.startsWith('exam-') ? examIdOrSlug : `exam-${examIdOrSlug}`;
@@ -479,7 +521,10 @@ export async function deleteExamAction(
   safeRevalidatePath('/admin/tests');
   safeRevalidatePath('/exams');
   safeRevalidatePath('/tests');
-  safeRevalidatePath('/dashboard');
+  // Bust cached exam, mock-test, and question lists after exam cascade delete
+  await invalidateExamsCache();
+  await invalidateMockTestsCache();
+  await invalidateQuestionsCache();
 
   return { success: true, count: deletedQuestionsCount };
 }
@@ -550,15 +595,9 @@ export async function toggleExamPublishAction(
   const newStatus: ExamStatus =
     targetStatus || (currentStatus === 'published' ? 'created' : 'published');
 
-  if (exam) {
-    exam.status = newStatus;
-  }
-  saveCustomExamsToFile(EXAMS_DATA);
-
-  // Sync associated mock tests in memory to match exam state
+  // Sync associated mock tests and exam references
   const targetExamId = dbExam?.id || exam?.id || examIdOrSlug;
   const targetSlug = dbExam?.slug || exam?.slug || cleanSlug;
-  await setMockTestsStatusForExam(targetExamId, targetSlug, newStatus);
 
   try {
     await prisma.exam.updateMany({
@@ -591,8 +630,19 @@ export async function toggleExamPublishAction(
       },
     });
   } catch (err) {
-    console.warn('Neon DB async sync on toggleExamPublishAction:', err);
+    console.error('Neon DB async sync on toggleExamPublishAction:', err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Database error toggling exam publish status',
+    };
   }
+
+  if (exam) {
+    exam.status = newStatus;
+  }
+  saveCustomExamsToFile(EXAMS_DATA);
+
+  await setMockTestsStatusForExam(targetExamId, targetSlug, newStatus);
 
   safeRevalidatePath('/admin/exams');
   safeRevalidatePath('/admin/questions');

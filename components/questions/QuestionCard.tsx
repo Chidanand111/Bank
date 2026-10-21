@@ -13,6 +13,7 @@ export interface QuestionCardProps {
   selectedOptionId: string | null;
   onSelectOption: (optionId: string) => void;
   isReviewMode?: boolean;
+  disabled?: boolean;
 }
 
 export const QuestionCard: React.FC<QuestionCardProps> = ({
@@ -22,6 +23,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
   selectedOptionId,
   onSelectOption,
   isReviewMode = false,
+  disabled = false,
 }) => {
   if (!question) {
     return (
@@ -59,6 +61,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
           <Badge variant="blue" size="sm">
             +{question.marks ?? 1.0} / -{question.negativeMarks ?? 0.25} Marks
           </Badge>
+          {disabled && !isReviewMode && (
+            <Badge variant="red" size="sm">
+              Locked
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -154,8 +161,12 @@ export const QuestionCard: React.FC<QuestionCardProps> = ({
             return (
               <label
                 key={option.id}
-                onClick={() => !isReviewMode && onSelectOption(option.id)}
-                className={`flex items-start gap-3.5 p-4 rounded-xl border transition-all cursor-pointer ${optionStyle}`}
+                onClick={() => !isReviewMode && !disabled && onSelectOption(option.id)}
+                className={`flex items-start gap-3.5 p-4 rounded-xl border transition-all ${
+                  disabled
+                    ? 'opacity-60 cursor-not-allowed bg-slate-50 border-slate-200'
+                    : `cursor-pointer ${optionStyle}`
+                }`}
               >
                 {/* Radio Circle / Review Icon */}
                 {isReviewMode ? (

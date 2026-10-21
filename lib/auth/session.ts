@@ -180,11 +180,15 @@ export async function clearSessionCookie(): Promise<void> {
 }
 
 export async function getSessionPayload(): Promise<SessionPayload | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!token) return null;
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    if (!token) return null;
 
-  return verifySession(token);
+    return verifySession(token);
+  } catch {
+    return null;
+  }
 }
 
 /**

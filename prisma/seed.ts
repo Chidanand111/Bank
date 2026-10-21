@@ -249,7 +249,7 @@ async function main() {
     return {
       id: q.id,
       text: q.text,
-      explanation: q.explanation,
+      explanation: q.explanation || '',
       marks: q.marks,
       negativeMarks: q.negativeMarks,
       difficulty: q.difficulty as Difficulty,
@@ -268,7 +268,7 @@ async function main() {
       id: opt.id,
       questionId: q.id,
       text: opt.text,
-      isCorrect: opt.isCorrect,
+      isCorrect: Boolean(opt.isCorrect),
       order: opt.order,
     }))
   );

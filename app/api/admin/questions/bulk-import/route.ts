@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth/permissions';
+import { getAuthenticatedAdmin } from '@/lib/auth/permissions';
 import { bulkImportQuestionsAction } from '@/lib/services/questionService';
 import { validateAndExtractZip } from '@/lib/storage/zipValidator';
 import { saveBatchImages, cleanupBatchImages } from '@/lib/storage/mediaStorage';
@@ -11,7 +11,10 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     // 1. Authorization Guard
-    await requireAdmin();
+    const auth = await getAuthenticatedAdmin();
+    if (!auth.user) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
 
     const contentType = request.headers.get('content-type') || '';
 

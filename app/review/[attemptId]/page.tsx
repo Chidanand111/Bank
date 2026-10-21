@@ -4,11 +4,9 @@ import React, { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getAttemptResultById } from '@/lib/services/testService';
 import { getAttemptByIdAction } from '@/lib/services/adminService';
-import { AttemptResult, Question } from '@/types';
+import { AttemptResult } from '@/types';
 import { QuestionCard } from '@/components/questions/QuestionCard';
 import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Card, CardContent } from '@/components/ui/Card';
 import { ArrowLeft, ChevronLeft, ChevronRight, CheckCircle2, XCircle, HelpCircle, Grid } from 'lucide-react';
 
 export interface ReviewPageProps {
@@ -18,21 +16,51 @@ export interface ReviewPageProps {
 export default function ReviewPage({ params }: ReviewPageProps) {
   const { attemptId } = use(params);
   const [result, setResult] = useState<AttemptResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'CORRECT' | 'INCORRECT' | 'UNATTEMPTED'>('ALL');
 
   useEffect(() => {
-    // 1. Try local storage for instant hydration
-    const data = getAttemptResultById(attemptId);
-    if (data) {
-      setResult(data);
-    } else {
-      // 2. Fall back to Neon PostgreSQL Database
-      getAttemptByIdAction(attemptId).then(dbData => {
-        if (dbData) setResult(dbData);
+    // 1. Load from server to authoritatively enforce server IDOR authorization
+    getAttemptByIdAction(attemptId)
+      .then(dbData => {
+        if (dbData) {
+          setResult(dbData);
+        } else {
+          // Fallback to local storage only if DB record is not found (e.g. offline preview)
+          const localData = getAttemptResultById(attemptId);
+          if (localData) {
+            setResult(localData);
+          } else {
+            setErrorMessage('Solutions review not found or access restricted.');
+          }
+        }
+      })
+      .catch(err => {
+        setResult(null);
+        setErrorMessage(err instanceof Error ? err.message : 'Access denied to this review.');
       });
-    }
   }, [attemptId]);
+
+  if (errorMessage) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-20 text-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-red-100 flex items-center justify-center mx-auto text-red-600 font-bold text-2xl">
+          !
+        </div>
+        <h2 className="text-xl font-bold text-slate-800">Access Restricted</h2>
+        <p className="text-slate-500 text-sm">{errorMessage}</p>
+        <div className="pt-4 flex justify-center gap-3">
+          <Link href="/dashboard">
+            <Button variant="primary" size="md">Return to Dashboard</Button>
+          </Link>
+          <Link href="/my-results">
+            <Button variant="outline" size="md">View My Attempts</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (!result || !result.questionDetails || result.questionDetails.length === 0) {
     return (

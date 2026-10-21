@@ -19,7 +19,7 @@
 
 import { requireAdmin } from '../auth/permissions';
 import { getDatabaseUsers } from '../auth/session';
-import { SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
+import { prisma } from '../prisma';
 import * as userService from './userService';
 import * as examService from './examService';
 import * as mockTestService from './mockTestService';
@@ -226,6 +226,10 @@ export async function getLiveExamQuestionsAction(testIdOrSlug: string): Promise<
   return questionService.getLiveExamQuestionsAction(testIdOrSlug);
 }
 
+export async function getCanonicalExamQuestions(testIdOrSlug: string): Promise<Question[]> {
+  return questionService.getCanonicalExamQuestions(testIdOrSlug);
+}
+
 export async function deleteQuestionAction(
   questionId: string
 ): Promise<{ success: boolean; error?: string }> {
@@ -253,7 +257,7 @@ export async function getAdminAllAttempts(): Promise<AttemptResult[]> {
 
 export async function saveAttemptAction(
   result: AttemptResult
-): Promise<{ success: boolean; attemptId?: string; error?: string }> {
+): Promise<{ success: boolean; attemptId?: string; result?: AttemptResult; error?: string }> {
   return attemptService.saveAttemptAction(result);
 }
 
@@ -263,6 +267,13 @@ export async function getAttemptByIdAction(attemptId: string): Promise<AttemptRe
 
 export async function getUserAttemptsAction(userId?: string): Promise<AttemptResult[]> {
   return attemptService.getUserAttemptsAction(userId);
+}
+
+export async function getUserDashboardStatsAction(dateRange?: {
+  from?: string;
+  to?: string;
+}) {
+  return attemptService.getUserDashboardStatsAction(dateRange);
 }
 
 // ============================================================================
@@ -285,7 +296,77 @@ export async function getAdminStats(): Promise<AdminStats> {
   const totalExams = exams.length;
   const totalQuestions = dynamicQuestions.length;
   const totalMockTests = dynamicMockTests.length;
-  const totalAttempts = SAMPLE_ATTEMPTS.length + 15; // Platform count
+
+  let totalAttempts = 0;
+  let recentAttempts: AttemptResult[] = [];
+  const attemptCountsByTest = new Map<string, number>();
+
+  try {
+    totalAttempts = await prisma.attempt.count({
+      where: { isCompleted: true },
+    });
+
+    const dbRecentAttempts = await prisma.attempt.findMany({
+      where: { isCompleted: true },
+      orderBy: { completedAt: 'desc' },
+      take: 5,
+      include: {
+        user: true,
+        mockTest: {
+          include: { exam: true },
+        },
+      },
+    });
+
+    recentAttempts = dbRecentAttempts.map(a => ({
+      id: a.id,
+      mockTestId: a.mockTestId,
+      mockTestTitle: a.mockTest?.title || 'Mock Test',
+      examSlug: a.mockTest?.exam?.slug || 'ibps-po',
+      examTitle: a.mockTest?.exam?.title || 'Exam',
+      userId: a.userId,
+      userName: a.user?.name || 'Aspirant',
+      startedAt: a.startedAt.toISOString(),
+      completedAt: a.completedAt?.toISOString() || a.updatedAt.toISOString(),
+      timeTakenSeconds: a.timeTakenSeconds,
+      totalDurationSeconds: (a.mockTest?.durationMinutes || 60) * 60,
+      score: a.score,
+      maxScore: a.maxScore,
+      percentage: a.maxScore > 0 ? (a.score / a.maxScore) * 100 : 0,
+      accuracy: a.accuracy,
+      totalQuestions: a.correctCount + a.incorrectCount + a.unansweredCount,
+      totalAttempted: a.totalAttempted,
+      correctCount: a.correctCount,
+      incorrectCount: a.incorrectCount,
+      unansweredCount: a.unansweredCount,
+      cutoffMarks: a.mockTest?.cutoffMarks || 60,
+      isCutoffCleared: a.score >= (a.mockTest?.cutoffMarks || 60),
+      sectionResults: [],
+      topicResults: [],
+      questionDetails: [],
+    }));
+
+    const groupedAttempts = await prisma.attempt.groupBy({
+      by: ['mockTestId'],
+      where: { isCompleted: true },
+      _count: { id: true },
+    });
+    for (const group of groupedAttempts) {
+      attemptCountsByTest.set(group.mockTestId, group._count.id);
+    }
+  } catch (err) {
+    console.warn('Failed to query attempt statistics from database in getAdminStats:', err);
+  }
+
+  const popularTests = [...dynamicMockTests]
+    .map(t => ({
+      id: t.id,
+      title: t.title,
+      examTitle: t.examTitle,
+      attemptsCount: attemptCountsByTest.get(t.id) || 0,
+    }))
+    .sort((a, b) => b.attemptsCount - a.attemptsCount)
+    .slice(0, 4);
 
   return {
     totalUsers,
@@ -296,12 +377,7 @@ export async function getAdminStats(): Promise<AdminStats> {
     totalMockTests,
     totalAttempts,
     recentUsers: users.slice(0, 5),
-    recentAttempts: SAMPLE_ATTEMPTS.slice(0, 5),
-    popularTests: dynamicMockTests.slice(0, 4).map(t => ({
-      id: t.id,
-      title: t.title,
-      examTitle: t.examTitle,
-      attemptsCount: Math.floor(Math.random() * 200) + 50,
-    })),
+    recentAttempts,
+    popularTests,
   };
 }

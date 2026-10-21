@@ -87,11 +87,13 @@ export function mapExamToId(examName: string): { examId: string; examSlug: strin
   }
   const norm = examName.toLowerCase().trim();
   const matched = EXAMS_DATA.find(e =>
-    e.id.toLowerCase() === norm ||
-    e.slug.toLowerCase() === norm ||
-    e.title.toLowerCase() === norm ||
-    e.title.toLowerCase().includes(norm) ||
-    norm.includes(e.title.toLowerCase())
+    Boolean(
+      (e.id && e.id.toLowerCase() === norm) ||
+      (e.slug && e.slug.toLowerCase() === norm) ||
+      (e.title && e.title.toLowerCase() === norm) ||
+      (e.title && e.title.toLowerCase().includes(norm)) ||
+      (e.title && norm.includes(e.title.toLowerCase()))
+    )
   );
   if (matched) {
     return { examId: matched.id, examSlug: matched.slug };
@@ -1028,7 +1030,7 @@ export function syncQuestionsToStore(questions: Question[]): void {
         pyqYear: q.pyqYear,
         pyqExam: q.pyqExam,
         difficulty: q.difficulty,
-        explanation: q.explanation,
+        explanation: q.explanation || '',
         marks: q.marks,
         negativeMarks: q.negativeMarks,
         options: optionsRecord,
@@ -1051,7 +1053,7 @@ export function syncQuestionsToStore(questions: Question[]): void {
         pyqExam: q.pyqExam,
         options: optionsRecord,
         answer: String.fromCharCode(65 + Math.max(0, q.options.findIndex(o => o.isCorrect))),
-        explanation: q.explanation,
+        explanation: q.explanation || '',
         difficulty: q.difficulty,
         marks: q.marks,
         negativeMarks: q.negativeMarks,

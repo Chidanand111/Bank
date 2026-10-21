@@ -11,16 +11,13 @@ import { Button } from '@/components/ui/Button';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { formatSecondsToReadable, formatDate } from '@/lib/utils/formatters';
 import {
-  Award,
   BarChart3,
   CheckCircle2,
   XCircle,
   Clock,
-  ArrowRight,
   RotateCcw,
   LayoutDashboard,
   ShieldCheck,
-  Target,
   FileText
 } from 'lucide-react';
 
@@ -31,19 +28,49 @@ export interface ResultPageProps {
 export default function ResultPage({ params }: ResultPageProps) {
   const { attemptId } = use(params);
   const [result, setResult] = useState<AttemptResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Try local storage for instant hydration
-    const data = getAttemptResultById(attemptId);
-    if (data) {
-      setResult(data);
-    } else {
-      // 2. Fall back to Neon PostgreSQL Database
-      getAttemptByIdAction(attemptId).then(dbData => {
-        if (dbData) setResult(dbData);
+    // 1. Load from server to authoritatively enforce server IDOR authorization
+    getAttemptByIdAction(attemptId)
+      .then(dbData => {
+        if (dbData) {
+          setResult(dbData);
+        } else {
+          // Fallback to local storage only if DB record is not found (e.g. offline preview)
+          const localData = getAttemptResultById(attemptId);
+          if (localData) {
+            setResult(localData);
+          } else {
+            setErrorMessage('Exam attempt result not found or access restricted.');
+          }
+        }
+      })
+      .catch(err => {
+        setResult(null);
+        setErrorMessage(err instanceof Error ? err.message : 'Access denied to this attempt.');
       });
-    }
   }, [attemptId]);
+
+  if (errorMessage) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-20 text-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-red-100 flex items-center justify-center mx-auto text-red-600 font-bold text-2xl">
+          <ShieldCheck className="w-8 h-8 text-red-600" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-800">Access Restricted</h2>
+        <p className="text-slate-500 text-sm">{errorMessage}</p>
+        <div className="pt-4 flex justify-center gap-3">
+          <Link href="/dashboard">
+            <Button variant="primary" size="md">Return to Dashboard</Button>
+          </Link>
+          <Link href="/my-results">
+            <Button variant="outline" size="md">View My Attempts</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (!result) {
     return (

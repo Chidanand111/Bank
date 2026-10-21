@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth/permissions';
+import { getAuthenticatedAdmin } from '@/lib/auth/permissions';
 import { saveBatchImages } from '@/lib/storage/mediaStorage';
 import { detectImageFormat } from '@/lib/storage/zipValidator';
 import { registerBatchImage, recordFailedImage, getImportBatch, createImportBatch } from '@/lib/storage/importBatchStore';
@@ -9,7 +9,10 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     // 1. Authorization Guard
-    await requireAdmin();
+    const auth = await getAuthenticatedAdmin();
+    if (!auth.user) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
 
     const formData = await request.formData();
     const batchId = (formData.get('batchId') as string) || `batch-${Date.now().toString(36)}`;

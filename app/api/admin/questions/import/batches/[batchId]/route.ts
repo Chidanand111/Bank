@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth/permissions';
+import { getAuthenticatedAdmin } from '@/lib/auth/permissions';
 import { getImportBatch } from '@/lib/storage/importBatchStore';
 import { safeCleanupUnreferencedBatchImages } from '@/lib/storage/mediaStorage';
 
@@ -10,7 +10,10 @@ export async function GET(
   context: { params: Promise<{ batchId: string }> }
 ) {
   try {
-    await requireAdmin();
+    const auth = await getAuthenticatedAdmin();
+    if (!auth.user) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
     const { batchId } = await context.params;
     const batch = getImportBatch(batchId);
 
@@ -35,7 +38,10 @@ export async function DELETE(
   context: { params: Promise<{ batchId: string }> }
 ) {
   try {
-    await requireAdmin();
+    const auth = await getAuthenticatedAdmin();
+    if (!auth.user) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
     const { batchId } = await context.params;
 
     // Clean up unreferenced batch images safely (never deletes referenced assets)

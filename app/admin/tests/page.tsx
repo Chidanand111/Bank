@@ -8,6 +8,7 @@ import {
   createMockTestAction,
   deleteMockTestAction,
   updateMockTestTitleAction,
+  toggleMockTestPublishAction,
 } from '@/lib/services/adminService';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { AdminMockTestInput, Exam, MockTest } from '@/types';
@@ -29,6 +30,7 @@ import {
   Sparkles,
   ExternalLink,
   BookOpen,
+  Globe,
 } from 'lucide-react';
 import {
   EXAM_PRESETS,
@@ -208,6 +210,24 @@ export default function AdminTestsPage() {
     });
   };
 
+  const handleTogglePublish = (test: MockTest) => {
+    const isCurrentlyPublished = test.status === 'published' || (!test.status && test.status !== 'created');
+    const targetStatus = isCurrentlyPublished ? 'created' : 'published';
+
+    startTransition(async () => {
+      const res = await toggleMockTestPublishAction(test.id, targetStatus);
+      if (res.success) {
+        setFeedback({
+          type: 'success',
+          text: `Mock test "${test.title}" status updated to "${targetStatus === 'published' ? 'Published (Visible to Students)' : 'Draft (Hidden from Students)'}" successfully.`,
+        });
+        await loadData();
+      } else {
+        setFeedback({ type: 'error', text: res.error || 'Failed to update test publish status.' });
+      }
+    });
+  };
+
   const openEditModal = (test: MockTest) => {
     setEditingTest(test);
     setEditTitle(test.title);
@@ -278,7 +298,11 @@ export default function AdminTestsPage() {
                 : 'bg-red-50 text-red-800 border-red-200'
             }`}
           >
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            {feedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            ) : (
+              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+            )}
             <span>{feedback.text}</span>
           </div>
         )}
@@ -289,7 +313,7 @@ export default function AdminTestsPage() {
             <Card key={test.id} className="border border-slate-200 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-colors">
               <CardContent className="p-6 space-y-4">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <Badge variant={test.isPyq ? 'purple' : 'blue'} size="sm">
                       {test.examTitle}
                     </Badge>
@@ -298,8 +322,27 @@ export default function AdminTestsPage() {
                         PYQ {test.year || ''}
                       </span>
                     )}
+                    {test.status === 'created' ? (
+                      <span className="bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded">
+                        DRAFT
+                      </span>
+                    ) : (
+                      <span className="bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded flex items-center gap-1">
+                        <Globe className="w-2.5 h-2.5" /> PUBLISHED
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-1.5">
+                    <Button
+                      variant={test.status === 'created' ? 'primary' : 'outline'}
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => handleTogglePublish(test)}
+                      className={test.status === 'created' ? 'text-[11px] py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold' : 'text-slate-500 hover:text-slate-800 text-[11px] py-1 px-2'}
+                      title={test.status === 'created' ? 'Publish test so students can take it' : 'Unpublish test to hide from students'}
+                    >
+                      {test.status === 'created' ? 'Publish' : 'Unpublish'}
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"
@@ -312,7 +355,7 @@ export default function AdminTestsPage() {
                     <Button
                       variant="danger"
                       size="sm"
-                      onClick={() => { setDeletingTest(test); setIsDeleteModalOpen(true); }}
+                      onClick={() => { setFeedback(null); setDeletingTest(test); setIsDeleteModalOpen(true); }}
                       className="p-1.5"
                       title="Delete this test paper"
                     >
@@ -632,6 +675,12 @@ export default function AdminTestsPage() {
           }
         >
           <div className="space-y-3 text-xs text-slate-600">
+            {feedback && feedback.type === 'error' && (
+              <div className="p-3 bg-red-100 text-red-900 border border-red-300 rounded-xl flex items-center gap-2 font-semibold">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{feedback.text}</span>
+              </div>
+            )}
             <div className="p-3.5 bg-red-50 text-red-800 border border-red-200 rounded-xl space-y-2">
               <div className="flex items-center gap-2 font-bold text-red-900">
                 <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />

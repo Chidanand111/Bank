@@ -4,7 +4,8 @@ export function calculateAttemptResult(
   mockTest: MockTest,
   responses: Record<string, UserResponseState>,
   timeTakenSeconds: number,
-  attemptId: string = `att-${Date.now()}`
+  attemptId: string = `att-${Date.now()}`,
+  user?: { id?: string; name?: string }
 ): AttemptResult {
   let totalScore = 0;
   let correctCount = 0;
@@ -75,12 +76,16 @@ export function calculateAttemptResult(
         isCorrect = true;
         correctCount += 1;
         secMetric.correct += 1;
-        marksObtained = question.marks;
+        marksObtained = question.marks ?? 1.0;
       } else {
         isCorrect = false;
         incorrectCount += 1;
         secMetric.incorrect += 1;
-        marksObtained = -question.negativeMarks;
+        const negRatio = mockTest.negativeMarkRatio ?? 0.25;
+        const qNegativeMarks = typeof question.negativeMarks === 'number'
+          ? question.negativeMarks
+          : (question.marks ?? 1.0) * negRatio;
+        marksObtained = -qNegativeMarks;
       }
     } else {
       unansweredCount += 1;
@@ -101,12 +106,23 @@ export function calculateAttemptResult(
     });
   });
 
-  const overallAccuracy = totalAttempted > 0 ? (correctCount / totalAttempted) * 100 : 0;
-  const percentage = mockTest.totalMarks > 0 ? (Math.max(0, totalScore) / mockTest.totalMarks) * 100 : 0;
-  const isCutoffCleared = totalScore >= mockTest.cutoffMarks;
+  const isSectional = mockTest.timerType === 'SECTIONAL_LOCKED' || Boolean(mockTest.enableSectionalTimer);
 
   const sectionResults: SectionResult[] = Object.entries(sectionMetricsMap).map(([code, m]) => {
     const accuracy = m.attempted > 0 ? (m.correct / m.attempted) * 100 : 0;
+    const secDef = (mockTest.sections || []).find(s => s.code === code);
+    
+    // Determine configured sectional cutoff marks
+    let secCutoff = 0;
+    if (typeof secDef?.cutoffMarks === 'number') {
+      secCutoff = secDef.cutoffMarks;
+    } else if (isSectional && m.maxScore > 0) {
+      // Standard competitive banking exam cutoff: 35% of section max marks
+      secCutoff = parseFloat((m.maxScore * 0.35).toFixed(2));
+    }
+
+    const isSecCleared = secCutoff > 0 ? m.score >= secCutoff : true;
+
     return {
       sectionCode: code,
       sectionName: m.sectionName,
@@ -115,12 +131,25 @@ export function calculateAttemptResult(
       correct: m.correct,
       incorrect: m.incorrect,
       unanswered: m.unanswered,
-      score: m.score,
+      score: parseFloat(m.score.toFixed(2)),
       maxScore: m.maxScore,
-      accuracy,
-      isCutoffCleared: true
+      accuracy: parseFloat(accuracy.toFixed(1)),
+      cutoffMarks: secCutoff,
+      isCutoffCleared: isSecCleared,
     };
   });
+
+  const overallCutoff = typeof mockTest.cutoffMarks === 'number'
+    ? mockTest.cutoffMarks
+    : (isSectional ? parseFloat((mockTest.totalMarks * 0.45).toFixed(2)) : parseFloat((mockTest.totalMarks * 0.40).toFixed(2)));
+
+  const overallScoreMet = totalScore >= overallCutoff;
+  const isCutoffCleared = isSectional && sectionResults.length > 0
+    ? overallScoreMet && sectionResults.every(s => s.isCutoffCleared)
+    : overallScoreMet;
+
+  const percentage = mockTest.totalMarks > 0 ? (Math.max(0, totalScore) / mockTest.totalMarks) * 100 : 0;
+  const overallAccuracy = totalAttempted > 0 ? (correctCount / totalAttempted) * 100 : 0;
 
   return {
     id: attemptId,
@@ -128,8 +157,8 @@ export function calculateAttemptResult(
     mockTestTitle: mockTest.title,
     examSlug: mockTest.examSlug,
     examTitle: mockTest.examTitle,
-    userId: 'user-current',
-    userName: 'Aspirant',
+    userId: user?.id || 'user-current',
+    userName: user?.name || 'Aspirant',
     startedAt: new Date(Date.now() - timeTakenSeconds * 1000).toISOString(),
     completedAt: new Date().toISOString(),
     timeTakenSeconds,
@@ -143,7 +172,7 @@ export function calculateAttemptResult(
     correctCount,
     incorrectCount,
     unansweredCount,
-    cutoffMarks: mockTest.cutoffMarks,
+    cutoffMarks: overallCutoff,
     isCutoffCleared,
     sectionResults,
     topicResults: [],

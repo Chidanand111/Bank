@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/auth/permissions';
+import { getAuthenticatedAdmin } from '@/lib/auth/permissions';
 import { retryImportBatch } from '@/lib/services/importBatchService';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +9,10 @@ export async function POST(
   context: { params: Promise<{ batchId: string }> }
 ) {
   try {
-    await requireAdmin();
+    const auth = await getAuthenticatedAdmin();
+    if (!auth.user) {
+      return NextResponse.json({ success: false, error: auth.error }, { status: auth.status });
+    }
     const { batchId } = await context.params;
     const body = await request.json().catch(() => ({}));
 

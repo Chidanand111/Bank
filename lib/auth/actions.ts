@@ -117,10 +117,13 @@ export async function adminLoginAction(
     return { success: false, error: 'Invalid administrator credentials.' };
   }
 
-  if (user.status === 'REJECTED') {
+  if (user.status && user.status !== 'APPROVED') {
     return {
       success: false,
-      error: 'Administrator access for this account has been revoked.',
+      error:
+        user.status === 'PENDING'
+          ? 'Administrator account is awaiting approval.'
+          : 'Administrator access for this account has been revoked.',
     };
   }
 
@@ -192,11 +195,19 @@ export async function logoutAction(): Promise<void> {
 
 /**
  * Candidate Student Demo Login
- * Only available for student evaluation.
+ * Safeguarded: Disabled in production unless explicitly allowed via ALLOW_DEMO_LOGINS=true.
  */
 export async function demoStudentLoginAction(): Promise<void> {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_LOGINS !== 'true') {
+    throw new Error('Forbidden: Demo sign-in is disabled in production.');
+  }
+
   const users = await getDatabaseUsers();
   const studentUser = users.find(u => u.role === 'USER' && (u.status === 'APPROVED' || !u.status)) || users[1];
+
+  if (!studentUser) {
+    throw new Error('No student demo account found in database.');
+  }
 
   await createSessionCookie({
     id: studentUser.id,
@@ -212,11 +223,19 @@ export async function demoStudentLoginAction(): Promise<void> {
 
 /**
  * Admin Portal Demo Login
- * Only available within the dedicated /admin/login portal.
+ * Safeguarded: Disabled in production unless explicitly allowed via ALLOW_DEMO_LOGINS=true.
  */
 export async function demoAdminLoginAction(): Promise<void> {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_LOGINS !== 'true') {
+    throw new Error('Forbidden: Demo sign-in is disabled in production.');
+  }
+
   const users = await getDatabaseUsers();
-  const adminUser = users.find(u => u.role === 'ADMIN') || users[0];
+  const adminUser = users.find(u => u.role === 'ADMIN' && (u.status === 'APPROVED' || !u.status)) || users[0];
+
+  if (!adminUser) {
+    throw new Error('No administrator demo account found in database.');
+  }
 
   await createSessionCookie({
     id: adminUser.id,

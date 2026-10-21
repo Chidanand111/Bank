@@ -738,7 +738,7 @@ export default function AdminQuestionsPage() {
     setFormTopicName(q.topicName);
     setFormText(q.text);
     setFormDifficulty(q.difficulty);
-    setFormExplanation(q.explanation);
+    setFormExplanation(q.explanation || '');
     setFormMarks(q.marks);
     setFormNegativeMarks(q.negativeMarks);
     setFormImageUrl(q.imageUrl || '');
@@ -753,7 +753,7 @@ export default function AdminQuestionsPage() {
       q.options.map(opt => ({
         text: opt.text || '',
         imageUrl: opt.imageUrl || '',
-        isCorrect: opt.isCorrect,
+        isCorrect: Boolean(opt.isCorrect),
       }))
     );
     setIsEditModalOpen(true);
@@ -2464,6 +2464,12 @@ export default function AdminQuestionsPage() {
           }
         >
           <div className="space-y-3 text-xs text-slate-600">
+            {feedback && feedback.type === 'error' && (
+              <div className="p-3 bg-red-100 text-red-900 border border-red-300 rounded-xl flex items-center gap-2 font-semibold">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{feedback.text}</span>
+              </div>
+            )}
             <div className="p-3 bg-red-50 text-red-800 border border-red-200 rounded-xl flex items-center gap-2">
               <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
               <span>Are you sure you want to permanently delete this question from the repository?</span>
@@ -2808,6 +2814,12 @@ export default function AdminQuestionsPage() {
           }
         >
           <div className="space-y-3 text-xs text-slate-600">
+            {feedback && feedback.type === 'error' && (
+              <div className="p-3 bg-red-100 text-red-900 border border-red-300 rounded-xl flex items-center gap-2 font-semibold">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{feedback.text}</span>
+              </div>
+            )}
             <div className="p-3.5 bg-red-50 text-red-800 border border-red-200 rounded-xl space-y-2">
               <div className="flex items-center gap-2 font-bold text-red-900">
                 <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />

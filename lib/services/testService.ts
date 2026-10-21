@@ -3,6 +3,7 @@ import { EXAMS_DATA } from '../data/exams';
 import { MOCK_TESTS_DATA } from '../data/mockTests';
 import { INITIAL_DASHBOARD_STATS, SAMPLE_ATTEMPTS } from '../data/sampleAttempts';
 import { generateRandomizedMockTest, getFixedQuestionsForMockTest } from '../db/questionDb';
+import { toStudentSafeQuestions } from '../utils/questionDto';
 
 import { recordUserSeenQuestions } from './userQuestionTracker';
 
@@ -77,6 +78,15 @@ export async function getMockTestById(
       const res = await fetch(`/api/exam-questions/${encodeURIComponent(targetKey)}`, {
         cache: 'no-store',
       });
+      if (res.status === 401 || res.status === 403) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(
+          errorData.error ||
+            (res.status === 403
+              ? 'Access restricted: This mock test is unpublished or requires account approval.'
+              : 'Authentication required to access exam.')
+        );
+      }
       if (res.ok) {
         const data = await res.json();
         if (data.success && Array.isArray(data.questions) && data.questions.length > 0) {
@@ -104,6 +114,17 @@ export async function getMockTestById(
         }
       }
     } catch (err) {
+      if (
+        err instanceof Error &&
+        (err.message.includes('Access restricted') ||
+          err.message.includes('Authentication') ||
+          err.message.includes('Forbidden') ||
+          err.message.includes('Unauthorized') ||
+          err.message.includes('unpublished') ||
+          err.message.includes('approval'))
+      ) {
+        throw err;
+      }
       console.warn('API route fetch fallback in testService:', err);
     }
   }
@@ -136,18 +157,27 @@ export async function getMockTestById(
         };
       }
     } catch (err) {
+      if (
+        err instanceof Error &&
+        (err.message.includes('Access restricted') ||
+          err.message.includes('Authentication') ||
+          err.message.includes('Forbidden') ||
+          err.message.includes('Unauthorized') ||
+          err.message.includes('unpublished') ||
+          err.message.includes('approval'))
+      ) {
+        throw err;
+      }
       console.warn('Server loader fallback for test:', err);
     }
   }
 
-  // 3. If test has dedicated preloaded questions (from DB or state)
-  if (test.questions && test.questions.length > 0) {
-    return test;
-  }
+  // 3. Assemble candidate test from preloaded, authentic fixed, or randomized pool
+  let candidateTest: MockTest | null = null;
 
-  // 4. If this is an authentic PYQ paper or dedicated fixed mock test,
-  // ensure fixed questions are deterministically retrieved if not preloaded
-  if (test.isPyq || test.isFixed) {
+  if (test.questions && test.questions.length > 0) {
+    candidateTest = test;
+  } else if (test.isPyq || test.isFixed) {
     const fixed = getFixedQuestionsForMockTest(targetKey);
     if (fixed && fixed.length > 0) {
       const updatedSections = test.sections.map(sec => {
@@ -158,7 +188,7 @@ export async function getMockTestById(
           marks: count || sec.marks,
         };
       });
-      return {
+      candidateTest = {
         ...test,
         isFixed: true,
         durationMinutes: test.durationMinutes || 60,
@@ -167,15 +197,26 @@ export async function getMockTestById(
         sections: updatedSections,
         questions: fixed,
       };
+    } else {
+      candidateTest = {
+        ...test,
+        questions: [],
+      };
     }
-    return {
-      ...test,
-      questions: [],
+  } else {
+    // Fallback to local deterministic questions for standard dynamic mocks
+    candidateTest = generateRandomizedMockTest(test, { excludeQuestionIds });
+  }
+
+  // Ensure student-safe question DTO is applied so answer keys are never leaked to the candidate
+  if (candidateTest && candidateTest.questions && candidateTest.questions.length > 0) {
+    candidateTest = {
+      ...candidateTest,
+      questions: toStudentSafeQuestions(candidateTest.questions) as Question[],
     };
   }
 
-  // 5. Fallback to local deterministic questions for standard dynamic mocks
-  return generateRandomizedMockTest(test, { excludeQuestionIds });
+  return candidateTest;
 }
 
 export function saveAttemptResult(result: AttemptResult): void {
@@ -214,12 +255,16 @@ export function getAttemptResultById(attemptId: string): AttemptResult | null {
     }
   }
 
-  // Fallback to sample attempts
-  const sample = SAMPLE_ATTEMPTS.find(a => a.id === attemptId);
-  return sample || null;
+  // Only check sample attempts if attemptId explicitly starts with 'att-sample-'
+  if (attemptId.startsWith('att-sample-')) {
+    const sample = SAMPLE_ATTEMPTS.find(a => a.id === attemptId);
+    return sample || null;
+  }
+  return null;
 }
 
-export function getDashboardStats(): DashboardStats {
+export function getDashboardStats(options?: { includeSampleData?: boolean }): DashboardStats {
+  const includeSampleData = options?.includeSampleData ?? false;
   let userAttempts: AttemptResult[] = [];
   if (typeof window !== 'undefined') {
     try {
@@ -232,19 +277,52 @@ export function getDashboardStats(): DashboardStats {
     }
   }
 
-  const allAttempts = [...userAttempts, ...SAMPLE_ATTEMPTS];
+  const allAttempts = includeSampleData ? [...userAttempts, ...SAMPLE_ATTEMPTS] : userAttempts;
 
   if (allAttempts.length === 0) {
-    return INITIAL_DASHBOARD_STATS;
+    return {
+      totalTestsAttempted: 0,
+      averageScore: 0,
+      bestScore: 0,
+      averageAccuracy: 0,
+      totalTimeSpentMinutes: 0,
+      recentAttempts: [],
+      sectionPerformance: [],
+      weakTopics: [],
+    };
   }
 
   const totalTestsAttempted = allAttempts.length;
   const totalScore = allAttempts.reduce((acc, curr) => acc + curr.score, 0);
   const averageScore = parseFloat((totalScore / totalTestsAttempted).toFixed(2));
-  const bestScore = Math.max(...allAttempts.map(a => a.score));
+  const bestScore = Math.max(...allAttempts.map(a => a.score), 0);
   const totalAccuracy = allAttempts.reduce((acc, curr) => acc + curr.accuracy, 0);
   const averageAccuracy = parseFloat((totalAccuracy / totalTestsAttempted).toFixed(1));
   const totalTimeSpentSeconds = allAttempts.reduce((acc, curr) => acc + curr.timeTakenSeconds, 0);
+
+  const secMap: Record<string, { sectionCode: string; sectionName: string; totalAttempted: number; totalCorrect: number }> = {};
+  for (const a of allAttempts) {
+    for (const s of a.sectionResults || []) {
+      if (!secMap[s.sectionCode]) {
+        secMap[s.sectionCode] = {
+          sectionCode: s.sectionCode,
+          sectionName: s.sectionName,
+          totalAttempted: 0,
+          totalCorrect: 0,
+        };
+      }
+      secMap[s.sectionCode].totalAttempted += s.attempted;
+      secMap[s.sectionCode].totalCorrect += s.correct;
+    }
+  }
+
+  const sectionPerformance = Object.values(secMap).map(s => ({
+    sectionCode: s.sectionCode,
+    sectionName: s.sectionName,
+    averageAccuracy: s.totalAttempted > 0 ? parseFloat(((s.totalCorrect / s.totalAttempted) * 100).toFixed(1)) : 0,
+    totalAttempted: s.totalAttempted,
+    totalCorrect: s.totalCorrect,
+  }));
 
   return {
     totalTestsAttempted,
@@ -253,7 +331,7 @@ export function getDashboardStats(): DashboardStats {
     averageAccuracy,
     totalTimeSpentMinutes: Math.round(totalTimeSpentSeconds / 60),
     recentAttempts: allAttempts.slice(0, 5),
-    sectionPerformance: INITIAL_DASHBOARD_STATS.sectionPerformance,
-    weakTopics: INITIAL_DASHBOARD_STATS.weakTopics,
+    sectionPerformance,
+    weakTopics: [],
   };
 }

@@ -4,17 +4,33 @@ import React, { useState, useEffect, use, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getMockTestById, saveAttemptResult } from '@/lib/services/testService';
 import { saveAttemptAction } from '@/lib/services/adminService';
-import { calculateAttemptResult } from '@/lib/scoring/scoreCalculator';
-import { MockTest, Question, QuestionStatus, UserResponseState } from '@/types';
+import { AttemptResult, MockTest, Question, QuestionStatus, UserResponseState } from '@/types';
 import { TestHeader } from '@/components/questions/TestHeader';
 import { QuestionCard } from '@/components/questions/QuestionCard';
 import { QuestionPalette } from '@/components/questions/QuestionPalette';
 import { SubmitConfirmModal } from '@/components/questions/SubmitConfirmModal';
 import { ProctoringGuard } from '@/components/questions/ProctoringGuard';
+import { SubmissionStatusModal } from '@/components/questions/SubmissionStatusModal';
 import { Button } from '@/components/ui/Button';
 import { Modal } from '@/components/ui/Modal';
-import { ChevronLeft, ChevronRight, Bookmark, RotateCcw, CheckCircle2, ArrowRight, AlertTriangle, LogOut } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Bookmark,
+  RotateCcw,
+  CheckCircle2,
+  ArrowRight,
+  AlertTriangle,
+  LogOut,
+  Lock,
+} from 'lucide-react';
 import { getUserSeenQuestionIds, recordUserSeenQuestions } from '@/lib/services/userQuestionTracker';
+import {
+  isExamComposite,
+  calculateExamTimeRemaining,
+  computeMonotonicRemainingTime,
+  syncSectionalStateOnResume,
+} from '@/lib/exam-engine/timingUtils';
 
 export interface TestPageProps {
   params: Promise<{ testId: string }>;
@@ -26,12 +42,25 @@ export default function TestPage({ params }: TestPageProps) {
 
   const [test, setTest] = useState<MockTest | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [currentSectionCode, setCurrentSectionCode] = useState<string>('');
   const [currentQuestionId, setCurrentQuestionId] = useState<string>('');
   const [responses, setResponses] = useState<Record<string, UserResponseState>>({});
   const [visitedQuestions, setVisitedQuestions] = useState<string[]>([]);
-  
-  // Sectional Timing State (20 minutes per section: 1200 seconds)
+
+  // Stable session attempt ID (preserved across retries to prevent duplicate submissions)
+  const [sessionAttemptId, setSessionAttemptId] = useState<string>('');
+
+  // Authoritative timing state
+  const [sessionStartTime, setSessionStartTime] = useState<number>(0);
+  const [sessionDeadline, setSessionDeadline] = useState<number>(0);
+  const [lastHeartbeatTime, setLastHeartbeatTime] = useState<number>(0);
+  const [lastRecordedRemainingSeconds, setLastRecordedRemainingSeconds] = useState<number>(0);
+
+  // Composite Exam Master Timer (single countdown clock for SSC / Railway)
+  const [compositeRemainingSeconds, setCompositeRemainingSeconds] = useState<number>(0);
+
+  // Sectional Timing State (for Banking exams: IBPS PO, SBI Clerk)
   const [sectionTimers, setSectionTimers] = useState<Record<string, number>>({});
   const [lockedSectionCodes, setLockedSectionCodes] = useState<string[]>([]);
   const [sectionTransitionModal, setSectionTransitionModal] = useState<{
@@ -43,15 +72,20 @@ export default function TestPage({ params }: TestPageProps) {
   // Proctoring strikes
   const [proctoringStrikes, setProctoringStrikes] = useState<number>(0);
 
+  // Modals & Submission state machine
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isExitModalOpen, setIsExitModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionPhase, setSubmissionPhase] = useState<'idle' | 'submitting' | 'success' | 'error'>('idle');
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+
+  const isSubmittingRef = useRef(false);
   const isSubmittedRef = useRef(false);
 
   // Storage key for test state persistence
   const storageKey = `bankmock_test_progress_${testId}`;
 
-  // Fetch test details at start of exam
+  // Fetch test details at start of exam or restore in-progress session
   useEffect(() => {
     async function loadTest() {
       // Check if candidate requested a clean restart or re-attempt
@@ -78,6 +112,12 @@ export default function TestPage({ params }: TestPageProps) {
       let inProgressStrikes: number | null = null;
       let inProgressSectionCode: string | null = null;
       let inProgressQuestionId: string | null = null;
+      let inProgressAttemptId: string | null = null;
+      let inProgressStartTime: number | null = null;
+      let inProgressDeadline: number | null = null;
+      let inProgressCompositeRemaining: number | null = null;
+      let inProgressLastRecordedRemaining: number | null = null;
+      let inProgressLastHeartbeat: number | null = null;
 
       if (!isReattemptOrRestart) {
         try {
@@ -94,6 +134,12 @@ export default function TestPage({ params }: TestPageProps) {
             if (typeof parsed.proctoringStrikes === 'number') inProgressStrikes = parsed.proctoringStrikes;
             if (parsed.currentSectionCode) inProgressSectionCode = parsed.currentSectionCode;
             if (parsed.currentQuestionId) inProgressQuestionId = parsed.currentQuestionId;
+            if (parsed.sessionAttemptId) inProgressAttemptId = parsed.sessionAttemptId;
+            if (typeof parsed.sessionStartTime === 'number') inProgressStartTime = parsed.sessionStartTime;
+            if (typeof parsed.sessionDeadline === 'number') inProgressDeadline = parsed.sessionDeadline;
+            if (typeof parsed.compositeRemainingSeconds === 'number') inProgressCompositeRemaining = parsed.compositeRemainingSeconds;
+            if (typeof parsed.lastRecordedRemainingSeconds === 'number') inProgressLastRecordedRemaining = parsed.lastRecordedRemainingSeconds;
+            if (typeof parsed.lastHeartbeatTime === 'number') inProgressLastHeartbeat = parsed.lastHeartbeatTime;
           }
         } catch (err) {
           console.error('Error reading saved session:', err);
@@ -102,95 +148,171 @@ export default function TestPage({ params }: TestPageProps) {
 
       // 2. If resuming an active session
       if (inProgressQuestions && inProgressQuestions.length > 0) {
-        const baseTest = await getMockTestById(testId);
-        if (baseTest) {
-          const freshMap = new Map(baseTest.questions.map(q => [q.id, q]));
-          const refreshedQuestions = inProgressQuestions.map(oldQ => {
-            const fresh = freshMap.get(oldQ.id);
-            if (!fresh) return oldQ;
-            return {
-              ...oldQ,
-              imageUrl: fresh.imageUrl || oldQ.imageUrl,
-              passage: fresh.passage || oldQ.passage,
-              passageImageUrl: fresh.passageImageUrl || oldQ.passageImageUrl,
-              groupId: fresh.groupId || oldQ.groupId,
-              options: oldQ.options.map((opt, idx) => ({
-                ...opt,
-                imageUrl: fresh.options[idx]?.imageUrl || opt.imageUrl,
-              })),
+        try {
+          const baseTest = await getMockTestById(testId);
+          if (baseTest) {
+            const isComposite = isExamComposite(baseTest);
+            const totalAllocatedSecs = (baseTest.durationMinutes || 60) * 60;
+            const now = Date.now();
+
+            const stableAttemptId = inProgressAttemptId || `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+            const startTime = inProgressStartTime || now;
+            const deadline = inProgressDeadline || (startTime + totalAllocatedSecs * 1000);
+            const lastRecorded = inProgressLastRecordedRemaining ?? totalAllocatedSecs;
+            const lastHeartbeat = inProgressLastHeartbeat ?? now;
+
+            setSessionAttemptId(stableAttemptId);
+            setSessionStartTime(startTime);
+            setSessionDeadline(deadline);
+            setLastRecordedRemainingSeconds(lastRecorded);
+            setLastHeartbeatTime(now);
+
+            const freshMap = new Map(baseTest.questions.map(q => [q.id, q]));
+            const refreshedQuestions = inProgressQuestions.map(oldQ => {
+              const fresh = freshMap.get(oldQ.id);
+              if (!fresh) return oldQ;
+              return {
+                ...oldQ,
+                imageUrl: fresh.imageUrl || oldQ.imageUrl,
+                passage: fresh.passage || oldQ.passage,
+                passageImageUrl: fresh.passageImageUrl || oldQ.passageImageUrl,
+                groupId: fresh.groupId || oldQ.groupId,
+                options: oldQ.options.map((opt, idx) => ({
+                  ...opt,
+                  imageUrl: fresh.options[idx]?.imageUrl || opt.imageUrl,
+                })),
+              };
+            });
+
+            const activeTest: MockTest = {
+              ...baseTest,
+              questions: refreshedQuestions,
             };
-          });
+            setTest(activeTest);
 
-          const activeTest: MockTest = {
-            ...baseTest,
-            questions: refreshedQuestions,
-          };
-          setTest(activeTest);
+            if (inProgressResponses) setResponses(inProgressResponses);
+            if (inProgressVisited) setVisitedQuestions(inProgressVisited);
+            if (inProgressStrikes) setProctoringStrikes(inProgressStrikes);
 
-          if (inProgressResponses) setResponses(inProgressResponses);
-          if (inProgressVisited) setVisitedQuestions(inProgressVisited);
-          if (inProgressSectionTimers) setSectionTimers(inProgressSectionTimers);
-          if (inProgressLockedSections) setLockedSectionCodes(inProgressLockedSections);
-          if (inProgressStrikes) setProctoringStrikes(inProgressStrikes);
+            // Synchronize timing on resume with monotonic clock protection
+            if (isComposite) {
+              const clockSync = computeMonotonicRemainingTime({
+                sessionDeadline: deadline,
+                lastRecordedRemaining: inProgressCompositeRemaining ?? lastRecorded,
+                lastHeartbeatTime: lastHeartbeat,
+                now,
+              });
+              setCompositeRemainingSeconds(clockSync.effectiveRemaining);
+              setLastRecordedRemainingSeconds(clockSync.effectiveRemaining);
 
-          const defaultSecCode = inProgressSectionCode || activeTest.sections[0]?.code || activeTest.questions[0]?.sectionCode || 'GENERAL';
-          const defaultQId = inProgressQuestionId || activeTest.questions.find(q => q.sectionCode === defaultSecCode)?.id || activeTest.questions[0]?.id || '';
+              const initialSecCode = inProgressSectionCode || activeTest.sections[0]?.code || 'GENERAL';
+              const initialQId = inProgressQuestionId || activeTest.questions.find(q => q.sectionCode === initialSecCode)?.id || activeTest.questions[0]?.id || '';
+              setCurrentSectionCode(initialSecCode);
+              setCurrentQuestionId(initialQId);
+            } else {
+              // Sectional locked: determine expired sections based on elapsed time
+              const resumeSync = syncSectionalStateOnResume({
+                sections: activeTest.sections,
+                sessionStartTime: startTime,
+                currentSectionTimers: inProgressSectionTimers || {},
+                lockedSectionCodes: inProgressLockedSections || [],
+                now,
+              });
 
-          setCurrentSectionCode(defaultSecCode);
-          setCurrentQuestionId(defaultQId);
+              setSectionTimers(resumeSync.updatedSectionTimers);
+              setLockedSectionCodes(resumeSync.updatedLockedSections);
+
+              const defaultSecCode = resumeSync.activeSectionCode || inProgressSectionCode || activeTest.sections[0]?.code || 'GENERAL';
+              const defaultQId = inProgressQuestionId || activeTest.questions.find(q => q.sectionCode === defaultSecCode)?.id || activeTest.questions[0]?.id || '';
+              setCurrentSectionCode(defaultSecCode);
+              setCurrentQuestionId(defaultQId);
+            }
+          }
+        } catch (err) {
+          setLoadError(err instanceof Error ? err.message : 'Failed to load exam session.');
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
         return;
       }
 
-      // 3. New exam start: Retrieve all questions previously seen by this user
-      const seenQuestionIds = getUserSeenQuestionIds();
-      const freshTest = await getMockTestById(testId, seenQuestionIds);
+      // 3. New exam start: Retrieve questions
+      try {
+        const seenQuestionIds = getUserSeenQuestionIds();
+        const freshTest = await getMockTestById(testId, seenQuestionIds);
 
-      if (freshTest) {
-        setTest(freshTest);
+        if (freshTest) {
+          setTest(freshTest);
 
-        // Initialize timers based on timerType
-        const isComposite = freshTest.timerType === 'OVERALL_COMPOSITE' || Boolean(freshTest.allowSectionSwitch);
-        const totalDurationSecs = (freshTest.durationMinutes || 60) * 60;
-        const initialTimers: Record<string, number> = {};
-        freshTest.sections.forEach((sec) => {
-          initialTimers[sec.code] = isComposite ? totalDurationSecs : (sec.durationMinutes || 20) * 60;
-        });
-        setSectionTimers(initialTimers);
+          const isComposite = isExamComposite(freshTest);
+          const totalDurationSecs = (freshTest.durationMinutes || 60) * 60;
+          const now = Date.now();
+          const stableAttemptId = `att-${now}-${Math.random().toString(36).slice(2, 7)}`;
+          const deadline = now + totalDurationSecs * 1000;
 
-        const initialSecCode = freshTest.sections[0]?.code || freshTest.questions[0]?.sectionCode || 'GENERAL';
-        const initialQId = freshTest.questions.find(q => q.sectionCode === initialSecCode)?.id || freshTest.questions[0]?.id || '';
+          setSessionAttemptId(stableAttemptId);
+          setSessionStartTime(now);
+          setSessionDeadline(deadline);
+          setLastHeartbeatTime(now);
+          setLastRecordedRemainingSeconds(totalDurationSecs);
 
-        setCurrentSectionCode(initialSecCode);
-        setCurrentQuestionId(initialQId);
-        setVisitedQuestions(initialQId ? [initialQId] : []);
+          if (isComposite) {
+            setCompositeRemainingSeconds(totalDurationSecs);
+            const initialTimers: Record<string, number> = {};
+            freshTest.sections.forEach((sec) => {
+              initialTimers[sec.code] = totalDurationSecs;
+            });
+            setSectionTimers(initialTimers);
+          } else {
+            const initialTimers: Record<string, number> = {};
+            freshTest.sections.forEach((sec) => {
+              initialTimers[sec.code] = (sec.durationMinutes || 20) * 60;
+            });
+            setSectionTimers(initialTimers);
+          }
 
-        // Record these newly assigned questions
-        const newIds = freshTest.questions.map(q => q.id);
-        recordUserSeenQuestions(undefined, newIds);
+          const initialSecCode = freshTest.sections[0]?.code || freshTest.questions[0]?.sectionCode || 'GENERAL';
+          const initialQId = freshTest.questions.find(q => q.sectionCode === initialSecCode)?.id || freshTest.questions[0]?.id || '';
+
+          setCurrentSectionCode(initialSecCode);
+          setCurrentQuestionId(initialQId);
+          setVisitedQuestions(initialQId ? [initialQId] : []);
+
+          // Record newly assigned questions
+          const newIds = freshTest.questions.map(q => q.id);
+          recordUserSeenQuestions(undefined, newIds);
+        }
+      } catch (err) {
+        setLoadError(err instanceof Error ? err.message : 'Failed to load exam session.');
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     }
     loadTest();
   }, [testId, storageKey]);
 
   // Autosave responses, timers, and locks to localStorage
   useEffect(() => {
-    if (!test || loading || isSubmittedRef.current) return;
+    if (!test || loading || isSubmittedRef.current || !sessionAttemptId) return;
     try {
       localStorage.setItem(
         storageKey,
         JSON.stringify({
           testId,
-          questions: test.questions,
-          responses,
-          visitedQuestions,
+          sessionAttemptId,
+          sessionStartTime,
+          sessionDeadline,
+          lastRecordedRemainingSeconds,
+          lastHeartbeatTime,
+          compositeRemainingSeconds,
           sectionTimers,
           lockedSectionCodes,
           proctoringStrikes,
           currentSectionCode,
           currentQuestionId,
+          responses,
+          visitedQuestions,
+          questions: test.questions,
         })
       );
     } catch (err) {
@@ -199,61 +321,162 @@ export default function TestPage({ params }: TestPageProps) {
   }, [
     responses,
     visitedQuestions,
+    compositeRemainingSeconds,
     sectionTimers,
     lockedSectionCodes,
     proctoringStrikes,
     currentSectionCode,
     currentQuestionId,
+    sessionAttemptId,
+    sessionStartTime,
+    sessionDeadline,
+    lastRecordedRemainingSeconds,
+    lastHeartbeatTime,
     test,
     loading,
     storageKey,
     testId,
   ]);
 
-  // Submit Test logic with server-side Neon PostgreSQL persistence
-  const executeSubmission = useCallback(() => {
-    if (!test || isSubmitting) return;
-    isSubmittedRef.current = true;
-    setIsSubmitting(true);
+  // Submit Test logic with server-side validation and confirmed response handling
+  const executeSubmission = useCallback(async () => {
+    if (!test || isSubmittingRef.current || isSubmittedRef.current) return;
 
-    // Calculate total time taken across all sections
-    const isComposite = test.timerType === 'OVERALL_COMPOSITE' || Boolean(test.allowSectionSwitch);
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
+    setIsSubmitModalOpen(false);
+    setSubmissionPhase('submitting');
+    setSubmissionError(null);
+
+    const isComposite = isExamComposite(test);
     const totalAllocated = isComposite
       ? (test.durationMinutes || 60) * 60
       : test.sections.reduce((acc, s) => acc + (s.durationMinutes || 20) * 60, 0);
-    const totalRemaining = isComposite
-      ? (sectionTimers[currentSectionCode] ?? 0)
-      : Object.values(sectionTimers).reduce((acc, v) => acc + v, 0);
-    const totalTimeTaken = Math.max(1, totalAllocated - totalRemaining);
 
-    const attemptId = `att-${Date.now()}`;
-    const result = calculateAttemptResult(test, responses, totalTimeTaken, attemptId);
-
-    // 1. Save result to localStorage for instant local render & offline resilience
-    saveAttemptResult(result);
-
-    // 2. Persist to Neon PostgreSQL Database asynchronously
-    saveAttemptAction(result).catch(err => {
-      console.warn('Background Neon DB attempt persistence error:', err);
+    const timingSummary = calculateExamTimeRemaining({
+      test,
+      isComposite,
+      compositeRemainingSeconds,
+      sectionTimers,
+      lockedSectionCodes,
+      currentSectionCode,
+      isSubmitting: true,
     });
 
-    // 3. Clear in-progress exam session state
+    const totalRemaining = timingSummary.totalRemainingSeconds;
+    const totalTimeTaken = Math.max(1, Math.min(totalAllocated + 180, totalAllocated - totalRemaining));
+    const attemptId = sessionAttemptId || `att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+
+    // Package candidate responses without client-side score assumptions
+    const candidateQuestionDetails = (test.questions || []).map(q => {
+      const resp = responses[q.id];
+      const selectedOptionId = resp?.selectedOptionId || null;
+      return {
+        question: q,
+        selectedOptionId,
+        isCorrect: null,
+        status: resp?.status || (selectedOptionId ? 'ANSWERED' : 'NOT_ANSWERED'),
+        marksObtained: 0,
+        timeSpentSeconds: resp?.timeSpentSeconds || 0,
+      };
+    });
+
+    const candidatePayload: AttemptResult = {
+      id: attemptId,
+      mockTestId: test.id,
+      mockTestTitle: test.title,
+      examSlug: test.examSlug,
+      examTitle: test.examTitle,
+      userId: '',
+      userName: '',
+      startedAt: new Date(sessionStartTime || (Date.now() - totalTimeTaken * 1000)).toISOString(),
+      completedAt: new Date().toISOString(),
+      timeTakenSeconds: totalTimeTaken,
+      totalDurationSeconds: totalAllocated,
+      score: 0,
+      maxScore: test.totalMarks,
+      percentage: 0,
+      accuracy: 0,
+      totalQuestions: test.totalQuestions || test.questions.length,
+      totalAttempted: 0,
+      correctCount: 0,
+      incorrectCount: 0,
+      unansweredCount: 0,
+      cutoffMarks: test.cutoffMarks,
+      isCutoffCleared: false,
+      sectionResults: [],
+      topicResults: [],
+      questionDetails: candidateQuestionDetails,
+    };
+
     try {
-      localStorage.removeItem(storageKey);
-      localStorage.removeItem(`bankmock_proctoring_strikes_${testId}`);
-    } catch (e) {
-      console.error(e);
+      // 1. Authoritative server-side grading and persistence
+      const saveRes = await saveAttemptAction(candidatePayload);
+
+      if (saveRes.success && saveRes.result) {
+        // Confirmed server success
+        isSubmittedRef.current = true;
+        saveAttemptResult(saveRes.result);
+        setSubmissionPhase('success');
+
+        try {
+          localStorage.removeItem(storageKey);
+          localStorage.removeItem(`bankmock_proctoring_strikes_${testId}`);
+        } catch (e) {
+          console.error(e);
+        }
+
+        setTimeout(() => {
+          router.push(`/result/${attemptId}`);
+        }, 800);
+        return;
+      }
+
+      // Check if duplicate submission (attempt already safely finalized on the server)
+      if (saveRes.error && saveRes.error.toLowerCase().includes('already been finalized')) {
+        isSubmittedRef.current = true;
+        setSubmissionPhase('success');
+
+        try {
+          localStorage.removeItem(storageKey);
+          localStorage.removeItem(`bankmock_proctoring_strikes_${testId}`);
+        } catch (e) {
+          console.error(e);
+        }
+
+        setTimeout(() => {
+          router.push(`/result/${attemptId}`);
+        }, 800);
+        return;
+      }
+
+      // Explicit server failure: Keep localStorage intact and allow retry
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+      setSubmissionPhase('error');
+      setSubmissionError(saveRes.error || 'The server could not record your submission. Please retry.');
+    } catch (networkErr: any) {
+      console.error('Submission network error:', networkErr);
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
+      setSubmissionPhase('error');
+      setSubmissionError(
+        'Network connection interrupted. We could not reach the server to submit your test. Your responses remain safely preserved on your device. Please verify your connection and click Retry Submission.'
+      );
     }
-
-    router.push(`/result/${attemptId}`);
-  }, [test, isSubmitting, sectionTimers, responses, storageKey, testId, router]);
-
-  // Active section remaining seconds
-  const activeSectionDefaultSecs = ((test?.sections.find(s => s.code === currentSectionCode)?.durationMinutes) || 20) * 60;
-  const activeSectionRemainingSeconds = sectionTimers[currentSectionCode] ?? activeSectionDefaultSecs;
-
-  // Total remaining seconds across all unexpired sections
-  const totalRemainingSeconds = Object.values(sectionTimers).reduce((sum, secVal) => sum + secVal, 0);
+  }, [
+    test,
+    sessionAttemptId,
+    sessionStartTime,
+    compositeRemainingSeconds,
+    sectionTimers,
+    lockedSectionCodes,
+    currentSectionCode,
+    responses,
+    storageKey,
+    testId,
+    router,
+  ]);
 
   // Handle Section Time Up -> Auto-transition to next section
   const handleSectionTimeUp = useCallback(() => {
@@ -287,59 +510,100 @@ export default function TestPage({ params }: TestPageProps) {
     }
   }, [test, currentSectionCode, executeSubmission]);
 
-  // Master 1-Second Sectional Countdown Clock (decoupled from component re-renders)
+  // Master 1-Second Countdown Clock with Monotonic Protection
   useEffect(() => {
-    if (loading || isSubmitting || isSubmittedRef.current || !test || !currentSectionCode) return;
+    if (loading || isSubmitting || submissionPhase !== 'idle' || isSubmittedRef.current || !test || !sessionDeadline) return;
 
-    const isComposite = test.timerType === 'OVERALL_COMPOSITE' || Boolean(test.allowSectionSwitch);
+    const isComposite = isExamComposite(test);
 
     const timerId = setInterval(() => {
-      setSectionTimers(prev => {
-        if (isComposite) {
-          const currentTotal = prev[currentSectionCode] ?? (test.durationMinutes || 60) * 60;
-          if (currentTotal <= 1) {
+      const now = Date.now();
+      setLastHeartbeatTime(now);
+
+      if (isComposite) {
+        setCompositeRemainingSeconds(prev => {
+          const sync = computeMonotonicRemainingTime({
+            sessionDeadline,
+            lastRecordedRemaining: prev,
+            lastHeartbeatTime,
+            now,
+          });
+
+          const nextVal = Math.min(Math.max(0, prev - 1), sync.effectiveRemaining);
+          setLastRecordedRemainingSeconds(nextVal);
+
+          if (nextVal <= 0 || sync.isExpired) {
+            clearInterval(timerId);
             setTimeout(() => {
               executeSubmission();
             }, 0);
-            const zeroTimers: Record<string, number> = {};
-            test.sections.forEach(s => { zeroTimers[s.code] = 0; });
-            return zeroTimers;
+            return 0;
           }
-          const nextVal = currentTotal - 1;
-          const nextTimers: Record<string, number> = {};
-          test.sections.forEach(s => { nextTimers[s.code] = nextVal; });
-          return nextTimers;
-        }
+          return nextVal;
+        });
+      } else {
+        setSectionTimers(prev => {
+          const currentSecTime = prev[currentSectionCode];
+          if (typeof currentSecTime !== 'number') return prev;
 
-        const currentSecTime = prev[currentSectionCode];
-        if (typeof currentSecTime !== 'number') return prev;
+          if (currentSecTime <= 1) {
+            setTimeout(() => {
+              handleSectionTimeUp();
+            }, 0);
+            return {
+              ...prev,
+              [currentSectionCode]: 0,
+            };
+          }
 
-        if (currentSecTime <= 1) {
-          setTimeout(() => {
-            handleSectionTimeUp();
-          }, 0);
+          const nextSecTime = currentSecTime - 1;
           return {
             ...prev,
-            [currentSectionCode]: 0,
+            [currentSectionCode]: nextSecTime,
           };
-        }
-
-        return {
-          ...prev,
-          [currentSectionCode]: currentSecTime - 1,
-        };
-      });
+        });
+      }
     }, 1000);
 
     return () => clearInterval(timerId);
-  }, [loading, isSubmitting, test, currentSectionCode, handleSectionTimeUp, executeSubmission]);
+  }, [
+    loading,
+    isSubmitting,
+    submissionPhase,
+    test,
+    currentSectionCode,
+    sessionDeadline,
+    lastHeartbeatTime,
+    handleSectionTimeUp,
+    executeSubmission,
+  ]);
 
-  // Handle active section timer tick (no-op retained for backwards compatibility)
+  // Compute Authoritative Remaining Times & Interaction Permissions
+  const isComposite = isExamComposite(test);
+  const timingSummary = calculateExamTimeRemaining({
+    test,
+    isComposite,
+    compositeRemainingSeconds,
+    sectionTimers,
+    lockedSectionCodes,
+    currentSectionCode,
+    isSubmitting: isSubmitting || submissionPhase !== 'idle',
+  });
+
+  const {
+    activeSectionRemainingSeconds,
+    totalRemainingSeconds,
+    isCurrentSectionExpired,
+    isExamExpired,
+    isInteractionDisabled,
+  } = timingSummary;
+
+  // Handle active section timer tick
   const handleSectionTimerTick = useCallback(() => {
-    // Clock is now handled by the master interval above
+    // Master interval handles countdown
   }, []);
 
-  // Mark question as visited when changing question (constrained to active section)
+  // Mark question as visited when changing question (constrained to active section or permitted cross-section)
   const selectQuestion = useCallback((qId: string) => {
     if (test) {
       const targetQ = test.questions.find(item => item.id === qId);
@@ -361,8 +625,10 @@ export default function TestPage({ params }: TestPageProps) {
     setVisitedQuestions(prev => (prev.includes(qId) ? prev : [...prev, qId]));
   }, [test, currentSectionCode, lockedSectionCodes]);
 
-  // Handle Option Select
+  // Handle Option Select (Blocked if section/exam is expired or submitting)
   const handleSelectOption = (optionId: string) => {
+    if (isInteractionDisabled) return;
+
     setResponses(prev => {
       const existing = prev[currentQuestionId] || {
         questionId: currentQuestionId,
@@ -392,8 +658,10 @@ export default function TestPage({ params }: TestPageProps) {
     });
   };
 
-  // Clear Response
+  // Clear Response (Blocked if section/exam is expired)
   const handleClearResponse = () => {
+    if (isInteractionDisabled) return;
+
     setResponses(prev => {
       const existing = prev[currentQuestionId];
       if (!existing) return prev;
@@ -412,8 +680,13 @@ export default function TestPage({ params }: TestPageProps) {
     });
   };
 
-  // Mark for Review & Next
+  // Mark for Review & Next (Blocked if section/exam is expired)
   const handleMarkForReview = () => {
+    if (isInteractionDisabled) {
+      handleNextQuestion();
+      return;
+    }
+
     setResponses(prev => {
       const existing = prev[currentQuestionId] || {
         questionId: currentQuestionId,
@@ -444,29 +717,31 @@ export default function TestPage({ params }: TestPageProps) {
     handleNextQuestion();
   };
 
-  // Save & Next
+  // Save & Next (Navigation allowed; mutating blocked if section/exam is expired)
   const handleSaveAndNext = () => {
-    setResponses(prev => {
-      const existing = prev[currentQuestionId] || {
-        questionId: currentQuestionId,
-        selectedOptionId: null,
-        isMarkedForReview: false,
-        status: 'NOT_ANSWERED',
-        timeSpentSeconds: 0,
-      };
+    if (!isInteractionDisabled) {
+      setResponses(prev => {
+        const existing = prev[currentQuestionId] || {
+          questionId: currentQuestionId,
+          selectedOptionId: null,
+          isMarkedForReview: false,
+          status: 'NOT_ANSWERED',
+          timeSpentSeconds: 0,
+        };
 
-      const isAnswered = Boolean(existing.selectedOptionId);
-      let newStatus: QuestionStatus = isAnswered ? 'ANSWERED' : 'NOT_ANSWERED';
-      if (isAnswered && existing.isMarkedForReview) newStatus = 'ANSWERED_AND_MARKED';
+        const isAnswered = Boolean(existing.selectedOptionId);
+        let newStatus: QuestionStatus = isAnswered ? 'ANSWERED' : 'NOT_ANSWERED';
+        if (isAnswered && existing.isMarkedForReview) newStatus = 'ANSWERED_AND_MARKED';
 
-      return {
-        ...prev,
-        [currentQuestionId]: {
-          ...existing,
-          status: newStatus,
-        },
-      };
-    });
+        return {
+          ...prev,
+          [currentQuestionId]: {
+            ...existing,
+            status: newStatus,
+          },
+        };
+      });
+    }
 
     handleNextQuestion();
   };
@@ -500,6 +775,21 @@ export default function TestPage({ params }: TestPageProps) {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl border border-red-200 shadow-xs max-w-md w-full text-center space-y-4">
+          <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto text-xl font-bold">
+            !
+          </div>
+          <h2 className="text-xl font-bold text-slate-800">Access Restricted</h2>
+          <p className="text-sm text-slate-600">{loadError}</p>
+          <Button onClick={() => router.push('/tests')}>Return to Practice Tests</Button>
+        </div>
+      </div>
+    );
+  }
+
   if (!test || !test.questions || test.questions.length === 0) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -517,7 +807,7 @@ export default function TestPage({ params }: TestPageProps) {
   const isMarkedForReview = Boolean(currentResponse?.isMarkedForReview);
   const activeSectionObj = test.sections.find(s => s.code === currentSectionCode);
 
-  // Compute metrics for modal
+  // Compute metrics for summary modal
   const allQuestions = test.questions;
   let answeredCount = 0;
   let markedCount = 0;
@@ -545,17 +835,18 @@ export default function TestPage({ params }: TestPageProps) {
         currentSectionCode={currentSectionCode}
         lockedSectionCodes={lockedSectionCodes}
         remainingSeconds={activeSectionRemainingSeconds}
-        totalRemainingSeconds={totalRemainingSeconds}
+        totalRemainingSeconds={isComposite ? undefined : totalRemainingSeconds}
         timerLabel={
-          test.timerType === 'OVERALL_COMPOSITE' || test.allowSectionSwitch
+          isComposite
             ? 'Total Exam Time Left'
             : `${activeSectionObj?.name || 'Section'} Time`
         }
-        isSectionalTimer={test.timerType !== 'OVERALL_COMPOSITE' && !test.allowSectionSwitch}
-        allowSectionSwitch={Boolean(test.allowSectionSwitch || test.timerType === 'OVERALL_COMPOSITE')}
-        timerType={test.timerType || (test.allowSectionSwitch ? 'OVERALL_COMPOSITE' : 'SECTIONAL_LOCKED')}
+        isSectionalTimer={!isComposite}
+        allowSectionSwitch={isComposite}
+        timerType={test.timerType || (isComposite ? 'OVERALL_COMPOSITE' : 'SECTIONAL_LOCKED')}
         onSelectSection={(selectedCode) => {
-          if (test.allowSectionSwitch || test.timerType === 'OVERALL_COMPOSITE') {
+          if (isComposite) {
+            if (lockedSectionCodes.includes(selectedCode)) return;
             setCurrentSectionCode(selectedCode);
             const firstQ = test.questions.find(q => q.sectionCode === selectedCode);
             if (firstQ) {
@@ -565,7 +856,7 @@ export default function TestPage({ params }: TestPageProps) {
           }
         }}
         onTickTimer={handleSectionTimerTick}
-        onTimeUp={test.timerType === 'OVERALL_COMPOSITE' ? executeSubmission : handleSectionTimeUp}
+        onTimeUp={isComposite ? executeSubmission : handleSectionTimeUp}
         onSubmitClick={() => setIsSubmitModalOpen(true)}
         onExitClick={() => setIsExitModalOpen(true)}
       />
@@ -576,12 +867,24 @@ export default function TestPage({ params }: TestPageProps) {
         <div className="lg:col-span-8 flex flex-col space-y-4">
           <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-xl border border-slate-200 text-xs text-slate-600">
             <span className="font-bold text-slate-900">
-              Active Section: <span className="text-blue-600">{activeSectionObj?.name}</span>
+              Active Section: <span className="text-blue-600">{activeSectionObj?.name || 'General'}</span>
             </span>
             <span className="font-mono text-slate-500">
               Question {currentQuestionIndex + 1} of {currentSectionQuestions.length}
             </span>
           </div>
+
+          {/* Section Expired or Locked Banner */}
+          {isInteractionDisabled && (
+            <div className="bg-amber-50 border border-amber-200 text-amber-900 px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 font-medium shadow-2xs">
+              <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>
+                {isExamExpired
+                  ? 'Exam time limit has expired. Responses are locked for submission.'
+                  : 'This section time limit has expired and answers are locked.'}
+              </span>
+            </div>
+          )}
 
           <QuestionCard
             question={currentQuestion}
@@ -589,6 +892,7 @@ export default function TestPage({ params }: TestPageProps) {
             totalQuestionsInSection={currentSectionQuestions.length}
             selectedOptionId={currentResponse?.selectedOptionId || null}
             onSelectOption={handleSelectOption}
+            disabled={isInteractionDisabled}
           />
 
           {/* Action Control Bar */}
@@ -598,6 +902,7 @@ export default function TestPage({ params }: TestPageProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleMarkForReview}
+                disabled={isInteractionDisabled}
                 className={`flex items-center gap-1.5 ${
                   isMarkedForReview ? 'bg-purple-50 text-purple-700 border-purple-300' : ''
                 }`}
@@ -610,6 +915,7 @@ export default function TestPage({ params }: TestPageProps) {
                 variant="secondary"
                 size="sm"
                 onClick={handleClearResponse}
+                disabled={isInteractionDisabled}
                 className="flex items-center gap-1.5 text-slate-600"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -665,6 +971,16 @@ export default function TestPage({ params }: TestPageProps) {
         remainingSeconds={totalRemainingSeconds}
       />
 
+      {/* Submission Status Modal (Saving Spinner, Success, Error with Safe Retry) */}
+      <SubmissionStatusModal
+        isOpen={submissionPhase !== 'idle'}
+        phase={submissionPhase}
+        errorMessage={submissionError}
+        onRetry={executeSubmission}
+        onClose={() => setSubmissionPhase('idle')}
+        isExamExpired={isExamExpired}
+      />
+
       {/* Section Transition Modal */}
       <Modal
         isOpen={sectionTransitionModal.isOpen}
@@ -679,7 +995,7 @@ export default function TestPage({ params }: TestPageProps) {
                 {sectionTransitionModal.prevSectionName} Completed
               </h4>
               <p className="mt-1 leading-relaxed text-blue-800">
-                The 20-minute time limit for <strong>{sectionTransitionModal.prevSectionName}</strong> has concluded and the section is now locked.
+                The time limit for <strong>{sectionTransitionModal.prevSectionName}</strong> has concluded and the section is now locked.
               </p>
             </div>
           </div>
@@ -689,10 +1005,6 @@ export default function TestPage({ params }: TestPageProps) {
               <span className="font-bold">Next Section:</span>
               <span className="font-bold text-indigo-700">{sectionTransitionModal.nextSectionName}</span>
             </div>
-            <div className="flex items-center justify-between">
-              <span className="font-bold">Allocated Time:</span>
-              <span className="font-mono font-bold text-slate-900">20 Minutes (1200s)</span>
-            </div>
           </div>
 
           <Button
@@ -701,7 +1013,7 @@ export default function TestPage({ params }: TestPageProps) {
             onClick={() => setSectionTransitionModal({ isOpen: false, prevSectionName: '', nextSectionName: '' })}
             className="w-full justify-center bg-blue-600 hover:bg-blue-700 font-bold"
           >
-            Start {sectionTransitionModal.nextSectionName} (20:00) <ArrowRight className="w-4 h-4 ml-1.5" />
+            Start {sectionTransitionModal.nextSectionName} <ArrowRight className="w-4 h-4 ml-1.5" />
           </Button>
         </div>
       </Modal>
@@ -719,10 +1031,10 @@ export default function TestPage({ params }: TestPageProps) {
               All In-Progress Answers Will Be Erased
             </div>
             <p className="leading-relaxed">
-              If you leave this exam session now without clicking <strong>Submit Test</strong>, all your selected answers and progress will be permanently erased.
+              If you leave this exam session now without clicking <strong>Submit Test</strong>, all your selected answers and progress will be erased.
             </p>
             <p className="leading-relaxed font-semibold text-amber-800">
-              When you restart or re-enter this exam, it will begin as a brand new test with a full 60-minute countdown timer (20 minutes per section).
+              When you restart or re-enter this exam, it will begin as a brand new test session.
             </p>
           </div>
 
