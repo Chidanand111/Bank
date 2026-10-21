@@ -23,6 +23,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 export interface StoredMediaFile {
   originalName: string;
@@ -38,6 +39,9 @@ export interface SaveBatchMediaOptions {
   category?: 'questions' | 'options' | 'passages';
 }
 
+// In-memory cache for high-resilience image serving across serverless executions
+export const memoryMediaCache = new Map<string, { buffer: Buffer; mimeType: string }>();
+
 /**
  * Sanitizes a filename to prevent directory traversal and filesystem hazards.
  */
@@ -48,18 +52,43 @@ export function sanitizeMediaFilename(filename: string): string {
   return clean || `image_${Date.now()}`;
 }
 
+let isPublicUploadWritable: boolean | null = null;
+
+export function checkPublicUploadWritable(): boolean {
+  if (isPublicUploadWritable !== null) {
+    return isPublicUploadWritable;
+  }
+  try {
+    const testDir = path.join(process.cwd(), 'public', 'uploads');
+    if (!fs.existsSync(testDir)) {
+      fs.mkdirSync(testDir, { recursive: true });
+    }
+    const testFile = path.join(testDir, `.write_test_${Date.now()}`);
+    fs.writeFileSync(testFile, 'test');
+    fs.unlinkSync(testFile);
+    isPublicUploadWritable = true;
+  } catch {
+    isPublicUploadWritable = false;
+  }
+  return isPublicUploadWritable;
+}
+
 /**
  * Resolves the absolute directory path where uploaded question images are persisted locally.
+ * In serverless environments (e.g. AWS Lambda / Vercel where /var/task is read-only),
+ * automatically falls back to the writable OS temporary directory (os.tmpdir()).
  */
 export function getLocalUploadDirectory(batchId: string, category = 'questions'): string {
-  // Use project workspace public folder
-  const uploadDir = path.join(process.cwd(), 'public', 'uploads', category, batchId);
-  return uploadDir;
+  if (checkPublicUploadWritable()) {
+    return path.join(process.cwd(), 'public', 'uploads', category, batchId);
+  }
+  return path.join(os.tmpdir(), 'bankmock_uploads', category, batchId);
 }
 
 /**
  * Persists an array of validated image buffers to disk under an isolated batch directory.
  * Idempotent: re-running with the same batchId and files safely overwrites without creating duplicates.
+ * Gracefully falls back to OS tmpdir and memory cache if running on a read-only filesystem.
  */
 export async function saveBatchImages(
   images: { filename: string; buffer: Uint8Array | Buffer; mimeType: string }[],
@@ -72,22 +101,45 @@ export async function saveBatchImages(
     return resultMap;
   }
 
-  // Ensure target upload directory exists
-  const targetDir = getLocalUploadDirectory(batchId, category);
+  let targetDir = getLocalUploadDirectory(batchId, category);
+  let diskWritable = true;
+
   if (!fs.existsSync(targetDir)) {
-    fs.mkdirSync(targetDir, { recursive: true });
+    try {
+      fs.mkdirSync(targetDir, { recursive: true });
+    } catch (mkdirErr) {
+      console.warn(`[MediaStorage] Primary targetDir ${targetDir} not writable, falling back to tmpdir:`, mkdirErr);
+      targetDir = path.join(os.tmpdir(), 'bankmock_uploads', category, batchId);
+      try {
+        if (!fs.existsSync(targetDir)) {
+          fs.mkdirSync(targetDir, { recursive: true });
+        }
+      } catch (fallbackErr) {
+        console.warn(`[MediaStorage] Fallback targetDir ${targetDir} also not writable:`, fallbackErr);
+        diskWritable = false;
+      }
+    }
   }
 
   for (const img of images) {
     const safeName = sanitizeMediaFilename(img.filename);
     const filePath = path.join(targetDir, safeName);
-
-    // Write binary buffer to disk
     const nodeBuffer = Buffer.isBuffer(img.buffer) ? img.buffer : Buffer.from(img.buffer);
-    fs.writeFileSync(filePath, nodeBuffer);
+
+    if (diskWritable) {
+      try {
+        fs.writeFileSync(filePath, nodeBuffer);
+      } catch (writeErr) {
+        console.warn(`[MediaStorage] Error writing ${filePath} to disk:`, writeErr);
+      }
+    }
 
     // Generate accessible relative web URL
     const publicUrl = `/uploads/${category}/${batchId}/${safeName}`;
+
+    // Always cache in memory as resilient fallback
+    memoryMediaCache.set(publicUrl, { buffer: nodeBuffer, mimeType: img.mimeType });
+    memoryMediaCache.set(`/api/media/${category}/${batchId}/${safeName}`, { buffer: nodeBuffer, mimeType: img.mimeType });
 
     const stored: StoredMediaFile = {
       originalName: img.filename,
@@ -116,6 +168,14 @@ export async function cleanupBatchImages(batchId: string, category = 'questions'
     }
   } catch (err) {
     console.warn(`Failed to cleanup batch media directory for batch ${batchId}:`, err);
+  }
+  try {
+    const tmpDir = path.join(os.tmpdir(), 'bankmock_uploads', category, batchId);
+    if (fs.existsSync(tmpDir)) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  } catch {
+    // Ignore tmp cleanup error
   }
 }
 

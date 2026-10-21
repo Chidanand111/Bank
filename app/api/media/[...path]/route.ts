@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
+import { memoryMediaCache } from '@/lib/storage/mediaStorage';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,18 +33,36 @@ export async function GET(
       }
     }
 
-    // Resolve file on disk under public/uploads
-    const relativePath = pathSegments.join(path.sep);
-    const basePath = path.join(process.cwd(), 'public', 'uploads');
-    const fullPath = path.resolve(basePath, relativePath);
+    const relativeUrl = `/uploads/${pathSegments.join('/')}`;
+    const apiRelativeUrl = `/api/media/${pathSegments.join('/')}`;
 
-    // Verify fullPath is strictly inside basePath
-    if (!fullPath.startsWith(basePath)) {
-      return new NextResponse('Forbidden', { status: 403 });
+    // 1. Check in-memory media cache
+    const cached = memoryMediaCache.get(relativeUrl) || memoryMediaCache.get(apiRelativeUrl);
+    if (cached) {
+      return new NextResponse(new Uint8Array(cached.buffer), {
+        status: 200,
+        headers: {
+          'Content-Type': cached.mimeType,
+          'Content-Length': cached.buffer.length.toString(),
+          'Cache-Control': 'public, max-age=31536000, immutable',
+        },
+      });
     }
 
-    if (!fs.existsSync(fullPath)) {
-      return new NextResponse('Not Found', { status: 404 });
+    // 2. Resolve file on disk under public/uploads
+    const relativePath = pathSegments.join(path.sep);
+    const basePath = path.join(process.cwd(), 'public', 'uploads');
+    let fullPath = path.resolve(basePath, relativePath);
+
+    // 3. Fallback to OS tmpdir (for serverless environments where public/uploads was read-only)
+    if (!fullPath.startsWith(basePath) || !fs.existsSync(fullPath)) {
+      const tmpBasePath = path.join(os.tmpdir(), 'bankmock_uploads');
+      const tmpFullPath = path.resolve(tmpBasePath, relativePath);
+      if (tmpFullPath.startsWith(tmpBasePath) && fs.existsSync(tmpFullPath)) {
+        fullPath = tmpFullPath;
+      } else {
+        return new NextResponse('Not Found', { status: 404 });
+      }
     }
 
     const stat = fs.statSync(fullPath);
@@ -55,7 +75,7 @@ export async function GET(
 
     const buffer = fs.readFileSync(fullPath);
 
-    return new NextResponse(buffer, {
+    return new NextResponse(new Uint8Array(buffer), {
       status: 200,
       headers: {
         'Content-Type': contentType,

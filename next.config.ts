@@ -10,6 +10,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  async rewrites() {
+    return [
+      {
+        source: '/uploads/:path*',
+        destination: '/api/media/:path*',
+      },
+    ];
+  },
 };
 
 export default nextConfig;

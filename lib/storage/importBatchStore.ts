@@ -10,6 +10,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 export type ImportBatchStatus =
   | 'CREATED'
@@ -82,19 +83,23 @@ const memoryBatchCache = new Map<string, ImportBatchMetadata>();
  */
 export function getBatchStorageDirectory(): string {
   const dir = path.join(process.cwd(), '.storage', 'import_batches');
-  if (!fs.existsSync(dir)) {
-    try {
+  try {
+    if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
-    } catch {
-      // Fallback to tmp directory if .storage cannot be created
-      const tmpDir = path.join(process.cwd(), 'public', 'uploads', 'batches');
+    }
+    return dir;
+  } catch {
+    // Fallback to true OS tmpdir if .storage cannot be created (e.g. serverless read-only /var/task)
+    const tmpDir = path.join(os.tmpdir(), 'bankmock_batches');
+    try {
       if (!fs.existsSync(tmpDir)) {
         fs.mkdirSync(tmpDir, { recursive: true });
       }
-      return tmpDir;
+    } catch (tmpErr) {
+      console.warn('[ImportBatchStore] Failed to create tmpDir fallback:', tmpErr);
     }
+    return tmpDir;
   }
-  return dir;
 }
 
 function getBatchFilePath(batchId: string): string {
@@ -346,7 +351,7 @@ export function listImportBatches(limit = 20): ImportBatchMetadata[] {
       const files = fs.readdirSync(dir).filter(f => f.endsWith('.json'));
       for (const file of files) {
         try {
-          const content = fs.readFileSync(path.join(dir, file), 'utf-8');
+          const content = fs.readFileSync(/*turbopackIgnore: true*/ (path.join as any)(/*turbopackIgnore: true*/ dir, file), 'utf-8');
           const batch = JSON.parse(content) as ImportBatchMetadata;
           batches.push(batch);
         } catch {
