@@ -188,6 +188,7 @@ export async function bulkImportQuestionsAction(
     duplicatePolicy?: 'SKIP' | 'UPDATE' | 'REVIEW';
     allowDestructiveUpdates?: boolean;
     chunkSize?: number;
+    imageMapping?: Record<string, string>;
   }
 ): Promise<{ success: boolean; count: number; error?: string; batchId?: string; report?: any }> {
   return questionService.bulkImportQuestionsAction(questions, partitionId, images, batchId, options);
@@ -195,7 +196,11 @@ export async function bulkImportQuestionsAction(
 
 export async function retryImportBatchAction(
   batchId: string,
-  overrides?: { duplicatePolicy?: 'SKIP' | 'UPDATE' | 'REVIEW'; allowDestructiveUpdates?: boolean }
+  overrides?: {
+    duplicatePolicy?: 'SKIP' | 'UPDATE' | 'REVIEW';
+    allowDestructiveUpdates?: boolean;
+    imageMapping?: Record<string, string>;
+  }
 ) {
   const { retryImportBatch } = await import('./importBatchService');
   return retryImportBatch(batchId, overrides);

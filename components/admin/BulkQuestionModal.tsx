@@ -125,6 +125,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
   const [finalReport, setFinalReport] = useState<any | null>(null);
   const [lastBatchId, setLastBatchId] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState<boolean>(false);
+  const [lastImageMapping, setLastImageMapping] = useState<Record<string, string>>({});
 
   // Clean up object URLs on unmount
   useEffect(() => {
@@ -884,6 +885,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
       setLastBatchId(deterministicBatchId);
 
       // 1. Separate bounded image upload (Avoids sending huge base64 in one Server Action)
+      const serverImageMapping: Record<string, string> = {};
       if (extractedImages.length > 0) {
         setImportProgressText(`Uploading ${extractedImages.length} diagrams in bounded batches...`);
         const chunkSize = 10;
@@ -903,15 +905,49 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
             const errData = await uploadRes.json().catch(() => ({}));
             throw new Error(errData.error || `Failed to upload image chunk ${Math.floor(i / chunkSize) + 1}`);
           }
+          const uploadData = await uploadRes.json().catch(() => ({}));
+          if (uploadData.uploaded && typeof uploadData.uploaded === 'object') {
+            for (const [filename, url] of Object.entries(uploadData.uploaded)) {
+              const cleanKey = filename.toLowerCase().replace(/\\/g, '/');
+              const baseKey = cleanKey.split('/').pop() || cleanKey;
+              serverImageMapping[cleanKey] = url as string;
+              serverImageMapping[baseKey] = url as string;
+            }
+          }
         }
       }
+      setLastImageMapping(serverImageMapping);
 
-      // 2. Submit questions to bounded, resilient import pipeline
+      // 2. Submit questions to bounded, resilient import pipeline with pre-resolved diagram URLs
       setImportProgressText(`Importing ${rawQuestions.length} questions in bounded database chunks...`);
-      const questionsToSubmit = rawQuestions.map((q) => ({
-        ...q,
-        examId: q.examId || selectedExamId,
-      }));
+      const questionsToSubmit = rawQuestions.map((q) => {
+        const qImg = q.imageUrl?.trim();
+        const pImg = q.passageImageUrl?.trim();
+
+        const cleanQ = qImg ? qImg.toLowerCase().replace(/\\/g, '/') : '';
+        const baseQ = cleanQ.split('/').pop() || cleanQ;
+        const mappedQImg = qImg ? (serverImageMapping[cleanQ] || serverImageMapping[baseQ] || qImg) : qImg;
+
+        const cleanP = pImg ? pImg.toLowerCase().replace(/\\/g, '/') : '';
+        const baseP = cleanP.split('/').pop() || cleanP;
+        const mappedPImg = pImg ? (serverImageMapping[cleanP] || serverImageMapping[baseP] || pImg) : pImg;
+
+        const mappedOptions = (q.options || []).map((opt) => {
+          const oImg = opt.imageUrl?.trim();
+          const cleanO = oImg ? oImg.toLowerCase().replace(/\\/g, '/') : '';
+          const baseO = cleanO.split('/').pop() || cleanO;
+          const mappedOImg = oImg ? (serverImageMapping[cleanO] || serverImageMapping[baseO] || oImg) : oImg;
+          return { ...opt, imageUrl: mappedOImg };
+        });
+
+        return {
+          ...q,
+          examId: q.examId || selectedExamId,
+          imageUrl: mappedQImg,
+          passageImageUrl: mappedPImg,
+          options: mappedOptions,
+        };
+      });
 
       const res = await bulkImportQuestionsAction(
         questionsToSubmit,
@@ -921,6 +957,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
         {
           duplicatePolicy,
           allowDestructiveUpdates,
+          imageMapping: serverImageMapping,
         }
       );
 
@@ -974,6 +1011,7 @@ export const BulkQuestionModal: React.FC<BulkQuestionModalProps> = ({
       const res = await retryImportBatchAction(lastBatchId, {
         duplicatePolicy,
         allowDestructiveUpdates,
+        imageMapping: lastImageMapping,
       });
       if (res.report) {
         setFinalReport(res.report);

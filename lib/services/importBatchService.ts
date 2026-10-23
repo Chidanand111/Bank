@@ -116,7 +116,10 @@ export async function executeResilientImport(
 
   // Merge any passed imageMapping into batch record
   for (const [key, url] of Object.entries(imageMapping)) {
-    batch.uploadedImages[key.toLowerCase()] = url;
+    const cleanKey = key.toLowerCase().replace(/\\/g, '/');
+    const baseKey = cleanKey.split('/').pop() || cleanKey;
+    batch.uploadedImages[cleanKey] = url;
+    batch.uploadedImages[baseKey] = url;
   }
 
   // Pre-resolve partitionId
@@ -465,6 +468,7 @@ export async function retryImportBatch(
   overrides: {
     duplicatePolicy?: DuplicateActionPolicy;
     allowDestructiveUpdates?: boolean;
+    imageMapping?: Record<string, string>;
   } = {}
 ): Promise<{ success: boolean; batch: ImportBatchMetadata; report: ImportBatchReport; error?: string }> {
   try {
@@ -479,6 +483,15 @@ export async function retryImportBatch(
   const batch = getImportBatch(batchId);
   if (!batch) {
     throw new Error(`Batch "${batchId}" not found for retry.`);
+  }
+
+  if (overrides.imageMapping) {
+    for (const [key, url] of Object.entries(overrides.imageMapping)) {
+      const cleanKey = key.toLowerCase().replace(/\\/g, '/');
+      const baseKey = cleanKey.split('/').pop() || cleanKey;
+      batch.uploadedImages[cleanKey] = url;
+      batch.uploadedImages[baseKey] = url;
+    }
   }
 
   if (batch.status === 'IMPORTING') {

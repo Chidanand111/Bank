@@ -507,6 +507,7 @@ export async function bulkImportQuestionsAction(
     duplicatePolicy?: 'SKIP' | 'UPDATE' | 'REVIEW';
     allowDestructiveUpdates?: boolean;
     chunkSize?: number;
+    imageMapping?: Record<string, string>;
   }
 ): Promise<{ success: boolean; count: number; error?: string; batchId?: string; report?: any }> {
   try {
@@ -533,7 +534,9 @@ export async function bulkImportQuestionsAction(
     }
 
     const activeBatchId = batchId || `batch-${Date.now().toString(36)}`;
-    const imageMapping: Record<string, string> = {};
+    const imageMapping: Record<string, string> = {
+      ...(options?.imageMapping || {}),
+    };
 
     // If diagrams are attached as base64 payload (e.g. from ZIP extraction), persist them to media storage
     if (images && images.length > 0) {
