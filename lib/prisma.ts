@@ -2,6 +2,28 @@ import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 
+/**
+ * Ensures PostgreSQL connections always target the isolated `bankmock` schema,
+ * preventing collisions with other tables in a shared database instance.
+ */
+export function enforceBankMockSchema(rawUrl: string): string {
+  if (!rawUrl || !rawUrl.trim()) return rawUrl;
+  let url = rawUrl.trim();
+
+  // If a schema query parameter is already explicitly provided, respect it
+  if (/[?&]schema=[^&#]+/i.test(url)) {
+    return url;
+  }
+
+  // Only apply to PostgreSQL connection strings
+  if (!url.startsWith('postgres://') && !url.startsWith('postgresql://')) {
+    return url;
+  }
+
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}schema=bankmock`;
+}
+
 function resolveDatabaseUrl(): string {
   // 1. Direct environment variable lookup
   const candidate =
@@ -12,7 +34,7 @@ function resolveDatabaseUrl(): string {
     process.env.NEON_DATABASE_URL;
 
   if (candidate && candidate.trim() && !candidate.includes('127.0.0.1:5432')) {
-    return candidate.trim();
+    return enforceBankMockSchema(candidate.trim());
   }
 
   // 2. Local development fallback: parse .env if not loaded yet into process.env
@@ -22,7 +44,7 @@ function resolveDatabaseUrl(): string {
       const content = fs.readFileSync(envPath, 'utf8');
       const match = content.match(/^DATABASE_URL\s*=\s*["']?([^"'\r\n]+)["']?/m);
       if (match && match[1]?.trim() && !match[1].includes('127.0.0.1:5432')) {
-        return match[1].trim();
+        return enforceBankMockSchema(match[1].trim());
       }
     }
   } catch {
@@ -30,10 +52,10 @@ function resolveDatabaseUrl(): string {
   }
 
   // 3. Fallback dummy placeholder to allow PrismaClient instantiation without hardcoded secrets
-  return (
+  const fallback =
     process.env.DATABASE_URL ||
-    'postgresql://postgres:postgres@localhost:5432/bankmock?sslmode=disable&connect_timeout=15'
-  );
+    'postgresql://postgres:postgres@localhost:5432/bankmock?sslmode=disable&connect_timeout=15';
+  return enforceBankMockSchema(fallback);
 }
 
 const activeDatabaseUrl = resolveDatabaseUrl();

@@ -90,3 +90,34 @@ describe('Serverless Read-Only Filesystem & Media Resilience', () => {
     }
   });
 });
+
+describe('Database Schema Isolation & Resilient Connection Resolution', () => {
+  it('appends schema=bankmock to PostgreSQL connection strings missing a schema parameter', async () => {
+    const { enforceBankMockSchema } = await import('@/lib/prisma');
+    const rawNeonUrl = 'postgresql://neondb_owner:pass@ep-red-wildflower.neon.tech/neondb?sslmode=require';
+    const isolatedUrl = enforceBankMockSchema(rawNeonUrl);
+    expect(isolatedUrl).toBe('postgresql://neondb_owner:pass@ep-red-wildflower.neon.tech/neondb?sslmode=require&schema=bankmock');
+  });
+
+  it('appends ?schema=bankmock if the PostgreSQL connection string has no query string', async () => {
+    const { enforceBankMockSchema } = await import('@/lib/prisma');
+    const rawUrl = 'postgresql://neondb_owner:pass@ep-red-wildflower.neon.tech/neondb';
+    const isolatedUrl = enforceBankMockSchema(rawUrl);
+    expect(isolatedUrl).toBe('postgresql://neondb_owner:pass@ep-red-wildflower.neon.tech/neondb?schema=bankmock');
+  });
+
+  it('preserves an existing schema parameter without duplicating or overriding it', async () => {
+    const { enforceBankMockSchema } = await import('@/lib/prisma');
+    const alreadyIsolated = 'postgresql://neondb_owner:pass@ep-red-wildflower.neon.tech/neondb?sslmode=require&schema=bankmock';
+    expect(enforceBankMockSchema(alreadyIsolated)).toBe(alreadyIsolated);
+
+    const customSchema = 'postgresql://user:pass@host/db?schema=custom_schema&sslmode=require';
+    expect(enforceBankMockSchema(customSchema)).toBe(customSchema);
+  });
+
+  it('handles empty or non-postgres inputs gracefully', async () => {
+    const { enforceBankMockSchema } = await import('@/lib/prisma');
+    expect(enforceBankMockSchema('')).toBe('');
+    expect(enforceBankMockSchema('file:./dev.db')).toBe('file:./dev.db');
+  });
+});

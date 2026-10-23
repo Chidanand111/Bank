@@ -211,10 +211,15 @@ export async function executeResilientImport(
         const deterministicId = qInput.id || `q-${activeBatchId}-${rowNum}`;
 
         // B. Retry / Idempotency Check (Does this exact question from this batch already exist in DB?)
-        const existingInBatch = await prisma.question.findUnique({
-          where: { id: deterministicId },
-          select: { id: true },
-        });
+        let existingInBatch: { id: string } | null = null;
+        try {
+          existingInBatch = await prisma.question.findUnique({
+            where: { id: deterministicId },
+            select: { id: true },
+          });
+        } catch {
+          existingInBatch = null;
+        }
 
         if (existingInBatch) {
           // Already created in a prior run of this batch! Skip safely without re-inserting
