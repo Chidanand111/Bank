@@ -988,13 +988,17 @@ export async function getCanonicalExamQuestions(testIdOrSlug: string): Promise<Q
     console.warn('getCanonicalExamQuestions fallback:', err);
   }
 
+  const freshQuestions = await loadFreshQuestionsFromDb();
+  const partitioned = partitionQuestionsListSync(freshQuestions, testIdOrSlug);
+  if (partitioned && partitioned.length > 0) {
+    return resolveGroupPassagesSync(partitioned);
+  }
+
   const fixed = getFixedQuestionsForMockTest(testIdOrSlug);
   if (fixed && fixed.length > 0) {
     return resolveGroupPassagesSync(fixed);
   }
 
-  const freshQuestions = await loadFreshQuestionsFromDb();
-  const partitioned = partitionQuestionsListSync(freshQuestions, testIdOrSlug);
   return resolveGroupPassagesSync(partitioned);
 }
 

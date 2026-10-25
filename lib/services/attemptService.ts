@@ -199,6 +199,86 @@ export async function saveAttemptAction(
     // 6. Validate Question-to-Exam and Option-to-Question Relationships
     const canonicalQMap = new Map(canonicalQuestions.map(q => [q.id, q]));
 
+    // Supplemental resilience: Check for any submitted questions not in canonical list and verify against DB
+    const missingQIds = (result.questionDetails || [])
+      .map(qd => qd.question?.id)
+      .filter((id): id is string => Boolean(id && !canonicalQMap.has(id)));
+
+    if (missingQIds.length > 0) {
+      try {
+        const foundDbQuestions = await prisma.question.findMany({
+          where: {
+            id: { in: missingQIds },
+          },
+          include: {
+            options: { orderBy: { order: 'asc' } },
+            exam: true,
+            section: true,
+            topic: true,
+            mockTestQuestions: true,
+          },
+        });
+
+        const testExamId = dbMockTest?.examId;
+        const testExamSlug = dbMockTest?.exam?.slug || (staticTest as any)?.examSlug || result.examSlug;
+        const testIdOrSlug = result.mockTestId.toLowerCase();
+
+        for (const dbQ of foundDbQuestions || []) {
+          // Verify question belongs to this mock test or parent exam
+          const belongsToMock = dbQ.mockTestQuestions?.some(
+            (mtq: any) => mtq.mockTestId === dbMockTest?.id || mtq.mockTestId === result.mockTestId
+          );
+          const belongsToExamId = Boolean(testExamId && dbQ.examId === testExamId);
+          const belongsToExamSlug = Boolean(
+            testExamSlug && (
+              (dbQ.exam?.slug && dbQ.exam.slug.toLowerCase() === testExamSlug.toLowerCase()) ||
+              (dbQ.examId && dbQ.examId.toLowerCase().includes(testExamSlug.toLowerCase()))
+            )
+          );
+          const belongsToTestSlug = Boolean(
+            (dbQ.examId && testIdOrSlug.includes(dbQ.examId.toLowerCase().replace(/^exam-/, ''))) ||
+            (dbQ.exam?.slug && testIdOrSlug.includes(dbQ.exam.slug.toLowerCase()))
+          );
+
+          if (belongsToMock || belongsToExamId || belongsToExamSlug || belongsToTestSlug) {
+            const canonicalQ: Question = {
+              id: dbQ.id,
+              text: dbQ.text,
+              imageUrl: dbQ.imageUrl || undefined,
+              passage: dbQ.passage || undefined,
+              passageImageUrl: dbQ.passageImageUrl || undefined,
+              groupId: dbQ.groupId || undefined,
+              isPyq: dbQ.isPyq,
+              pyqYear: dbQ.pyqYear || undefined,
+              pyqExam: dbQ.pyqExam || undefined,
+              difficulty: (dbQ.difficulty as any) || 'MEDIUM',
+              explanation: dbQ.explanation || '',
+              marks: dbQ.marks ?? 1.0,
+              negativeMarks: dbQ.negativeMarks ?? 0.25,
+              examId: dbQ.examId,
+              sectionId: dbQ.sectionId,
+              sectionCode: dbQ.section?.code || 'GENERAL',
+              sectionName: dbQ.section?.name || 'General',
+              topicId: dbQ.topicId,
+              topicName: dbQ.topic?.name || 'General',
+              options: (dbQ.options || []).map((opt: any) => ({
+                id: opt.id,
+                questionId: opt.questionId,
+                text: opt.text,
+                imageUrl: opt.imageUrl || undefined,
+                isCorrect: opt.isCorrect,
+                order: opt.order,
+              })),
+            };
+            canonicalQuestions.push(canonicalQ);
+            canonicalQMap.set(canonicalQ.id, canonicalQ);
+          }
+        }
+      } catch (lookupErr) {
+        console.warn('Error fetching supplemental canonical questions from DB:', lookupErr);
+      }
+    }
+
     for (const qd of result.questionDetails || []) {
       const submittedQId = qd.question?.id;
       if (!submittedQId || !canonicalQMap.has(submittedQId)) {

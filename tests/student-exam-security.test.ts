@@ -764,6 +764,105 @@ describe('Student Exam Security & Zero Answer-Key Leakage Audit', () => {
       expect(res.error).toMatch(/Invalid question: Question "q-foreign-exam-999" does not belong to exam/i);
     });
 
+    it('accepts attempt submission when questions were dynamically loaded from parent exam in database', async () => {
+      vi.spyOn(sessionModule, 'getCurrentUser').mockResolvedValue({
+        id: 'real-student-id',
+        role: 'USER',
+        status: 'APPROVED',
+        email: 'real@bank.com',
+        name: 'Real Candidate',
+      });
+
+      const importedQId = 'q-import-mvnh646c-vvtr4-1';
+      const importedQuestion = {
+        id: importedQId,
+        text: 'Four letter-clusters have been given...',
+        examId: 'exam-ssc-chsl',
+        sectionId: 'sec-ssc-chsl-reasoning',
+        marks: 2.0,
+        negativeMarks: 0.5,
+        options: [
+          { id: 'opt-imp-1', questionId: importedQId, text: 'Option A', isCorrect: false, order: 1 },
+          { id: 'opt-imp-2', questionId: importedQId, text: 'Option B', isCorrect: true, order: 2 },
+        ],
+        mockTestQuestions: [],
+      };
+
+      (prisma.mockTest.findFirst as any).mockResolvedValue({
+        id: 'mock-ssc-chsl-prelims-1',
+        slug: 'ssc-chsl-prelims-1',
+        status: 'published',
+        isPublished: true,
+        durationMinutes: 60,
+        cutoffMarks: 60,
+        negativeMarkRatio: 0.25,
+        examId: 'exam-ssc-chsl',
+        exam: {
+          id: 'exam-ssc-chsl',
+          slug: 'ssc-chsl',
+          title: 'SSC CHSL',
+        },
+        mockTestQuestions: [],
+      });
+
+      (prisma.question.findMany as any).mockResolvedValue([importedQuestion]);
+
+      let savedAttemptData: any = null;
+      (prisma.attempt.upsert as any).mockImplementation(({ create }: any) => {
+        savedAttemptData = create;
+        return Promise.resolve({ id: create.id });
+      });
+
+      const res = await saveAttemptAction({
+        id: 'att-import-test',
+        mockTestId: 'mock-ssc-chsl-prelims-1',
+        mockTestTitle: 'SSC CHSL Prelims Mock 1',
+        examSlug: 'ssc-chsl',
+        examTitle: 'SSC CHSL',
+        userId: 'real-student-id',
+        userName: 'Real Candidate',
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        timeTakenSeconds: 50,
+        totalDurationSeconds: 3600,
+        score: 2,
+        maxScore: 2,
+        percentage: 100,
+        accuracy: 100,
+        totalQuestions: 1,
+        totalAttempted: 1,
+        correctCount: 1,
+        incorrectCount: 0,
+        unansweredCount: 0,
+        cutoffMarks: 60,
+        isCutoffCleared: false,
+        sectionResults: [],
+        topicResults: [],
+        questionDetails: [
+          {
+            question: {
+              id: importedQId,
+              text: 'Four letter-clusters have been given...',
+              options: [
+                { id: 'opt-imp-1', questionId: importedQId, text: 'Option A', order: 1 },
+                { id: 'opt-imp-2', questionId: importedQId, text: 'Option B', order: 2 },
+              ],
+            } as any,
+            selectedOptionId: 'opt-imp-2',
+            isCorrect: true,
+            marksObtained: 2,
+            status: 'ANSWERED',
+            timeSpentSeconds: 50,
+          },
+        ],
+      });
+
+      expect(res.success).toBe(true);
+      expect(savedAttemptData).toBeDefined();
+      expect(savedAttemptData.score).toBe(2);
+      expect(savedAttemptData.correctCount).toBe(1);
+    });
+
     it('rejects attempt submission when selectedOptionId belongs to another question or does not exist', async () => {
       vi.spyOn(sessionModule, 'getCurrentUser').mockResolvedValue({
         id: 'real-student-id',
