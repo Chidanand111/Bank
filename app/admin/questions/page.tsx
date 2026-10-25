@@ -61,6 +61,11 @@ import {
   ChevronsRight,
   Clock,
   Table as TableIcon,
+  LayoutGrid,
+  List,
+  ChevronDown,
+  ChevronUp,
+  Check,
 } from 'lucide-react';
 import {
   EXAM_PRESETS,
@@ -432,6 +437,34 @@ export default function AdminQuestionsPage() {
   // Partition Organizing & Search States
   const [partitionFilter, setPartitionFilter] = useState<'ALL' | 'EXAM' | 'PYQ' | 'MOCK'>('ALL');
   const [partitionSearch, setPartitionSearch] = useState('');
+  const [isPartitionDirectoryOpen, setIsPartitionDirectoryOpen] = useState(true);
+  const [partitionViewMode, setPartitionViewMode] = useState<'grid' | 'table'>('grid');
+
+  const handleQuickPublishPartition = (partition: ExamPartition) => {
+    startTransition(async () => {
+      const isExam = partition.category === 'EXAM' || partition.id.startsWith('exam-');
+      const res = isExam
+        ? await toggleExamPublishAction(partition.id, 'published')
+        : await toggleMockTestPublishAction(partition.id, 'published');
+      if (res?.success) {
+        setFeedback({
+          text: `Exam "${partition.label}" has been published and is now live for students!`,
+          type: 'success',
+        });
+        const [freshParts, freshExams] = await Promise.all([
+          getAdminPartitions(),
+          getAdminExams(),
+        ]);
+        if (freshParts) setPartitions(freshParts);
+        if (freshExams) setExams(freshExams);
+      } else {
+        setFeedback({
+          text: res?.error || 'Failed to publish exam partition.',
+          type: 'error',
+        });
+      }
+    });
+  };
 
   // Edit Partition Title States
   const [editingPartition, setEditingPartition] = useState<ExamPartition | null>(null);
@@ -448,6 +481,18 @@ export default function AdminQuestionsPage() {
   const [promptTargetPartitionId, setPromptTargetPartitionId] = useState('');
 
   const activePartition = partitions.find(p => p.id === activePartitionId) || partitions[0] || PARTITIONS[0];
+
+  const filteredPartitions = partitions.filter(p => {
+    if (partitionFilter !== 'ALL' && p.category !== partitionFilter && p.id !== 'ALL') return false;
+    if (!partitionSearch.trim()) return true;
+    const q = partitionSearch.toLowerCase();
+    return (
+      p.label.toLowerCase().includes(q) ||
+      p.title.toLowerCase().includes(q) ||
+      p.badge.toLowerCase().includes(q) ||
+      (p.pyqYear && String(p.pyqYear).includes(q))
+    );
+  });
 
   const loadQuestions = async () => {
     try {
@@ -1027,628 +1072,615 @@ export default function AdminQuestionsPage() {
           </div>
         )}
 
-        {/* Organised Partition Tabs & Sessions Selector */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-indigo-600" />
-                  Exam Partitions & Sessions:
-                </span>
-                <span className="bg-indigo-50 text-indigo-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-indigo-100">
-                  {partitions.length} Available
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Organized exam spaces: select any partition to view, curate, or add dedicated questions for that exam paper.
-              </p>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (partitionFilter === 'PYQ') {
-                  setCreatePartitionType('PYQ');
-                } else if (partitionFilter === 'MOCK') {
-                  setCreatePartitionType('MOCK');
-                } else {
-                  setCreatePartitionType('EXAM');
-                }
-                if (exams.length > 0) {
-                  const currExam = (activePartition && activePartition.examId && activePartition.examId !== 'ALL'
-                    ? exams.find(e => e.id === activePartition.examId)
-                    : exams.find(e => e.id === pyqExamId)) || exams[0];
-                  if (currExam) {
-                    setPyqExamId(currExam.id);
-                    handlePyqPresetChange(detectDefaultPresetForExam(currExam.id, currExam.category));
-                  }
-                }
-                setIsCreatePyqModalOpen(true);
-              }}
-              className="flex items-center gap-1.5 text-xs font-bold border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 shrink-0 shadow-xs"
-            >
-              <PlusCircle className="w-3.5 h-3.5 text-indigo-600" />
-              + Create New Exam / Paper
-            </Button>
-          </div>
-
-          {/* Filter Toolbar & Quick Search */}
-          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
-              <button
-                type="button"
-                onClick={() => setPartitionFilter('ALL')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  partitionFilter === 'ALL'
-                    ? 'bg-white text-indigo-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                All Partitions ({partitions.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setPartitionFilter('EXAM')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  partitionFilter === 'EXAM'
-                    ? 'bg-white text-emerald-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                🏛️ Target Exams ({partitions.filter(p => p.category === 'EXAM').length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setPartitionFilter('PYQ')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  partitionFilter === 'PYQ'
-                    ? 'bg-white text-purple-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-purple-600" />
-                ★ Official PYQs ({partitions.filter(p => p.category === 'PYQ').length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setPartitionFilter('MOCK')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                  partitionFilter === 'MOCK'
-                    ? 'bg-white text-blue-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <span className="w-2 h-2 rounded-full bg-blue-600" />
-                🎯 Mock Sessions ({partitions.filter(p => p.category === 'MOCK').length})
-              </button>
-            </div>
-
-            <div className="relative md:w-64">
-              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="Filter partitions by title, year..."
-                value={partitionSearch}
-                onChange={(e) => setPartitionSearch(e.target.value)}
-                className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-            </div>
-          </div>
-
-          {/* Grouped Partitions Layout */}
-          {partitionFilter === 'ALL' && !partitionSearch.trim() ? (
-            <div className="space-y-3 pt-1">
-              {/* 1. Global Repository */}
-              <div>
-                <button
-                  type="button"
-                  onClick={() => setActivePartitionId('ALL')}
-                  className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between sm:justify-start gap-3 border ${
-                    activePartitionId === 'ALL'
-                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-300'
-                      : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span>Master Question Bank (All Questions)</span>
-                  </div>
-                  <span className={`text-[10px] px-2 py-0.5 rounded font-semibold ${activePartitionId === 'ALL' ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-200 text-slate-700'}`}>
-                    Complete Repository
-                  </span>
-                </button>
-              </div>
-
-              {/* 2. Target Banking Examinations & Architectures (Includes exams created by admin) */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-900">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                    Target Banking Examinations & Architectures ({partitions.filter(p => p.category === 'EXAM').length})
-                  </div>
-                  <span className="text-[10px] text-slate-400 font-medium">
-                    Includes all exams created by admin
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {partitions.filter(p => p.category === 'EXAM').map(partition => {
-                    const isActive = activePartitionId === partition.id;
-                    const isDraft = partition.status === 'created';
-                    return (
-                      <div
-                        key={partition.id}
-                        className={`inline-flex items-center rounded-xl text-xs font-semibold transition-all border shadow-2xs ${
-                          isActive
-                            ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-300'
-                            : isDraft
-                            ? 'bg-amber-50/80 hover:bg-amber-100 text-amber-950 border-amber-300'
-                            : 'bg-emerald-50/70 hover:bg-emerald-100/90 text-emerald-950 border-emerald-200'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setActivePartitionId(partition.id)}
-                          className="px-3 py-2 flex items-center gap-2 text-left cursor-pointer"
-                        >
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : isDraft ? 'bg-amber-500' : 'bg-emerald-600'}`} />
-                          <span>{partition.label}</span>
-                          {isDraft ? (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-black ${isActive ? 'bg-amber-300 text-amber-950' : 'bg-amber-200 text-amber-900'}`}>
-                              Draft
-                            </span>
-                          ) : (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isActive ? 'bg-emerald-900 text-emerald-100' : 'bg-emerald-200/80 text-emerald-900'}`}>
-                              {partition.badge}
-                            </span>
-                          )}
-                        </button>
-                        {isDraft && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              startTransition(async () => {
-                                const isExam = partition.category === 'EXAM' || partition.id.startsWith('exam-');
-                                const res = isExam
-                                  ? await toggleExamPublishAction(partition.id, 'published')
-                                  : await toggleMockTestPublishAction(partition.id, 'published');
-                                if (res?.success) {
-                                  setFeedback({
-                                    text: `Exam "${partition.label}" has been published and is now live for students!`,
-                                    type: 'success',
-                                  });
-                                  const [freshParts, freshExams] = await Promise.all([
-                                    getAdminPartitions(),
-                                    getAdminExams(),
-                                  ]);
-                                  if (freshParts) setPartitions(freshParts);
-                                  if (freshExams) setExams(freshExams);
-                                }
-                              });
-                            }}
-                            className={`px-2 py-2 text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer border-l flex items-center gap-1 ${
-                              isActive
-                                ? 'border-emerald-600/60 text-emerald-200 hover:text-white hover:bg-emerald-800'
-                                : 'border-amber-200 text-amber-700 hover:text-emerald-700 hover:bg-emerald-50'
-                            }`}
-                            title="Click to publish exam immediately so students can view it"
-                          >
-                            <Globe className="w-3 h-3" />
-                            Publish
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditPartitionModal(partition);
-                          }}
-                          className={`px-2 py-2 transition-colors cursor-pointer border-l ${
-                            isActive
-                              ? 'border-emerald-600/60 text-emerald-200 hover:text-white hover:bg-emerald-800/50'
-                              : 'border-emerald-200/70 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50/60'
-                          }`}
-                          title={`Edit title of ${partition.label}`}
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeletingPartition(partition);
-                            setIsDeletePartitionModalOpen(true);
-                          }}
-                          className={`pr-2.5 pl-1.5 py-2 transition-colors cursor-pointer border-l ${
-                            isActive
-                              ? 'border-emerald-600/60 text-emerald-200 hover:text-red-200 hover:bg-emerald-800/50'
-                              : 'border-emerald-200/70 text-slate-400 hover:text-red-600 hover:bg-red-50/60'
-                          }`}
-                          title={`Delete ${partition.label} and all questions in it`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 2. Official Previous Year Papers */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-purple-900">
-                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                  Official Previous Year Question Papers (PYQs)
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {partitions.filter(p => p.category === 'PYQ').map(partition => {
-                    const isActive = activePartitionId === partition.id;
-                    return (
-                      <div
-                        key={partition.id}
-                        className={`inline-flex items-center rounded-xl text-xs font-semibold transition-all border shadow-2xs ${
-                          isActive
-                            ? 'bg-purple-700 text-white border-purple-700 shadow-xs ring-2 ring-purple-300'
-                            : 'bg-purple-50/60 hover:bg-purple-100/90 text-purple-900 border-purple-200'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setActivePartitionId(partition.id)}
-                          className="px-3 py-2 flex items-center gap-2 text-left cursor-pointer"
-                        >
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : 'bg-purple-600'}`} />
-                          <span>{partition.label}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isActive ? 'bg-purple-800 text-purple-100' : 'bg-purple-200/80 text-purple-800'}`}>
-                            {partition.badge}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditPartitionModal(partition);
-                          }}
-                          className={`px-2 py-2 transition-colors cursor-pointer border-l ${
-                            isActive
-                              ? 'border-purple-600/60 text-purple-200 hover:text-white hover:bg-purple-800/50'
-                              : 'border-purple-200/70 text-purple-400 hover:text-purple-700 hover:bg-purple-50/60'
-                          }`}
-                          title={`Edit title of ${partition.label}`}
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeletingPartition(partition);
-                            setIsDeletePartitionModalOpen(true);
-                          }}
-                          className={`pr-2.5 pl-1.5 py-2 transition-colors cursor-pointer border-l ${
-                            isActive
-                              ? 'border-purple-600/60 text-purple-200 hover:text-red-200 hover:bg-purple-800/50'
-                              : 'border-purple-200/70 text-purple-400 hover:text-red-600 hover:bg-red-50/60'
-                          }`}
-                          title={`Delete ${partition.label} and all questions in it`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 3. Dedicated Mock Exam Sessions */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
-                <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-blue-900">
-                  <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                  Dedicated Mock Exam Sessions
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {partitions.filter(p => p.category === 'MOCK').map(partition => {
-                    const isActive = activePartitionId === partition.id;
-                    return (
-                      <div
-                        key={partition.id}
-                        className={`inline-flex items-center rounded-xl text-xs font-semibold transition-all border shadow-2xs ${
-                          isActive
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs ring-2 ring-blue-300'
-                            : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => setActivePartitionId(partition.id)}
-                          className="px-3 py-2 flex items-center gap-2 text-left cursor-pointer"
-                        >
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : 'bg-blue-500'}`} />
-                          <span>{partition.label}</span>
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isActive ? 'bg-blue-700 text-blue-100' : 'bg-slate-200 text-slate-700'}`}>
-                            {partition.badge}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditPartitionModal(partition);
-                          }}
-                          className={`px-2 py-2 transition-colors cursor-pointer border-l ${
-                            isActive
-                              ? 'border-blue-500/60 text-blue-200 hover:text-white hover:bg-blue-700/50'
-                              : 'border-slate-200 text-slate-400 hover:text-blue-700 hover:bg-blue-50/60'
-                          }`}
-                          title={`Edit title of ${partition.label}`}
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeletingPartition(partition);
-                            setIsDeletePartitionModalOpen(true);
-                          }}
-                          className={`pr-2.5 pl-1.5 py-2 transition-colors cursor-pointer border-l ${
-                            isActive
-                              ? 'border-blue-500/60 text-blue-200 hover:text-red-200 hover:bg-blue-700/50'
-                              : 'border-slate-200 text-slate-400 hover:text-red-600 hover:bg-red-50/60'
-                          }`}
-                          title={`Delete ${partition.label} and all questions in it`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2 pt-1">
-              {partitions
-                .filter(p => {
-                  if (partitionFilter !== 'ALL' && p.category !== partitionFilter && p.id !== 'ALL') return false;
-                  if (!partitionSearch.trim()) return true;
-                  const q = partitionSearch.toLowerCase();
-                  return (
-                    p.label.toLowerCase().includes(q) ||
-                    p.title.toLowerCase().includes(q) ||
-                    p.badge.toLowerCase().includes(q) ||
-                    (p.pyqYear && String(p.pyqYear).includes(q))
-                  );
-                })
-                .map(partition => {
-                  const isActive = activePartitionId === partition.id;
-                  return (
-                    <div
-                      key={partition.id}
-                      className={`inline-flex items-center rounded-xl text-xs font-semibold transition-all border shadow-2xs ${
-                        isActive
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs ring-2 ring-indigo-300'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setActivePartitionId(partition.id)}
-                        className="px-3.5 py-2 flex items-center gap-2 text-left cursor-pointer"
-                      >
-                        {partition.category === 'EXAM' && (
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : partition.status === 'created' ? 'bg-amber-500' : 'bg-emerald-600'}`} />
-                        )}
-                        {partition.category === 'PYQ' && (
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : 'bg-purple-600'}`} />
-                        )}
-                        {partition.category === 'MOCK' && (
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? 'bg-amber-300' : 'bg-blue-500'}`} />
-                        )}
-                        <span>{partition.label}</span>
-                        {partition.status === 'created' ? (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded font-black bg-amber-400 text-amber-950">
-                            Draft
-                          </span>
-                        ) : (
-                          <span
-                            className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                              isActive ? 'bg-indigo-700 text-indigo-100' : 'bg-slate-200 text-slate-700'
-                            }`}
-                          >
-                            {partition.badge}
-                          </span>
-                        )}
-                      </button>
-                      {partition.status === 'created' && partition.id !== 'ALL' && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            startTransition(async () => {
-                              const isExam = partition.category === 'EXAM' || partition.id.startsWith('exam-');
-                              const res = isExam
-                                ? await toggleExamPublishAction(partition.id, 'published')
-                                : await toggleMockTestPublishAction(partition.id, 'published');
-                              if (res?.success) {
-                                setFeedback({
-                                  text: `Exam "${partition.label}" has been published and is now live for students!`,
-                                  type: 'success',
-                                });
-                                const [freshParts, freshExams] = await Promise.all([
-                                  getAdminPartitions(),
-                                  getAdminExams(),
-                                ]);
-                                if (freshParts) setPartitions(freshParts);
-                                if (freshExams) setExams(freshExams);
-                              }
-                            });
-                          }}
-                          className={`px-2 py-2 text-[10px] font-black uppercase tracking-wider transition-colors cursor-pointer border-l flex items-center gap-1 ${
-                            isActive
-                              ? 'border-indigo-500/60 text-amber-200 hover:text-white hover:bg-indigo-800'
-                              : 'border-slate-200 text-amber-700 hover:text-emerald-700 hover:bg-emerald-50'
-                          }`}
-                          title="Click to publish immediately so students can view it"
-                        >
-                          <Globe className="w-3 h-3" />
-                          Publish
-                        </button>
-                      )}
-                      {partition.id !== 'ALL' && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEditPartitionModal(partition);
-                          }}
-                          className={`px-2 py-2 transition-colors cursor-pointer border-l ${
-                            isActive
-                              ? 'border-indigo-500/60 text-indigo-200 hover:text-white hover:bg-indigo-700/50'
-                              : 'border-slate-200 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/60'
-                          }`}
-                          title={`Edit title of ${partition.label}`}
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      {partition.id !== 'ALL' && (
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeletingPartition(partition);
-                            setIsDeletePartitionModalOpen(true);
-                          }}
-                          className={`pr-2.5 pl-1.5 py-2 transition-colors cursor-pointer border-l ${
-                            isActive
-                              ? 'border-indigo-500/60 text-indigo-200 hover:text-red-200 hover:bg-indigo-700/50'
-                              : 'border-slate-200 text-slate-400 hover:text-red-600 hover:bg-red-50/60'
-                          }`}
-                          title={`Delete ${partition.label} and all questions in it`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-            </div>
-          )}
-        </div>
-
-        {/* Exam Partition Banner (When specific exam selected) */}
-        {activePartitionId !== 'ALL' && (
-          <div className="bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="space-y-2 max-w-3xl">
+        {/* 1. Executive Active Scope Command Center */}
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-5 sm:p-6 text-white shadow-lg border border-slate-800 space-y-4">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div className="space-y-1.5 max-w-3xl">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="bg-amber-400 text-amber-950 text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md shadow-xs">
-                  {activePartition.category === 'PYQ' ? 'Official Previous Year Paper' : activePartition.category === 'EXAM' ? 'Target Examination' : 'Fixed Exam Session'}
+                <span className={`text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md shadow-xs ${
+                  activePartitionId === 'ALL'
+                    ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-400/30'
+                    : activePartition.category === 'EXAM'
+                    ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-400/30'
+                    : activePartition.category === 'PYQ'
+                    ? 'bg-purple-500/20 text-purple-300 border border-purple-400/30'
+                    : 'bg-blue-500/20 text-blue-300 border border-blue-400/30'
+                }`}>
+                  {activePartitionId === 'ALL'
+                    ? '🌐 Complete Question Bank'
+                    : activePartition.category === 'PYQ'
+                    ? '📜 Official Previous Year Paper'
+                    : activePartition.category === 'EXAM'
+                    ? '🏛️ Target Examination Category'
+                    : '⏱️ Fixed Mock Exam Session'}
                 </span>
-                {activePartition.status === 'created' ? (
-                  <span className="bg-amber-500 text-amber-950 text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md shadow-xs flex items-center gap-1">
-                    <EyeOff className="w-3 h-3" /> Created (Draft - Hidden)
-                  </span>
-                ) : (
-                  <span className="bg-emerald-500 text-white text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md shadow-xs flex items-center gap-1">
-                    <Globe className="w-3 h-3" /> Published
-                  </span>
+
+                {activePartitionId !== 'ALL' && (
+                  activePartition.status === 'created' ? (
+                    <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                      <EyeOff className="w-3 h-3 text-amber-300" /> Draft (Hidden from students)
+                    </span>
+                  ) : (
+                    <span className="bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md flex items-center gap-1">
+                      <Globe className="w-3 h-3 text-emerald-300" /> Published (Live)
+                    </span>
+                  )
                 )}
+
                 {activePartition.pyqYear && (
-                  <span className="bg-white/20 text-white text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <span className="bg-white/10 text-slate-200 border border-white/15 text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
                     <Calendar className="w-3 h-3" /> Year {activePartition.pyqYear}
                   </span>
                 )}
-                <span className="bg-indigo-700/80 text-indigo-100 text-[11px] font-semibold px-2 py-0.5 rounded-md">
-                  {questions.length} Questions (Dedicated Paper)
+
+                <span className="bg-white/10 text-indigo-200 text-[11px] font-semibold px-2 py-0.5 rounded-md">
+                  {questions.length} Questions in View
                 </span>
               </div>
 
               <div className="flex items-center gap-3 flex-wrap">
-                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  {activePartition.title}
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight flex items-center gap-2">
+                  {activePartitionId === 'ALL' ? 'Complete Question Bank Repository' : activePartition.title}
                 </h2>
-                <button
-                  type="button"
-                  onClick={() => openEditPartitionModal(activePartition)}
-                  className="px-2.5 py-1 rounded-lg bg-white/15 hover:bg-white/25 text-white transition-colors text-xs font-bold flex items-center gap-1.5 border border-white/20 shadow-xs shrink-0"
-                  title="Edit Exam / Paper Title"
-                >
-                  <Edit2 className="w-3 h-3 text-amber-300" />
-                  Edit Title
-                </button>
+                {activePartitionId !== 'ALL' && (
+                  <button
+                    type="button"
+                    onClick={() => openEditPartitionModal(activePartition)}
+                    className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-indigo-200 hover:text-white transition-colors text-xs font-bold flex items-center gap-1.5 border border-white/15 shadow-xs cursor-pointer"
+                    title="Rename Partition / Paper Title"
+                  >
+                    <Edit2 className="w-3 h-3 text-amber-300" />
+                    Rename
+                  </button>
+                )}
               </div>
 
-              <p className="text-xs sm:text-sm text-indigo-200 leading-relaxed">
-                {activePartition.description}
+              <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
+                {activePartitionId === 'ALL'
+                  ? 'All questions across all 28 partitions, subjects, and competitive exams stored in Neon PostgreSQL.'
+                  : (activePartition.description || `${activePartition.title} questions partition.`)}
               </p>
             </div>
 
-            <div className="shrink-0 flex items-center gap-2.5 flex-wrap">
-              {activePartition.status === 'created' ? (
-                <Button
-                  variant="primary"
-                  size="md"
-                  disabled={isPending}
-                  onClick={() => handleToggleActivePartitionStatus('published')}
-                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black border-none shadow-sm flex items-center gap-1.5 cursor-pointer"
-                  title="Publish this exam so students can view and attempt it"
+            {/* Quick Scope Switcher & Primary Controls */}
+            <div className="shrink-0 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full lg:w-auto">
+              {/* Quick Jump Dropdown */}
+              <div className="relative">
+                <select
+                  value={activePartitionId}
+                  onChange={(e) => setActivePartitionId(e.target.value)}
+                  className="w-full sm:w-auto bg-slate-800/90 hover:bg-slate-800 text-white border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer shadow-sm transition-all"
                 >
-                  <Globe className="w-4 h-4 text-emerald-950" /> Publish Exam
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="md"
-                  disabled={isPending}
-                  onClick={() => handleToggleActivePartitionStatus('created')}
-                  className="bg-white/10 hover:bg-amber-500/20 text-white hover:text-amber-200 border-white/30 hover:border-amber-400/50 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
-                  title="Set this exam to Draft (hide from students)"
+                  <option value="ALL">🌐 Master Repository (All Partitions)</option>
+                  <optgroup label="🏛️ Target Examinations">
+                    {partitions.filter(p => p.category === 'EXAM').map(p => (
+                      <option key={p.id} value={p.id}>
+                        🏛️ {p.label} {p.status === 'created' ? '(Draft)' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="📜 Official PYQ Papers">
+                    {partitions.filter(p => p.category === 'PYQ').map(p => (
+                      <option key={p.id} value={p.id}>
+                        📜 {p.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="⏱️ Mock Exam Sessions">
+                    {partitions.filter(p => p.category === 'MOCK').map(p => (
+                      <option key={p.id} value={p.id}>
+                        ⏱️ {p.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+
+              {/* Toggle Directory Button */}
+              <button
+                type="button"
+                onClick={() => setIsPartitionDirectoryOpen(prev => !prev)}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 hover:text-white border border-indigo-500/40 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                title={isPartitionDirectoryOpen ? 'Collapse Directory' : 'Expand Directory'}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>{isPartitionDirectoryOpen ? 'Hide Directory' : `Browse Directory (${partitions.length})`}</span>
+                {isPartitionDirectoryOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+
+              {/* All Questions Quick Return */}
+              {activePartitionId !== 'ALL' && (
+                <button
+                  type="button"
+                  onClick={() => setActivePartitionId('ALL')}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-bold transition-all cursor-pointer shadow-xs"
+                  title="Return to Master Question Bank"
                 >
-                  <EyeOff className="w-4 h-4 text-amber-300" /> Set to Draft
-                </Button>
+                  <BookOpen className="w-3.5 h-3.5 text-indigo-300" />
+                  <span>All Questions</span>
+                </button>
               )}
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => openEditPartitionModal(activePartition)}
-                className="bg-white/10 hover:bg-white/20 text-white border-white/30 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
-              >
-                <Edit2 className="w-4 h-4 text-amber-300" /> Edit Title
-              </Button>
-              <Button
-                variant="outline"
-                size="md"
-                onClick={() => setIsBulkModalOpen(true)}
-                className="bg-white/10 hover:bg-white/20 text-white border-white/30 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
-                title="Bulk import questions into this paper"
-              >
-                <Upload className="w-4 h-4" /> Bulk Import
-              </Button>
-              <Button
-                variant="danger"
-                size="md"
-                onClick={() => {
-                  setDeletingPartition(activePartition);
-                  setIsDeletePartitionModalOpen(true);
-                }}
-                className="bg-red-600 hover:bg-red-700 text-white font-bold flex items-center gap-1.5 shadow-sm cursor-pointer"
-                title="Delete this exam and all its questions from the database to save space"
-              >
-                <Trash2 className="w-4 h-4" /> Delete Exam
-              </Button>
+            </div>
+          </div>
+
+          {/* Action Row for Active Scope */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-800/80">
+            <div className="flex items-center gap-2 text-xs text-slate-300">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>
+                Scope: <strong className="text-white font-bold">{activePartitionId === 'ALL' ? 'Complete Repository' : activePartition.label}</strong>
+              </span>
+              <span className="text-slate-600">•</span>
+              <span className="text-slate-400">
+                {activePartitionId === 'ALL'
+                  ? `${partitions.length} partitions available`
+                  : activePartition.badge}
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {activePartitionId !== 'ALL' && (
+                <>
+                  {activePartition.status === 'created' ? (
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => handleToggleActivePartitionStatus('published')}
+                      className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black border-none shadow-sm flex items-center gap-1.5 cursor-pointer text-xs"
+                      title="Publish this exam so students can view and attempt it"
+                    >
+                      <Globe className="w-3.5 h-3.5 text-emerald-950" /> Publish Exam
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={isPending}
+                      onClick={() => handleToggleActivePartitionStatus('created')}
+                      className="bg-white/10 hover:bg-amber-500/20 text-white hover:text-amber-200 border-white/30 hover:border-amber-400/50 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer text-xs"
+                      title="Set this exam to Draft (hide from students)"
+                    >
+                      <EyeOff className="w-3.5 h-3.5 text-amber-300" /> Set to Draft
+                    </Button>
+                  )}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsBulkModalOpen(true)}
+                    className="bg-white/10 hover:bg-white/20 text-white border-white/30 font-bold flex items-center gap-1.5 shadow-sm cursor-pointer text-xs"
+                    title="Bulk import questions into this paper"
+                  >
+                    <Upload className="w-3.5 h-3.5" /> Bulk Import
+                  </Button>
+
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => {
+                      setDeletingPartition(activePartition);
+                      setIsDeletePartitionModalOpen(true);
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold flex items-center gap-1.5 shadow-sm cursor-pointer text-xs"
+                    title="Delete this exam and all its questions"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </Button>
+                </>
+              )}
+
               <Button
                 variant="primary"
-                size="md"
-                onClick={() => openCreateModal(activePartition)}
-                className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold border-none shadow-sm flex items-center gap-1.5 cursor-pointer"
+                size="sm"
+                onClick={() => openCreateModal(activePartitionId !== 'ALL' ? activePartition : undefined)}
+                className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black border-none shadow-sm flex items-center gap-1.5 cursor-pointer text-xs"
               >
-                <PlusCircle className="w-4 h-4" /> Add Question
+                <PlusCircle className="w-3.5 h-3.5 text-slate-950" />
+                {activePartitionId !== 'ALL' ? `Add Question to ${activePartition.label}` : 'Add Question'}
               </Button>
             </div>
+          </div>
+        </div>
+
+        {/* 2. Structured Partition Directory (Expanded / Collapsed) */}
+        {isPartitionDirectoryOpen && (
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-4">
+            {/* Directory Controls Header */}
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              {/* Category Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-1 p-1 bg-slate-100/80 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setPartitionFilter('ALL')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    partitionFilter === 'ALL'
+                      ? 'bg-white text-indigo-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  All ({partitions.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPartitionFilter('EXAM')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    partitionFilter === 'EXAM'
+                      ? 'bg-white text-emerald-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                  🏛️ Target Exams ({partitions.filter(p => p.category === 'EXAM').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPartitionFilter('PYQ')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    partitionFilter === 'PYQ'
+                      ? 'bg-white text-purple-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-purple-600" />
+                  📜 Official PYQs ({partitions.filter(p => p.category === 'PYQ').length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPartitionFilter('MOCK')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                    partitionFilter === 'MOCK'
+                      ? 'bg-white text-blue-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span className="w-2 h-2 rounded-full bg-blue-600" />
+                  ⏱️ Mock Sessions ({partitions.filter(p => p.category === 'MOCK').length})
+                </button>
+              </div>
+
+              {/* Search, View Mode, and Create Action */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="relative flex-1 sm:w-56">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search partitions..."
+                    value={partitionSearch}
+                    onChange={(e) => setPartitionSearch(e.target.value)}
+                    className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 placeholder-slate-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                  />
+                  {partitionSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setPartitionSearch('')}
+                      className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                {/* View Switcher: Grid vs Table */}
+                <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setPartitionViewMode('grid')}
+                    className={`p-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                      partitionViewMode === 'grid'
+                        ? 'bg-white text-indigo-700 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Grid Card View"
+                  >
+                    <LayoutGrid className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPartitionViewMode('table')}
+                    className={`p-1.5 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                      partitionViewMode === 'table'
+                        ? 'bg-white text-indigo-700 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800'
+                    }`}
+                    title="Compact Table View"
+                  >
+                    <List className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Create Exam / Paper */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (partitionFilter === 'PYQ') setCreatePartitionType('PYQ');
+                    else if (partitionFilter === 'MOCK') setCreatePartitionType('MOCK');
+                    else setCreatePartitionType('EXAM');
+                    setIsCreatePyqModalOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 text-xs font-bold border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 shrink-0 shadow-xs cursor-pointer"
+                >
+                  <PlusCircle className="w-3.5 h-3.5 text-indigo-600" />
+                  + New Exam / Paper
+                </Button>
+              </div>
+            </div>
+
+            {/* Directory Cards Grid */}
+            {partitionViewMode === 'grid' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
+                {/* Global Master Card */}
+                {(!partitionSearch.trim() && (partitionFilter === 'ALL')) && (
+                  <div
+                    onClick={() => setActivePartitionId('ALL')}
+                    className={`p-4 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                      activePartitionId === 'ALL'
+                        ? 'bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-500 ring-2 ring-indigo-400 shadow-sm'
+                        : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 hover:shadow-2xs'
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                          Master Repository
+                        </span>
+                        {activePartitionId === 'ALL' && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-600 text-white flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Active
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-bold text-sm text-slate-900">
+                        Master Question Bank
+                      </h4>
+                      <p className="text-[11px] text-slate-500 line-clamp-2">
+                        Complete database repository containing all practice and official questions across all exam categories.
+                      </p>
+                    </div>
+                    <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                      <span>{partitions.length - 1} Partitions</span>
+                      <span className="text-indigo-600 font-bold">Select All →</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Filtered Partition Cards */}
+                {filteredPartitions.map((partition) => {
+                  if (partition.id === 'ALL') return null;
+                  const isActive = activePartitionId === partition.id;
+                  const isDraft = partition.status === 'created';
+
+                  return (
+                    <div
+                      key={partition.id}
+                      onClick={() => setActivePartitionId(partition.id)}
+                      className={`group relative p-3.5 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between ${
+                        isActive
+                          ? 'bg-indigo-50/70 border-indigo-500 ring-2 ring-indigo-400 shadow-sm'
+                          : isDraft
+                          ? 'bg-amber-50/40 hover:bg-amber-50/80 border-amber-200/80 hover:border-amber-300 hover:shadow-2xs'
+                          : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 hover:shadow-2xs'
+                      }`}
+                    >
+                      <div className="space-y-2">
+                        {/* Card Header Chips & Actions */}
+                        <div className="flex items-center justify-between gap-1.5">
+                          <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded ${
+                            partition.category === 'EXAM'
+                              ? 'bg-emerald-100 text-emerald-800'
+                              : partition.category === 'PYQ'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {partition.category === 'EXAM' ? 'Target Exam' : partition.category === 'PYQ' ? 'Official PYQ' : 'Mock Test'}
+                          </span>
+
+                          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                            {isDraft ? (
+                              <button
+                                type="button"
+                                onClick={() => handleQuickPublishPartition(partition)}
+                                className="text-[10px] px-1.5 py-0.5 rounded font-black bg-amber-400 hover:bg-emerald-500 text-amber-950 hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                                title="Click to publish immediately"
+                              >
+                                <Globe className="w-2.5 h-2.5" /> Draft
+                              </button>
+                            ) : (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                                Live
+                              </span>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => openEditPartitionModal(partition)}
+                              className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors cursor-pointer"
+                              title="Rename Partition Title"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeletingPartition(partition);
+                                setIsDeletePartitionModalOpen(true);
+                              }}
+                              className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                              title="Delete Partition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Title */}
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-900 group-hover:text-indigo-700 transition-colors line-clamp-2 leading-snug">
+                            {partition.label}
+                          </h4>
+                          {partition.pyqYear && (
+                            <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded inline-block mt-1">
+                              Paper Year {partition.pyqYear}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card Footer */}
+                      <div className="pt-2.5 mt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+                        <span className="font-semibold text-slate-600">
+                          {partition.badge}
+                        </span>
+                        {isActive ? (
+                          <span className="font-bold text-indigo-700 flex items-center gap-1">
+                            <Check className="w-3 h-3" /> Selected
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 group-hover:text-indigo-600 transition-colors">
+                            Select →
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              /* Compact Table View */
+              <div className="overflow-x-auto rounded-xl border border-slate-200">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                      <th className="py-2.5 px-3">Partition Title</th>
+                      <th className="py-2.5 px-3">Category</th>
+                      <th className="py-2.5 px-3">Questions & Badge</th>
+                      <th className="py-2.5 px-3 text-center">Status</th>
+                      <th className="py-2.5 px-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-slate-700">
+                    {/* All Questions Row */}
+                    <tr
+                      onClick={() => setActivePartitionId('ALL')}
+                      className={`cursor-pointer transition-colors ${
+                        activePartitionId === 'ALL' ? 'bg-indigo-50/80 font-bold text-indigo-950' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <td className="py-2.5 px-3 font-bold text-slate-900 flex items-center gap-2">
+                        <BookOpen className="w-4 h-4 text-indigo-600" />
+                        Master Question Bank (All Questions)
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                          Repository
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-semibold text-slate-600">
+                        Complete Database ({partitions.length - 1} Partitions)
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                          Live
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right">
+                        <span className="text-indigo-600 font-bold text-xs">
+                          {activePartitionId === 'ALL' ? '● Active' : 'Open'}
+                        </span>
+                      </td>
+                    </tr>
+
+                    {filteredPartitions.filter(p => p.id !== 'ALL').map((partition) => {
+                      const isActive = activePartitionId === partition.id;
+                      const isDraft = partition.status === 'created';
+
+                      return (
+                        <tr
+                          key={partition.id}
+                          onClick={() => setActivePartitionId(partition.id)}
+                          className={`cursor-pointer transition-colors ${
+                            isActive ? 'bg-indigo-50/80 font-bold text-indigo-950' : 'hover:bg-slate-50'
+                          }`}
+                        >
+                          <td className="py-2.5 px-3">
+                            <div className="font-bold text-slate-900">{partition.label}</div>
+                            {partition.pyqYear && (
+                              <div className="text-[10px] text-purple-700 font-semibold">Year {partition.pyqYear}</div>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                              partition.category === 'EXAM'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : partition.category === 'PYQ'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {partition.category}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-medium text-slate-600">
+                            {partition.badge}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            {isDraft ? (
+                              <span className="text-[10px] font-black text-amber-900 bg-amber-200 px-2 py-0.5 rounded">
+                                Draft
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                                Published
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3 text-right" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => openEditPartitionModal(partition)}
+                                className="p-1 rounded text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 cursor-pointer"
+                                title="Rename Title"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeletingPartition(partition);
+                                  setIsDeletePartitionModalOpen(true);
+                                }}
+                                className="p-1 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 cursor-pointer"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {filteredPartitions.length === 0 && (
+              <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                <p className="text-xs font-semibold text-slate-600">No partitions match your filter or search.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPartitionFilter('ALL');
+                    setPartitionSearch('');
+                  }}
+                  className="mt-2 text-xs font-bold text-indigo-600 hover:underline cursor-pointer"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            )}
           </div>
         )}
 
