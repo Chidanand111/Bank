@@ -646,18 +646,45 @@ export async function getAdminPartitions(): Promise<AdminPartitionInfo[]> {
     description: `All practice and dedicated questions mapped to ${e.title}.`,
   }));
 
-  const testPartitions: AdminPartitionInfo[] = allTests.map(t => ({
-    id: t.id,
-    label: t.isPyq ? (t.year ? `${t.examTitle.split('(')[0].trim()} ${t.year} PYQ` : t.title) : t.title,
-    badge: t.isPyq ? `Official Paper (${t.totalQuestions} Qs)` : `Fixed Exam (${t.totalQuestions} Qs)`,
-    title: t.title,
-    isPyq: Boolean(t.isPyq),
-    pyqYear: t.year,
-    examId: t.examId,
-    category: t.isPyq ? 'PYQ' : 'MOCK',
-    status: t.status || 'published',
-    description: t.description || `${t.title} with dedicated questions.`,
-  }));
+  const seedPyqLabels: Record<string, string> = {
+    'mock-sbi-clerk-2024-pyq': 'SBI Clerk 2024 PYQ',
+    'mock-sbi-clerk-2023-pyq': 'SBI Clerk 2023-24 PYQ',
+    'mock-ibps-po-2025-pyq': 'IBPS PO 2025 PYQ',
+    'mock-ibps-po-2025-mains-pyq': 'IBPS PO 2025 Mains PYQ',
+    'mock-ibps-po-2024-pyq': 'IBPS PO 2024 PYQ',
+    'mock-ibps-po-2023-pyq': 'IBPS PO 2023 PYQ',
+  };
+
+  const testPartitions: AdminPartitionInfo[] = allTests.map(t => {
+    // Only untouched legacy seed mock tests retain their concise seed pill labels
+    const isSeedWithDefaultTitle =
+      Boolean(seedPyqLabels[t.id]) &&
+      (t.title === 'SBI Clerk Prelims 2024 - Previous Year Question Paper' ||
+        t.title === 'SBI Clerk Prelims 2023-24 - Previous Year Question Paper' ||
+        t.title === 'IBPS PO Prelims 2025 - Previous Year Question Paper' ||
+        t.title === 'IBPS PO Mains 2025 - Previous Year Question Paper' ||
+        t.title === 'IBPS PO Prelims 2024 - Previous Year Question Paper' ||
+        t.title === 'IBPS PO Prelims 2023 - Previous Year Question Paper');
+
+    // For all user-created exams, custom papers, edited titles, and newly created PYQs:
+    // ALWAYS PRESERVE AND DISPLAY THE GIVEN TITLE (t.title)
+    const label = isSeedWithDefaultTitle
+      ? seedPyqLabels[t.id]
+      : (t.title?.trim() || (t.isPyq && t.year ? `${t.examTitle.split('(')[0].trim()} ${t.year} PYQ` : t.title));
+
+    return {
+      id: t.id,
+      label,
+      badge: t.isPyq ? `Official Paper (${t.totalQuestions} Qs)` : `Fixed Exam (${t.totalQuestions} Qs)`,
+      title: t.title,
+      isPyq: Boolean(t.isPyq),
+      pyqYear: t.year,
+      examId: t.examId,
+      category: t.isPyq ? 'PYQ' : 'MOCK',
+      status: t.status || 'published',
+      description: t.description || `${t.title} with dedicated questions.`,
+    };
+  });
 
   const map = new Map<string, AdminPartitionInfo>();
   for (const p of [...basePartitions, ...examPartitions, ...testPartitions]) {

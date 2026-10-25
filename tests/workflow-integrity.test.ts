@@ -7,6 +7,7 @@ import {
   createMockTestAction,
   deleteMockTestAction,
   toggleMockTestPublishAction,
+  getAdminPartitions,
 } from '@/lib/services/mockTestService';
 import {
   createExamAction,
@@ -240,6 +241,83 @@ describe('Admin & Student Workflow Integrity: Error Propagation & Historical Pro
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('Database write permission denied');
+    });
+
+    it('preserves exact user-given titles for custom partitions without overriding to "IBPS PO 2026 PYQ"', async () => {
+      mockPrisma.exam.findMany.mockResolvedValue([
+        {
+          id: 'exam-ibps-po',
+          title: 'IBPS PO (Probationary Officer)',
+          slug: 'ibps-po',
+          description: 'Official',
+          isActive: true,
+          sections: [],
+          mockTests: [],
+        },
+      ]);
+
+      mockPrisma.mockTest.findMany.mockResolvedValue([
+        {
+          id: 'mock-sbi-clerk-2024-pyq',
+          title: 'SBI Clerk Prelims 2024 - Previous Year Question Paper',
+          slug: 'sbi-clerk-prelims-2024-pyq',
+          description: '',
+          durationMinutes: 60,
+          totalMarks: 100,
+          cutoffMarks: 70,
+          isPublished: true,
+          isPyq: true,
+          year: 2024,
+          examId: 'exam-sbi-clerk',
+          exam: { title: 'SBI Clerk', sections: [] },
+          mockTestQuestions: [],
+        },
+        {
+          id: 'mock-custom-given-title',
+          title: 'Custom Live Prelims Shift 3 Special',
+          slug: 'custom-live-prelims-shift-3-special',
+          description: '',
+          durationMinutes: 60,
+          totalMarks: 100,
+          cutoffMarks: 65,
+          isPublished: true,
+          isPyq: true,
+          year: 2026,
+          examId: 'exam-ibps-po',
+          exam: { title: 'IBPS PO (Probationary Officer)', sections: [] },
+          mockTestQuestions: [],
+        },
+        {
+          id: 'mock-custom-mock-session',
+          title: 'Full Mock Speed Test 12',
+          slug: 'full-mock-speed-test-12',
+          description: '',
+          durationMinutes: 60,
+          totalMarks: 100,
+          cutoffMarks: 50,
+          isPublished: true,
+          isPyq: false,
+          year: 2026,
+          examId: 'exam-ibps-po',
+          exam: { title: 'IBPS PO (Probationary Officer)', sections: [] },
+          mockTestQuestions: [],
+        },
+      ]);
+
+      const partitions = await getAdminPartitions();
+
+      // Seed retains concise label
+      const seed = partitions.find(p => p.id === 'mock-sbi-clerk-2024-pyq');
+      expect(seed?.label).toBe('SBI Clerk 2024 PYQ');
+
+      // Custom PYQ preserves exact user title and does NOT become "IBPS PO 2026 PYQ"
+      const customPyq = partitions.find(p => p.id === 'mock-custom-given-title');
+      expect(customPyq?.label).toBe('Custom Live Prelims Shift 3 Special');
+      expect(customPyq?.label).not.toBe('IBPS PO 2026 PYQ');
+
+      // Custom Mock preserves exact user title
+      const customMock = partitions.find(p => p.id === 'mock-custom-mock-session');
+      expect(customMock?.label).toBe('Full Mock Speed Test 12');
     });
   });
 

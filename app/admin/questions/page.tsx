@@ -8,6 +8,8 @@ import {
   deleteQuestionAction,
   getAdminPartitions,
   getAdminExams,
+  createExamAction,
+  updateExamTitleAction,
   createMockTestAction,
   updateMockTestTitleAction,
   deleteMockTestAction,
@@ -389,6 +391,7 @@ export default function AdminQuestionsPage() {
 
   // Create Exam / PYQ Modal States
   const [isCreatePyqModalOpen, setIsCreatePyqModalOpen] = useState(false);
+  const [createPartitionType, setCreatePartitionType] = useState<'EXAM' | 'PYQ' | 'MOCK'>('EXAM');
   const [pyqTitle, setPyqTitle] = useState('');
   const [pyqExamId, setPyqExamId] = useState('exam-ibps-po');
   const [pyqCustomExamTitle, setPyqCustomExamTitle] = useState('');
@@ -397,7 +400,7 @@ export default function AdminQuestionsPage() {
   const [pyqDuration, setPyqDuration] = useState(60);
   const [pyqMarks, setPyqMarks] = useState(100);
   const [pyqCutoff, setPyqCutoff] = useState(60);
-  const [pyqDescription, setPyqDescription] = useState('Authentic Previous Year Question Paper with official questions.');
+  const [pyqDescription, setPyqDescription] = useState('');
   const [pyqPreset, setPyqPreset] = useState<ExamPresetKey>('PRELIMS_3');
 
   // Auto-adjust timing, marks, and cutoffs when exam preset changes
@@ -513,6 +516,50 @@ export default function AdminQuestionsPage() {
   const handleCreatePyqFromModal = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const trimmedTitle = pyqTitle.trim();
+    if (!trimmedTitle) {
+      setFeedback({ text: 'Please enter a title for the exam / paper.', type: 'error' });
+      return;
+    }
+
+    // 1. If admin is creating a Target Banking Examination Architecture
+    if (createPartitionType === 'EXAM') {
+      startTransition(async () => {
+        const res = await createExamAction({
+          title: trimmedTitle,
+          category: pyqCustomExamCategory,
+          description: pyqDescription.trim() || `${trimmedTitle} Recruitment Examination`,
+          status: 'published',
+        });
+
+        if (res.success && res.exam) {
+          const [parts, freshExams] = await Promise.all([
+            getAdminPartitions(),
+            getAdminExams(),
+          ]);
+          if (parts) setPartitions(parts);
+          if (freshExams) setExams(freshExams);
+          setActivePartitionId(res.exam.id);
+          setIsCreatePyqModalOpen(false);
+          setPromptExamTitle(res.exam.title);
+          setPromptTargetPartitionId(res.exam.id);
+          setIsPromptOpen(true);
+          setPyqTitle('');
+          setPyqCustomExamTitle('');
+          setPyqDescription('');
+          setFeedback({
+            text: `Target Examination "${res.exam.title}" created successfully and published!`,
+            type: 'success',
+          });
+        } else {
+          setFeedback({ text: res.error || 'Failed to create exam category.', type: 'error' });
+        }
+      });
+      return;
+    }
+
+    // 2. If admin is creating a PYQ Paper or Dedicated Mock Session
+    const isPyqType = createPartitionType === 'PYQ';
     const config = EXAM_PRESETS[pyqPreset] || EXAM_PRESETS.PRELIMS_3;
 
     let sections = config.sections.map((s) => ({
@@ -531,10 +578,13 @@ export default function AdminQuestionsPage() {
       ];
     }
 
+    const baseSlug = trimmedTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const uniqueSlug = `${baseSlug}-${Date.now().toString(36)}${isPyqType ? '-pyq' : ''}`;
+
     const inputData: AdminMockTestInput = {
-      title: pyqTitle.trim(),
-      slug: pyqTitle.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-pyq',
-      description: pyqDescription.trim(),
+      title: trimmedTitle,
+      slug: uniqueSlug,
+      description: pyqDescription.trim() || `${trimmedTitle} Examination Paper`,
       examId: pyqExamId === '__NEW_EXAM__' ? 'exam-custom' : pyqExamId,
       customExamTitle: pyqExamId === '__NEW_EXAM__' ? pyqCustomExamTitle.trim() : undefined,
       customExamCategory: pyqExamId === '__NEW_EXAM__' ? pyqCustomExamCategory : undefined,
@@ -542,8 +592,8 @@ export default function AdminQuestionsPage() {
       totalMarks: Number(pyqMarks),
       cutoffMarks: Number(pyqCutoff),
       isFree: true,
-      isPyq: true,
-      year: pyqYear !== '' ? Number(pyqYear) : new Date().getFullYear(),
+      isPyq: isPyqType,
+      year: isPyqType ? (pyqYear !== '' ? Number(pyqYear) : new Date().getFullYear()) : null,
       timerType: config.timerType,
       allowSectionSwitch: config.allowSectionSwitch,
       negativeMarkRatio: config.negativeMarkRatio,
@@ -569,8 +619,13 @@ export default function AdminQuestionsPage() {
         setIsPromptOpen(true);
         setPyqTitle('');
         setPyqCustomExamTitle('');
+        setPyqDescription('');
+        setFeedback({
+          text: `Paper "${res.test.title}" created successfully and published!`,
+          type: 'success',
+        });
       } else {
-        setFeedback({ text: res.error || 'Failed to create PYQ paper.', type: 'error' });
+        setFeedback({ text: res.error || 'Failed to create paper.', type: 'error' });
       }
     });
   };
@@ -994,17 +1049,28 @@ export default function AdminQuestionsPage() {
               variant="outline"
               size="sm"
               onClick={() => {
+                if (partitionFilter === 'PYQ') {
+                  setCreatePartitionType('PYQ');
+                } else if (partitionFilter === 'MOCK') {
+                  setCreatePartitionType('MOCK');
+                } else {
+                  setCreatePartitionType('EXAM');
+                }
                 if (exams.length > 0) {
-                  const currExam = exams.find(e => e.id === pyqExamId) || exams[0];
-                  if (!pyqExamId) setPyqExamId(currExam.id);
-                  handlePyqPresetChange(detectDefaultPresetForExam(currExam.id, currExam.category));
+                  const currExam = (activePartition && activePartition.examId && activePartition.examId !== 'ALL'
+                    ? exams.find(e => e.id === activePartition.examId)
+                    : exams.find(e => e.id === pyqExamId)) || exams[0];
+                  if (currExam) {
+                    setPyqExamId(currExam.id);
+                    handlePyqPresetChange(detectDefaultPresetForExam(currExam.id, currExam.category));
+                  }
                 }
                 setIsCreatePyqModalOpen(true);
               }}
               className="flex items-center gap-1.5 text-xs font-bold border-indigo-200 bg-indigo-50/70 text-indigo-700 hover:bg-indigo-100 shrink-0 shadow-xs"
             >
               <PlusCircle className="w-3.5 h-3.5 text-indigo-600" />
-              + Create New Exam
+              + Create New Exam / Paper
             </Button>
           </div>
 
@@ -1178,6 +1244,21 @@ export default function AdminQuestionsPage() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            openEditPartitionModal(partition);
+                          }}
+                          className={`px-2 py-2 transition-colors cursor-pointer border-l ${
+                            isActive
+                              ? 'border-emerald-600/60 text-emerald-200 hover:text-white hover:bg-emerald-800/50'
+                              : 'border-emerald-200/70 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50/60'
+                          }`}
+                          title={`Edit title of ${partition.label}`}
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setDeletingPartition(partition);
                             setIsDeletePartitionModalOpen(true);
                           }}
@@ -1229,6 +1310,21 @@ export default function AdminQuestionsPage() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
+                            openEditPartitionModal(partition);
+                          }}
+                          className={`px-2 py-2 transition-colors cursor-pointer border-l ${
+                            isActive
+                              ? 'border-purple-600/60 text-purple-200 hover:text-white hover:bg-purple-800/50'
+                              : 'border-purple-200/70 text-purple-400 hover:text-purple-700 hover:bg-purple-50/60'
+                          }`}
+                          title={`Edit title of ${partition.label}`}
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setDeletingPartition(partition);
                             setIsDeletePartitionModalOpen(true);
                           }}
@@ -1275,6 +1371,21 @@ export default function AdminQuestionsPage() {
                           <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${isActive ? 'bg-blue-700 text-blue-100' : 'bg-slate-200 text-slate-700'}`}>
                             {partition.badge}
                           </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditPartitionModal(partition);
+                          }}
+                          className={`px-2 py-2 transition-colors cursor-pointer border-l ${
+                            isActive
+                              ? 'border-blue-500/60 text-blue-200 hover:text-white hover:bg-blue-700/50'
+                              : 'border-slate-200 text-slate-400 hover:text-blue-700 hover:bg-blue-50/60'
+                          }`}
+                          title={`Edit title of ${partition.label}`}
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           type="button"
@@ -1385,6 +1496,23 @@ export default function AdminQuestionsPage() {
                         >
                           <Globe className="w-3 h-3" />
                           Publish
+                        </button>
+                      )}
+                      {partition.id !== 'ALL' && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEditPartitionModal(partition);
+                          }}
+                          className={`px-2 py-2 transition-colors cursor-pointer border-l ${
+                            isActive
+                              ? 'border-indigo-500/60 text-indigo-200 hover:text-white hover:bg-indigo-700/50'
+                              : 'border-slate-200 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/60'
+                          }`}
+                          title={`Edit title of ${partition.label}`}
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
                         </button>
                       )}
                       {partition.id !== 'ALL' && (
@@ -2485,55 +2613,94 @@ export default function AdminQuestionsPage() {
       <Modal
         isOpen={isCreatePyqModalOpen}
         onClose={() => setIsCreatePyqModalOpen(false)}
-        title="Create New Exam / Dedicated Partition"
+        title="Create Exam / Dedicated Partition"
       >
         <form onSubmit={handleCreatePyqFromModal} className="space-y-4 text-xs">
+          {/* Segmented Type Selector */}
+          <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-xl">
+            <button
+              type="button"
+              onClick={() => {
+                setCreatePartitionType('EXAM');
+                if (pyqDescription.includes('Previous Year')) setPyqDescription('');
+              }}
+              className={`py-2 px-2 text-center rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                createPartitionType === 'EXAM'
+                  ? 'bg-white text-emerald-950 shadow-xs ring-1 ring-emerald-300'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
+              Target Exam
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCreatePartitionType('PYQ');
+                if (!pyqDescription) setPyqDescription('Authentic Previous Year Question Paper with official questions.');
+              }}
+              className={`py-2 px-2 text-center rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                createPartitionType === 'PYQ'
+                  ? 'bg-white text-purple-950 shadow-xs ring-1 ring-purple-300'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-purple-600 shrink-0" />
+              Official PYQ
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setCreatePartitionType('MOCK');
+                if (pyqDescription.includes('Previous Year')) setPyqDescription('Dedicated full-length preliminary practice mock test with sectional timers.');
+              }}
+              className={`py-2 px-2 text-center rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                createPartitionType === 'MOCK'
+                  ? 'bg-white text-blue-950 shadow-xs ring-1 ring-blue-300'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+              Mock Session
+            </button>
+          </div>
+
           <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-200 text-indigo-950 text-xs flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
             <span>
-              Create a new exam paper or official PYQ under any existing or custom exam. A dedicated partition will be created immediately, allowing you to add, manage, and curate official questions for this exact paper.
+              {createPartitionType === 'EXAM'
+                ? 'Create a Master Banking Examination Architecture. Your exact given title will appear in Target Banking Examinations and student catalogs.'
+                : createPartitionType === 'PYQ'
+                ? 'Create an Official Previous Year Question Paper. Your exact given title will appear in Official PYQs with dedicated questions.'
+                : 'Create a Dedicated Practice Mock Test Session with sectional timers, non-overlapping questions, and TCS iON palette.'}
             </span>
           </div>
 
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">
-              Select Exam or Title a New One <span className="text-red-500">*</span>
-            </label>
-            <select
-              value={pyqExamId}
-              onChange={(e) => handlePyqExamChange(e.target.value)}
-              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
-            >
-              {exams.map((ex) => (
-                <option key={ex.id} value={ex.id}>
-                  {ex.title} ({ex.category})
-                </option>
-              ))}
-              <option value="__NEW_EXAM__">+ Create New Exam (Title it anything)...</option>
-            </select>
-          </div>
-
-          {pyqExamId === '__NEW_EXAM__' && (
-            <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-3">
+          {createPartitionType === 'EXAM' ? (
+            /* --- TARGET EXAM CREATION FIELDS --- */
+            <div className="space-y-3">
               <div>
-                <label className="font-bold text-indigo-950 block mb-1">
-                  Custom Exam Title <span className="text-red-500">*</span>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Examination Name / Title <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  value={pyqCustomExamTitle}
-                  onChange={(e) => setPyqCustomExamTitle(e.target.value)}
-                  placeholder="e.g. IBPS RRB Officer Scale 1, RBI Assistant, SBI PO, LIC AAO..."
-                  className="w-full px-2.5 py-2 bg-white border border-indigo-200 rounded-lg text-xs"
+                  value={pyqTitle}
+                  onChange={(e) => setPyqTitle(e.target.value)}
+                  placeholder="e.g. RBI Grade B (Officers), SBI PO, LIC AAO, IBPS RRB Officer Scale 1"
+                  className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:bg-white"
                 />
               </div>
+
               <div>
-                <label className="font-bold text-indigo-950 block mb-1">Category</label>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Examination Category <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={pyqCustomExamCategory}
                   onChange={(e) => handlePyqCustomCategoryChange(e.target.value as any)}
-                  className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs"
+                  className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
                 >
                   <option value="PO">PO (Probationary Officer / Scale 1)</option>
                   <option value="CLERK">Clerk (Junior Associate / Assistant)</option>
@@ -2543,159 +2710,246 @@ export default function AdminQuestionsPage() {
                   <option value="OTHER">Other Banking / Insurance / Regulatory</option>
                 </select>
               </div>
-            </div>
-          )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">
-                Paper Year <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                required
-                value={pyqYear}
-                onChange={(e) => setPyqYear(e.target.value ? Number(e.target.value) : '')}
-                placeholder="e.g. 2024, 2023, 2022"
-                className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-              />
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Description / Notes</label>
+                <textarea
+                  rows={2}
+                  value={pyqDescription}
+                  onChange={(e) => setPyqDescription(e.target.value)}
+                  placeholder="Recruitment Examination for Banking Aspirants"
+                  className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                />
+              </div>
             </div>
-
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">
-                Exam Preset
-              </label>
-              <select
-                value={pyqPreset}
-                onChange={(e) => handlePyqPresetChange(e.target.value as ExamPresetKey)}
-                className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900"
-              >
-                {EXAM_PRESET_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Timing & Marks Breakdown Preview Card */}
-          {EXAM_PRESETS[pyqPreset] && (
-            <div className="p-3 bg-gradient-to-br from-slate-50 to-indigo-50/50 rounded-xl border border-indigo-100 text-xs space-y-2">
-              <div className="flex items-center justify-between flex-wrap gap-1.5">
-                <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                  <Clock className="w-3.5 h-3.5 text-indigo-600" />
-                  Section Timings & Marks Breakdown
-                </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100/90 text-indigo-800 border border-indigo-200">
-                  {EXAM_PRESETS[pyqPreset].badge}
-                </span>
+          ) : (
+            /* --- PYQ OR MOCK TEST CREATION FIELDS --- */
+            <div className="space-y-3">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Parent Exam Category <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={pyqExamId}
+                  onChange={(e) => handlePyqExamChange(e.target.value)}
+                  className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium"
+                >
+                  {exams.map((ex) => (
+                    <option key={ex.id} value={ex.id}>
+                      {ex.title} ({ex.category})
+                    </option>
+                  ))}
+                  <option value="__NEW_EXAM__">+ Create New Parent Exam (Title it anything)...</option>
+                </select>
               </div>
 
-              {EXAM_PRESETS[pyqPreset].sections.length > 0 ? (
-                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-2xs">
-                  <table className="w-full text-left border-collapse text-[11px]">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
-                        <th className="py-1.5 px-2.5">Section</th>
-                        <th className="py-1.5 px-2 text-center">Questions</th>
-                        <th className="py-1.5 px-2 text-center">Marks</th>
-                        <th className="py-1.5 px-2.5 text-right">Time Allocated</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-slate-700">
-                      {EXAM_PRESETS[pyqPreset].sections.map((sec) => (
-                        <tr key={sec.code} className="hover:bg-slate-50/60 transition-colors">
-                          <td className="py-1.5 px-2.5 font-medium text-slate-900">{sec.name}</td>
-                          <td className="py-1.5 px-2 text-center font-semibold">{sec.questionCount}</td>
-                          <td className="py-1.5 px-2 text-center font-semibold">{sec.marks}</td>
-                          <td className="py-1.5 px-2.5 text-right font-bold text-indigo-600">
-                            {sec.durationMinutes} min
-                          </td>
-                        </tr>
-                      ))}
-                      <tr className="bg-indigo-50/70 font-bold text-indigo-950 border-t border-indigo-100">
-                        <td className="py-1.5 px-2.5">Total</td>
-                        <td className="py-1.5 px-2 text-center">
-                          {EXAM_PRESETS[pyqPreset].sections.reduce((acc, s) => acc + s.questionCount, 0)}
-                        </td>
-                        <td className="py-1.5 px-2 text-center">{EXAM_PRESETS[pyqPreset].totalMarks}</td>
-                        <td className="py-1.5 px-2.5 text-right text-indigo-700">
-                          {EXAM_PRESETS[pyqPreset].totalDuration} min
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+              {pyqExamId === '__NEW_EXAM__' && (
+                <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-3">
+                  <div>
+                    <label className="font-bold text-indigo-950 block mb-1">
+                      New Parent Exam Title <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={pyqCustomExamTitle}
+                      onChange={(e) => setPyqCustomExamTitle(e.target.value)}
+                      placeholder="e.g. IBPS RRB Officer Scale 1, RBI Assistant, SBI PO, LIC AAO..."
+                      className="w-full px-2.5 py-2 bg-white border border-indigo-200 rounded-lg text-xs font-semibold"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-indigo-950 block mb-1">Category</label>
+                    <select
+                      value={pyqCustomExamCategory}
+                      onChange={(e) => handlePyqCustomCategoryChange(e.target.value as any)}
+                      className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs"
+                    >
+                      <option value="PO">PO (Probationary Officer / Scale 1)</option>
+                      <option value="CLERK">Clerk (Junior Associate / Assistant)</option>
+                      <option value="SO">SO (Specialist Officer)</option>
+                      <option value="SSC">SSC (CGL, CHSL, MTS, CPO)</option>
+                      <option value="RAILWAY">Railway (RRB NTPC, Group D, ALP)</option>
+                      <option value="OTHER">Other Banking / Insurance / Regulatory</option>
+                    </select>
+                  </div>
                 </div>
-              ) : (
-                <p className="text-[11px] text-slate-500 italic">
-                  Custom pattern: enter duration, total marks, and cutoff marks manually below.
-                </p>
               )}
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  {createPartitionType === 'PYQ' ? 'Official Paper Title' : 'Mock Test Title'}{' '}
+                  <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={pyqTitle}
+                  onChange={(e) => setPyqTitle(e.target.value)}
+                  placeholder={
+                    createPartitionType === 'PYQ'
+                      ? 'e.g. SBI Clerk Prelims 2024 Shift 1 Official Question Paper'
+                      : 'e.g. IBPS PO Prelims Speed Drill Mock 3'
+                  }
+                  className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:bg-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {createPartitionType === 'PYQ' && (
+                  <div>
+                    <label className="font-semibold text-slate-700 block mb-1">
+                      Paper Year <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      value={pyqYear}
+                      onChange={(e) => setPyqYear(e.target.value ? Number(e.target.value) : '')}
+                      placeholder="e.g. 2024, 2023, 2025"
+                      className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold"
+                    />
+                  </div>
+                )}
+
+                <div className={createPartitionType === 'PYQ' ? '' : 'sm:col-span-2'}>
+                  <label className="font-semibold text-slate-700 block mb-1">
+                    Exam Preset / Architecture
+                  </label>
+                  <select
+                    value={pyqPreset}
+                    onChange={(e) => handlePyqPresetChange(e.target.value as ExamPresetKey)}
+                    className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900"
+                  >
+                    {EXAM_PRESET_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Timing & Marks Breakdown Preview Card */}
+              {EXAM_PRESETS[pyqPreset] && (
+                <div className="p-3 bg-gradient-to-br from-slate-50 to-indigo-50/50 rounded-xl border border-indigo-100 text-xs space-y-2">
+                  <div className="flex items-center justify-between flex-wrap gap-1.5">
+                    <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-indigo-600" />
+                      Section Timings & Marks Breakdown
+                    </span>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100/90 text-indigo-800 border border-indigo-200">
+                      {EXAM_PRESETS[pyqPreset].badge}
+                    </span>
+                  </div>
+
+                  {EXAM_PRESETS[pyqPreset].sections.length > 0 ? (
+                    <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-2xs">
+                      <table className="w-full text-left border-collapse text-[11px]">
+                        <thead>
+                          <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+                            <th className="py-1.5 px-2.5">Section</th>
+                            <th className="py-1.5 px-2 text-center">Questions</th>
+                            <th className="py-1.5 px-2 text-center">Marks</th>
+                            <th className="py-1.5 px-2.5 text-right">Time Allocated</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                          {EXAM_PRESETS[pyqPreset].sections.map((sec) => (
+                            <tr key={sec.code} className="hover:bg-slate-50/60 transition-colors">
+                              <td className="py-1.5 px-2.5 font-medium text-slate-900">{sec.name}</td>
+                              <td className="py-1.5 px-2 text-center font-semibold">{sec.questionCount}</td>
+                              <td className="py-1.5 px-2 text-center font-semibold">{sec.marks}</td>
+                              <td className="py-1.5 px-2.5 text-right font-bold text-indigo-600">
+                                {sec.durationMinutes} min
+                              </td>
+                            </tr>
+                          ))}
+                          <tr className="bg-indigo-50/70 font-bold text-indigo-950 border-t border-indigo-100">
+                            <td className="py-1.5 px-2.5">Total</td>
+                            <td className="py-1.5 px-2 text-center">
+                              {EXAM_PRESETS[pyqPreset].sections.reduce((acc, s) => acc + s.questionCount, 0)}
+                            </td>
+                            <td className="py-1.5 px-2 text-center">{EXAM_PRESETS[pyqPreset].totalMarks}</td>
+                            <td className="py-1.5 px-2.5 text-right text-indigo-700">
+                              {EXAM_PRESETS[pyqPreset].totalDuration} min
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 italic">
+                      Custom pattern: enter duration, total marks, and cutoff marks manually below.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">Description / Notes</label>
+                <textarea
+                  rows={2}
+                  value={pyqDescription}
+                  onChange={(e) => setPyqDescription(e.target.value)}
+                  className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Duration (Min)</label>
+                  <input
+                    type="number"
+                    value={pyqDuration}
+                    onChange={(e) => setPyqDuration(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Total Marks</label>
+                  <input
+                    type="number"
+                    value={pyqMarks}
+                    onChange={(e) => setPyqMarks(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="font-semibold text-slate-700 block mb-1">Cutoff Marks</label>
+                  <input
+                    type="number"
+                    value={pyqCutoff}
+                    onChange={(e) => setPyqCutoff(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+              </div>
             </div>
           )}
-
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">
-              Exam Paper Title <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              required
-              value={pyqTitle}
-              onChange={(e) => setPyqTitle(e.target.value)}
-              placeholder="e.g. IBPS RRB PO 2023 Prelims - Shift 1 Official Question Paper"
-              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-            />
-          </div>
-
-          <div>
-            <label className="font-semibold text-slate-700 block mb-1">Description / Notes</label>
-            <textarea
-              required
-              rows={2}
-              value={pyqDescription}
-              onChange={(e) => setPyqDescription(e.target.value)}
-              className="w-full px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-            />
-          </div>
-
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Duration (Min)</label>
-              <input
-                type="number"
-                value={pyqDuration}
-                onChange={(e) => setPyqDuration(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-              />
-            </div>
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Total Marks</label>
-              <input
-                type="number"
-                value={pyqMarks}
-                onChange={(e) => setPyqMarks(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-              />
-            </div>
-            <div>
-              <label className="font-semibold text-slate-700 block mb-1">Cutoff Marks</label>
-              <input
-                type="number"
-                value={pyqCutoff}
-                onChange={(e) => setPyqCutoff(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-              />
-            </div>
-          </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
             <Button variant="secondary" size="md" type="button" onClick={() => setIsCreatePyqModalOpen(false)}>
               Cancel
             </Button>
-            <Button variant="primary" size="md" type="submit" isLoading={isPending} className="bg-indigo-600 hover:bg-indigo-700 font-bold">
-              Create Exam & Open Partition
+            <Button
+              variant="primary"
+              size="md"
+              type="submit"
+              isLoading={isPending}
+              className={`font-bold text-white ${
+                createPartitionType === 'EXAM'
+                  ? 'bg-emerald-600 hover:bg-emerald-700'
+                  : createPartitionType === 'PYQ'
+                  ? 'bg-purple-600 hover:bg-purple-700'
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+            >
+              {createPartitionType === 'EXAM'
+                ? 'Create Examination & Open Architecture'
+                : createPartitionType === 'PYQ'
+                ? 'Create PYQ Paper & Open Partition'
+                : 'Create Mock Test & Open Partition'}
             </Button>
           </div>
         </form>
