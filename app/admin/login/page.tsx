@@ -36,8 +36,17 @@ function AdminLoginForm() {
 
   const handleAdminDemoLogin = () => {
     setError(null);
+    setEmail('admin@bankmock.com');
+    setPassword('admin123');
+    const formData = new FormData();
+    formData.append('email', 'admin@bankmock.com');
+    formData.append('password', 'admin123');
+    formData.append('callbackUrl', callbackUrl);
     startTransition(async () => {
-      await demoAdminLoginAction();
+      const res = await adminLoginAction(null, formData);
+      if (res && !res.success && res.error) {
+        setError(res.error);
+      }
     });
   };
 

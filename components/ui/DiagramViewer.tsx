@@ -66,16 +66,45 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({
     };
   }, [isZoomOpen]);
 
+  // Normalize and validate diagram source reference
+  const normalizedSrc = React.useMemo(() => {
+    if (!src || typeof src !== 'string') return '';
+    const trimmed = src.trim();
+    if (!trimmed) return '';
+
+    // Filter out invalid dummy strings (like option letters "A", "B" or LaTeX expressions)
+    if (trimmed.length <= 4 && /^[A-E0-9]$/i.test(trimmed)) return '';
+    if (trimmed.startsWith('$') || trimmed.includes('\\frac')) return '';
+
+    // Standard valid web URL formats
+    if (
+      trimmed.startsWith('/') ||
+      trimmed.startsWith('http://') ||
+      trimmed.startsWith('https://') ||
+      trimmed.startsWith('data:image/') ||
+      trimmed.startsWith('blob:')
+    ) {
+      return trimmed;
+    }
+
+    // Bare filename fallback (e.g. "reasoning_q5_question.png") -> route to /api/media/questions/
+    if (/\.(png|jpe?g|webp|gif|svg)$/i.test(trimmed)) {
+      return `/api/media/questions/${trimmed}`;
+    }
+
+    return trimmed;
+  }, [src]);
+
   // When src changes, reset loading status
   useEffect(() => {
-    if (!src) {
+    if (!normalizedSrc) {
       setLoadStatus('error');
     } else {
       setLoadStatus('loading');
     }
-  }, [src, retryKey]);
+  }, [normalizedSrc, retryKey]);
 
-  if (!src) {
+  if (!normalizedSrc) {
     return null;
   }
 
@@ -84,6 +113,10 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({
     setLoadStatus('loading');
     setRetryKey((prev) => prev + 1);
   };
+
+  const imageSrcWithCacheBust = retryKey > 0
+    ? `${normalizedSrc}${normalizedSrc.includes('?') ? '&' : '?'}retry=${retryKey}`
+    : normalizedSrc;
 
   const zoomIn = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -145,7 +178,7 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({
         {/* Rendered Image */}
         <img
           key={retryKey}
-          src={src}
+          src={imageSrcWithCacheBust}
           alt={alt}
           title={title || alt}
           loading="lazy"
@@ -257,7 +290,7 @@ export const DiagramViewer: React.FC<DiagramViewerProps> = ({
               }}
             >
               <img
-                src={src}
+                src={imageSrcWithCacheBust}
                 alt={alt}
                 className="max-h-[75vh] max-w-[85vw] object-contain select-none"
                 style={{ imageRendering: 'auto' }}

@@ -10,6 +10,18 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  outputFileTracingExcludes: {
+    '*': [
+      'tests/**',
+      'scripts/**',
+      '**/*.test.ts',
+      '**/*.test.tsx',
+      'node_modules/@swc/**',
+      'node_modules/esbuild/**',
+      'node_modules/vitest/**',
+      'node_modules/typescript/**',
+    ],
+  },
   async rewrites() {
     return [
       {

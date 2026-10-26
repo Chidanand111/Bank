@@ -1,0 +1,14 @@
+# Ignore test files and test runners
+tests/
+vitest.config.mts
+
+# Ignore development verify scripts
+scripts/
+
+# Ignore documentation and markdown files (except README)
+*.md
+!README.md
+
+# Ignore temporary and scratch directories
+scratch/
+.system_generated/

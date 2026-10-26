@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { NextRequest } from 'next/server';
 
 // Mock Next.js cache and headers
 vi.mock('next/cache', () => ({
@@ -430,4 +431,57 @@ describe('Phase 2: Exam Diagram Readability & Format-Aware Image Processing', ()
       expect(res.question?.imageUrl?.startsWith('data:image/')).toBe(false);
     });
   });
+
+  describe('8. Resilient Cross-Batch Media Serving & Diagram Recovery', () => {
+    it('successfully recovers and serves a diagram located in an alternate batch directory', async () => {
+      const { GET } = await import('@/app/api/media/[...path]/route');
+      const { memoryMediaCache } = await import('@/lib/storage/mediaStorage');
+
+      // 1. Setup a test batch directory with a dummy image file
+      const sourceBatchId = `test-src-batch-${Date.now()}`;
+      const sourceDir = path.join(process.cwd(), 'public', 'uploads', 'questions', sourceBatchId);
+      fs.mkdirSync(sourceDir, { recursive: true });
+
+      const testImageName = `recovery_diagram_${Date.now()}.png`;
+      const sourceFilePath = path.join(sourceDir, testImageName);
+      const dummyPngBytes = Buffer.from([
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+        0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+      ]);
+      fs.writeFileSync(sourceFilePath, dummyPngBytes);
+
+      try {
+        // 2. Request the image pointing to a DIFFERENT, nonexistent batch ID
+        const nonexistentBatchId = `nonexistent-batch-${Date.now()}`;
+        const req = new NextRequest(`http://localhost:3000/api/media/questions/${nonexistentBatchId}/${testImageName}`);
+        const res = await GET(req, {
+          params: Promise.resolve({
+            path: ['questions', nonexistentBatchId, testImageName],
+          }),
+        });
+
+        // 3. Verify it was successfully resolved, served with 200, and cached in memory
+        expect(res.status).toBe(200);
+        expect(res.headers.get('Content-Type')).toBe('image/png');
+
+        const cached = memoryMediaCache.get(`/uploads/questions/${nonexistentBatchId}/${testImageName}`);
+        expect(cached).toBeDefined();
+        expect(cached?.mimeType).toBe('image/png');
+      } finally {
+        fs.rmSync(sourceDir, { recursive: true, force: true });
+      }
+    });
+
+    it('rejects path traversal attempts with 403 Forbidden', async () => {
+      const { GET } = await import('@/app/api/media/[...path]/route');
+      const req = new NextRequest('http://localhost:3000/api/media/questions/../../etc/passwd');
+      const res = await GET(req, {
+        params: Promise.resolve({
+          path: ['questions', '..', '..', 'etc', 'passwd'],
+        }),
+      });
+      expect(res.status).toBe(403);
+    });
+  });
 });
+
