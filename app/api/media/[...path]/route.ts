@@ -22,19 +22,19 @@ function isSafeSubpath(parent: string, child: string): boolean {
 
 function searchFileInDirectories(targetFilename: string, searchRoots: string[]): string | null {
   for (const sDir of searchRoots) {
-    if (!fs.existsSync(sDir)) continue;
+    if (!fs.existsSync(/*turbopackIgnore: true*/ sDir)) continue;
     try {
       // 1. Direct check in directory
       const directCand = path.join(sDir, targetFilename);
-      if (fs.existsSync(directCand) && fs.statSync(directCand).isFile()) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ directCand) && fs.statSync(/*turbopackIgnore: true*/ directCand).isFile()) {
         return directCand;
       }
       // 2. Search batch subdirectories
-      const entries = fs.readdirSync(sDir, { withFileTypes: true });
+      const entries = fs.readdirSync(/*turbopackIgnore: true*/ sDir, { withFileTypes: true });
       for (const entry of entries) {
         if (entry.isDirectory()) {
           const subCand = path.join(sDir, entry.name, targetFilename);
-          if (fs.existsSync(subCand) && fs.statSync(subCand).isFile()) {
+          if (fs.existsSync(/*turbopackIgnore: true*/ subCand) && fs.statSync(/*turbopackIgnore: true*/ subCand).isFile()) {
             return subCand;
           }
         }
@@ -87,9 +87,9 @@ export async function GET(
     let fullPath = path.resolve(basePath, relativePath);
 
     // 3. Fallback to OS tmpdir (for serverless environments where public/uploads was read-only)
-    if (!fs.existsSync(fullPath)) {
+    if (!fs.existsSync(/*turbopackIgnore: true*/ fullPath)) {
       const tmpFullPath = path.resolve(tmpBasePath, relativePath);
-      if (fs.existsSync(tmpFullPath)) {
+      if (fs.existsSync(/*turbopackIgnore: true*/ tmpFullPath)) {
         fullPath = tmpFullPath;
       }
     }
@@ -97,7 +97,7 @@ export async function GET(
     // 4. Resilient cross-batch fallback search
     // If the image was uploaded under an earlier batch folder or batch ID was regenerated,
     // search across all subdirectories under public/uploads and tmpdir.
-    if (!fs.existsSync(fullPath)) {
+    if (!fs.existsSync(/*turbopackIgnore: true*/ fullPath)) {
       const targetFilename = pathSegments[pathSegments.length - 1];
       const category = pathSegments[0] || 'questions';
 
@@ -120,7 +120,7 @@ export async function GET(
       return new NextResponse('Forbidden', { status: 403 });
     }
 
-    const stat = fs.statSync(fullPath);
+    const stat = fs.statSync(/*turbopackIgnore: true*/ fullPath);
     if (!stat.isFile()) {
       return new NextResponse('Not Found', { status: 404 });
     }
@@ -128,7 +128,7 @@ export async function GET(
     const ext = path.extname(fullPath).toLowerCase();
     const contentType = MIME_MAP[ext] || 'application/octet-stream';
 
-    const buffer = fs.readFileSync(fullPath);
+    const buffer = fs.readFileSync(/*turbopackIgnore: true*/ fullPath);
 
     // Always cache resolved file in memory for subsequent sub-millisecond retrieval
     memoryMediaCache.set(relativeUrl, { buffer, mimeType: contentType });

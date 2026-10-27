@@ -1,14 +1,21 @@
-# Ignore test files and test runners
-tests/
+# Ensure application routes and UI components are never ignored
+!/app/
+!/app/**
+!/components/
+!/components/**
+
+# Ignore test runner files at repository root only
+/tests/
 vitest.config.mts
 
-# Ignore development verify scripts
-scripts/
+# Ignore development verify scripts at root
+/scripts/
 
-# Ignore documentation and markdown files (except README)
-*.md
-!README.md
+# Ignore root documentation files (except README)
+/*.md
+!/README.md
 
 # Ignore temporary and scratch directories
-scratch/
-.system_generated/
+/scratch/
+/.system_generated/
+
